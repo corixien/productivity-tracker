@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Productivity Tracker</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div id="auth-screen" class="screen active">
+        <div class="auth-container">
+            <div class="auth-card">
+                <h1 data-i18n="appTitle">Productivity Tracker</h1>
+                <p data-i18n="authSubtitle">Sign in with your username to start tracking</p>
+                <form id="auth-form">
+                    <input type="text" id="auth-username" required placeholder="Username" data-i18n-placeholder="usernamePlaceholder">
+                    <input type="password" id="auth-password" required placeholder="Password" data-i18n-placeholder="passwordPlaceholder">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="auth-remember" checked>
+                        <span data-i18n="rememberMe">Remember me</span>
+                    </label>
+                    <button type="submit" data-i18n="signIn">Sign In</button>
+                    <button type="button" id="auth-toggle" class="auth-toggle" data-i18n="register">Register</button>
+                </form>
+                <p id="auth-error" class="error-msg"></p>
+            </div>
+        </div>
+    </div>
+
+    <div id="app-screen" class="screen">
+        <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Toggle menu">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+        </button>
+
+        <nav id="sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <h2 data-i18n="appTitle">Productivity Tracker</h2>
+            </div>
+            <ul class="sidebar-nav">
+                <li class="nav-item active" data-section="main">
+                    <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="14" width="7" height="7"></rect>
+                        <rect x="3" y="14" width="7" height="7"></rect>
+                    </svg>
+                    <span data-i18n="navMain">Tasks</span>
+                </li>
+                <li class="nav-item" data-section="leaderboard">
+                    <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M8 21h8M12 17v4M7 4h10l-1 9H8L7 4zM5 4h14"></path>
+                    </svg>
+                    <span data-i18n="navLeaderboard">Leaderboard</span>
+                </li>
+                <li class="nav-item" data-section="settings">
+                    <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M12 1v6m0 6v6m4.22-10.22l4.24-4.24M6.34 6.34L2.1 2.1m17.8 17.8l-4.24-4.24M6.34 17.66l-4.24 4.24M23 12h-6m-6 0H1m20.07-4.93l-4.24 4.24M6.34 6.34l-4.24-4.24"></path>
+                    </svg>
+                    <span data-i18n="navSettings">Settings</span>
+                </li>
+            </ul>
+            <div class="sidebar-footer">
+                <p data-i18n="builtWith">Built with Kilo Code</p>
+                <p data-i18n="mainContributor">Main contributor: Mateo Rettenberger</p>
+            </div>
+        </nav>
+
+        <main id="main-content">
+            <section id="section-main" class="content-section active">
+                <div class="rank-display">
+                    <div class="rank-badge-wrapper">
+                        <div class="rank-badge" id="rank-badge" data-rank="Newcomer">
+                            <span class="rank-icon">⭐</span>
+                            <span class="rank-label">Newcomer</span>
+                            <span class="level-info" id="level-info">Level 0</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="xp-container">
+                    <div class="xp-label">
+                        <span data-i18n="xpProgress">XP Progress</span>
+                        <span id="xp-text">0 / 100 XP</span>
+                    </div>
+                    <div class="xp-bar">
+                        <div class="xp-fill" id="xp-fill" style="width: 0%"></div>
+                    </div>
+                </div>
+                <button id="add-task-btn" class="primary-btn" data-i18n="addTask">Add Task</button>
+                <div class="task-lists">
+                    <div class="task-column">
+                        <h3 data-i18n="pendingTasks">Pending Tasks</h3>
+                        <ul id="pending-list" class="task-list"></ul>
+                    </div>
+                    <div class="task-column">
+                        <h3 data-i18n="completedTasks">Completed Tasks</h3>
+                        <ul id="completed-list" class="task-list"></ul>
+                    </div>
+                </div>
+            </section>
+
+            <section id="section-leaderboard" class="content-section">
+                <div class="leaderboard-header">
+                    <h2 data-i18n="leaderboardTitle">Leaderboard</h2>
+                    <button id="add-friend-btn" class="secondary-btn" data-i18n="addFriend">+ Add Friend</button>
+                </div>
+
+                <div id="add-friend-modal" class="modal">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3 data-i18n="addFriend">Add Friend</h3>
+                            <button class="modal-close" id="close-friend-modal">&times;</button>
+                        </div>
+                        <form id="friend-form">
+                            <div class="form-group">
+                                <label for="friend-username" data-i18n="friendUsername">Username</label>
+                                <input type="text" id="friend-username" required placeholder="Username" data-i18n-placeholder="friendUsernamePlaceholder">
+                            </div>
+                            <div class="modal-buttons">
+                                <button type="button" id="cancel-friend-btn" class="secondary-btn" data-i18n="cancel">Cancel</button>
+                                <button type="submit" class="primary-btn" data-i18n="add">Add Friend</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table class="leaderboard-table">
+                        <thead>
+                            <tr>
+                                <th data-i18n="colRank">Rank</th>
+                                <th data-i18n="colUser">User</th>
+                                <th data-i18n="colXP">XP</th>
+                                <th data-i18n="colTasks">Tasks</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaderboard-body"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="section-settings" class="content-section">
+                <div class="settings-username-display" id="settings-username-display"></div>
+                <h2 data-i18n="settingsTitle">Settings</h2>
+                <div class="settings-group">
+                    <label data-i18n="changeUsername">Change Username</label>
+                    <div class="settings-input-group">
+                        <input type="text" id="settings-new-username" placeholder="New username" data-i18n-placeholder="newUsernamePlaceholder">
+                        <button id="change-username-btn" class="primary-btn" data-i18n="save">Save</button>
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <label data-i18n="changePassword">Change Password</label>
+                    <div class="settings-input-group">
+                        <input type="password" id="settings-new-password" placeholder="New password" data-i18n-placeholder="newPasswordPlaceholder">
+                        <button id="change-password-btn" class="primary-btn" data-i18n="save">Save</button>
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <label data-i18n="profilePicture">Profile Picture</label>
+                    <div class="avatar-upload">
+                        <img id="current-avatar" src="" alt="Avatar" class="current-avatar" style="display:none;">
+                        <div id="avatar-placeholder" class="avatar-placeholder">👤</div>
+                        <input type="file" id="avatar-input" accept="image/*" style="display:none;">
+                        <button id="upload-avatar-btn" class="secondary-btn" data-i18n="uploadAvatar">Upload Avatar</button>
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <label data-i18n="language">Language</label>
+                    <select id="language-select">
+                        <option value="en">English</option>
+                        <option value="de">Deutsch</option>
+                    </select>
+                </div>
+                <div class="settings-group">
+                    <label data-i18n="credits">Credits</label>
+                    <p class="credits-text" data-i18n="creditsText">Built with Kilo Code. Main contributor: Mateo Rettenberger.</p>
+                </div>
+                <button id="sign-out-btn" class="danger-btn" data-i18n="signOut">Sign Out</button>
+            </section>
+        </main>
+    </div>
+
+    <div id="add-task-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 data-i18n="addTask">Add Task</h3>
+                <button class="modal-close" id="close-task-modal">&times;</button>
+            </div>
+            
+            <div id="ai-task-section">
+                <div class="form-group">
+                    <label for="ai-task-input" data-i18n="describeTask">Describe your task</label>
+                    <textarea id="ai-task-input" rows="3" data-i18n-placeholder="aiTaskPlaceholder"></textarea>
+                </div>
+                <div class="ai-buttons">
+                    <button type="button" id="ai-submit-btn" class="primary-btn" data-i18n="aiSubmit">Let AI Rate It</button>
+                    <button type="button" id="ai-fallback-btn" class="secondary-btn" data-i18n="fillManually">Fill in manually</button>
+                </div>
+            </div>
+            
+            <div id="ai-loading" class="ai-loading" style="display:none;">
+                <div class="spinner"></div>
+                <p data-i18n="aiRating">AI is rating your task...</p>
+            </div>
+            
+            <div id="manual-fallback-section" style="display:none;">
+                <button type="button" id="back-to-ai-btn" class="secondary-btn" data-i18n="backToAI">Back to AI</button>
+                <form id="task-form">
+                    <div class="form-group">
+                        <label for="task-name" data-i18n="taskName">Task Name</label>
+                        <input type="text" id="task-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="task-duration" data-i18n="duration">Duration (minutes)</label>
+                        <input type="number" id="task-duration" min="1" max="1440" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="task-hardness" data-i18n="hardness">Hardness (1-10)</label>
+                        <input type="range" id="task-hardness" min="1" max="10" value="5" class="slider">
+                        <span id="hardness-value" class="slider-value">5</span>
+                    </div>
+                    <div class="form-group">
+                        <label data-i18n="xpPreview">XP Preview</label>
+                        <span id="xp-preview" class="xp-preview-value">25 XP</span>
+                    </div>
+                    <button type="submit" class="primary-btn" data-i18n="createTask">Create Task</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="overlay" class="overlay"></div>
+
+    <script>
+        window.addEventListener('error', function(e) {
+            if (e.target.tagName === 'SCRIPT') {
+                console.error('Script load error:', e.target.src || 'inline script');
+            }
+        });
+
+        window.addEventListener('unhandledrejection', function(e) {
+            console.error('Unhandled promise rejection:', e.reason);
+        });
+
+        setTimeout(function() {
+            if (!window.app) {
+                console.error('app.js did not load. Check module imports.');
+            }
+        }, 2000);
+    </script>
+
+    <script type="module" src="js/i18n.js?v=4"></script>
+    <script type="module" src="js/firebase.js?v=4"></script>
+    <script type="module" src="js/auth.js?v=4"></script>
+    <script type="module" src="js/tasks.js?v=4"></script>
+    <script type="module" src="js/leaderboard.js?v=4"></script>
+    <script type="module" src="js/settings.js?v=4"></script>
+    <script type="module" src="js/ui.js?v=4"></script>
+    <script type="module" src="js/ai-service.js?v=4"></script>
+    <script type="module" src="js/app.js?v=4"></script>
+</body>
+</html>
