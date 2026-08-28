@@ -1,9 +1,16 @@
 import { api } from './firebase.js';
 import { t } from './i18n.js';
 
-function calculateXP(duration, hardness) {
-    const multiplier = Math.ceil(hardness / 2);
-    return duration * multiplier;
+function calculateXP(duration, hardness, taskSize, usefulness) {
+    const sizeValue = {
+        mini: 5,
+        small: 10,
+        medium: 20,
+        big: 40,
+        extreme: 60
+    }[taskSize] || 20;
+    
+    return Math.round(sizeValue * (hardness / 10 + usefulness / 10) * duration / 10);
 }
 
 const RANK_THRESHOLDS = [
@@ -38,8 +45,8 @@ function getProgressPercent(xp) {
     return Math.min(100, Math.max(0, (progress / range) * 100));
 }
 
-async function addTask(userEmail, name, duration, hardness) {
-    return api.createTask(userEmail, name, duration, hardness);
+async function addTask(userEmail, name, duration, hardness, taskSize, usefulness, category) {
+    return api.createTask(userEmail, name, duration, hardness, taskSize, usefulness, category);
 }
 
 async function completeTask(userEmail, taskId) {
@@ -94,6 +101,8 @@ function renderTasks(pendingTasks, completedTasks) {
                 <div class="task-meta">
                     <span>${t('duration')}: ${task.duration} min</span>
                     <span>${t('hardness')}: ${task.hardness}/10</span>
+                    <span>${t('size')}: ${task.taskSize || 'medium'}</span>
+                    <span>${t('usefulness')}: ${task.usefulness || 5}/10</span>
                 </div>
                 <div class="task-actions">
                     <button class="btn-complete" onclick="app.completeTask('${task.id}')">${t('taskCompleted')}</button>
@@ -118,6 +127,8 @@ function renderTasks(pendingTasks, completedTasks) {
                 <div class="task-meta">
                     <span>${t('duration')}: ${task.duration} min</span>
                     <span>${t('hardness')}: ${task.hardness}/10</span>
+                    <span>${t('size')}: ${task.taskSize || 'medium'}</span>
+                    <span>${t('usefulness')}: ${task.usefulness || 5}/10</span>
                 </div>
                 <div class="task-actions">
                     <button class="btn-delete" onclick="app.deleteTask('${task.id}')">${t('delete')}</button>

@@ -1004,3 +1004,27 @@ input:-moz-autofill:focus {
     -moz-text-fill-color: #ffffff !important;
     caret-color: #ffffff !important;
 }
+
+/* Goals textarea */
+.goals-textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--bg-tertiary);
+    border-radius: var(--radius);
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 150px;
+}
+
+.goals-textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(74, 144, 217, 0.2);
+}
+
+#save-goals-btn {
+    margin-top: 12px;
+}

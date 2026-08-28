@@ -11,7 +11,7 @@ const DATA_DIR = path.join(__dirname, 'data');
 const DB_PATH = path.join(DATA_DIR, 'app.db');
 const AVATARS_DIR = path.join(__dirname, 'avatars');
 const aiRatingConfig = require('./js/ai-rating-config');
-const GROQ_API_KEY = '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';
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
 app.use(cors());
 app.use(express.json());
@@ -37,6 +37,7 @@ db.serialize(() => {
         friends TEXT DEFAULT '[]',
         language TEXT DEFAULT 'en',
         avatar TEXT,
+        goals TEXT DEFAULT '',
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )`);
 
@@ -47,6 +48,9 @@ db.serialize(() => {
         duration INTEGER NOT NULL,
         hardness INTEGER NOT NULL,
         xp INTEGER NOT NULL,
+        task_size TEXT DEFAULT 'medium',
+        usefulness INTEGER DEFAULT 5,
+        category TEXT DEFAULT 'other',
         completed INTEGER DEFAULT 0,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         completed_at TEXT
@@ -90,6 +94,11 @@ function createUser(username, password) {
             }
         );
     });
+}
+
+function calculateXP(duration, hardness, taskSize, usefulness) {
+    const sizeValue = aiRatingConfig.taskSizes[taskSize] || 20;
+    return Math.round(sizeValue * (hardness / 10 + usefulness / 10) * duration / 10);
 }
 
 app.post('/api/auth/register', async (req, res) => {
@@ -162,7 +171,7 @@ app.put('/api/users/:username', async (req, res) => {
             return res.status(404).json({ success: false, error: 'User not found' });
         }
 
-        const allowedFields = ['xp', 'level', 'rank', 'friends', 'language', 'avatar'];
+        const allowedFields = ['xp', 'level', 'rank', 'friends', 'language', 'avatar', 'goals'];
         const updates = {};
         for (const field of allowedFields) {
             if (req.body[field] !== undefined) {
@@ -233,7 +242,7 @@ app.get('/api/tasks', async (req, res) => {
 
 app.post('/api/tasks', async (req, res) => {
     try {
-        const { userId, name, duration, hardness } = req.body;
+        const { userId, name, duration, hardness, taskSize, usefulness, category } = req.body;
         if (!userId || !name || !duration || !hardness) {
             return res.status(400).json({ error: 'Missing fields' });
         }
@@ -244,7 +253,10 @@ app.post('/api/tasks', async (req, res) => {
             name,
             duration: parseInt(duration),
             hardness: parseInt(hardness),
-            xp: calculateXP(duration, hardness),
+            xp: calculateXP(duration, hardness, taskSize, usefulness),
+            taskSize: taskSize || 'medium',
+            usefulness: usefulness || 5,
+            category: category || 'other',
             completed: 0,
             createdAt: new Date().toISOString(),
             completedAt: null
@@ -252,8 +264,8 @@ app.post('/api/tasks', async (req, res) => {
 
         await new Promise((resolve, reject) => {
             db.run(
-                'INSERT INTO tasks (id, user_id, name, duration, hardness, xp, completed, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                [task.id, task.userId, task.name, task.duration, task.hardness, task.xp, task.completed, task.createdAt],
+                'INSERT INTO tasks (id, user_id, name, duration, hardness, xp, task_size, usefulness, category, completed, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [task.id, task.userId, task.name, task.duration, task.hardness, task.xp, task.taskSize, task.usefulness, task.category, task.completed, task.createdAt],
                 (err) => {
                     if (err) reject(err);
                     else resolve();
@@ -388,17 +400,15 @@ app.post('/api/friends', async (req, res) => {
     }
 });
 
-function calculateXP(duration, hardness) {
-    const multiplier = Math.ceil(hardness / 2);
-    return duration * multiplier;
-}
-
 app.post('/api/ai/rate', async (req, res) => {
     try {
-        const { description } = req.body;
+        const { description, goals } = req.body;
         if (!description || !description.trim()) {
             return res.status(400).json({ error: 'Description is required' });
         }
+
+        const goalsText = goals ? `\n\nUser's long-term goals:\n${goals}` : '';
+        const userMessage = `${description.trim()}${goalsText}`;
 
         const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
@@ -410,7 +420,7 @@ app.post('/api/ai/rate', async (req, res) => {
                 model: 'groq/compound',
                 messages: [
                     { role: 'system', content: aiRatingConfig.systemPrompt },
-                    { role: 'user', content: description.trim() }
+                    { role: 'user', content: userMessage }
                 ],
                 temperature: 0.1,
                 max_tokens: 200
@@ -447,11 +457,19 @@ app.post('/api/ai/rate', async (req, res) => {
             return res.status(500).json({ error: 'Incomplete task data from AI' });
         }
 
+        const taskSize = taskData.taskSize || 'medium';
+        const hardness = Math.max(1, Math.min(10, parseInt(taskData.hardness) || 5));
+        const usefulness = Math.max(1, Math.min(10, parseInt(taskData.usefulness) || 5));
+        const duration = Math.max(1, Math.min(1440, parseInt(taskData.duration) || 30));
+
         res.json({
             name: String(taskData.name).slice(0, 100),
-            duration: Math.max(1, Math.min(1440, parseInt(taskData.duration) || 30)),
-            hardness: Math.max(1, Math.min(10, parseInt(taskData.hardness) || 5)),
-            category: taskData.category || 'other'
+            duration,
+            hardness,
+            taskSize,
+            usefulness,
+            category: taskData.category || 'other',
+            xp: calculateXP(duration, hardness, taskSize, usefulness)
         });
     } catch (error) {
         console.error('AI rating error:', error);

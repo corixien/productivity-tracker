@@ -44,7 +44,7 @@ function initSettings() {
     if (username && currentAvatar) {
         api.getUser(username).then(user => {
             if (user.avatar) {
-                currentAvatar.src = user.avatar;
+                currentAvatar.src = user.avatar + '?t=' + Date.now();
                 currentAvatar.style.display = 'block';
                 if (avatarPlaceholder) avatarPlaceholder.style.display = 'none';
             }
@@ -69,7 +69,7 @@ function initSettings() {
                 const result = await uploadAvatar(username, base64);
                 if (result.success) {
                     if (currentAvatar && avatarPlaceholder) {
-                        currentAvatar.src = result.avatar;
+                        currentAvatar.src = result.avatar + '?t=' + Date.now();
                         currentAvatar.style.display = 'block';
                         avatarPlaceholder.style.display = 'none';
                     }
@@ -78,6 +78,15 @@ function initSettings() {
                 }
             };
             reader.readAsDataURL(file);
+        });
+    }
+    
+    const goalsTextarea = document.getElementById('settings-goals');
+    if (goalsTextarea && username) {
+        api.getUser(username).then(user => {
+            if (user.goals) {
+                goalsTextarea.value = user.goals;
+            }
         });
     }
 }
@@ -106,4 +115,10 @@ async function changeUsername(oldUsername, newUsername) {
     return { success: true, newUsername };
 }
 
-export { changePassword, changeUsername, uploadAvatar, initSettings };
+async function saveGoals(username) {
+    const goals = document.getElementById('settings-goals').value.trim();
+    const result = await api.updateUser(username, { goals });
+    return result;
+}
+
+export { changePassword, changeUsername, uploadAvatar, saveGoals, initSettings };

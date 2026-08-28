@@ -1,6 +1,6 @@
 const AI_RATE_TIMEOUT = 10000;
 
-async function rateTaskWithAI(taskDescription) {
+async function rateTaskWithAI(taskDescription, goals) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), AI_RATE_TIMEOUT);
 
@@ -13,7 +13,7 @@ async function rateTaskWithAI(taskDescription) {
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ description: taskDescription }),
+            body: JSON.stringify({ description: taskDescription, goals }),
             signal: controller.signal
         });
         clearTimeout(timeoutId);

@@ -2,7 +2,7 @@ import { register, signIn, signOut, restoreSession, subscribeToUser, getCurrentU
 import { api } from './firebase.js';
 import { calculateXP, getRankName, getProgressPercent, addTask, completeTask as completeTaskOp, deleteTask as deleteTaskOp, renderTasks, updateXPDisplay } from './tasks.js';
 import { addFriend, loadLeaderboard, renderLeaderboard } from './leaderboard.js';
-import { changePassword, changeUsername, uploadAvatar, initSettings } from './settings.js';
+import { changePassword, changeUsername, uploadAvatar, saveGoals, initSettings } from './settings.js';
 import { initUI, showSection, closeModals } from './ui.js';
 import { setLanguage, getCurrentLang, t } from './i18n.js';
 import { rateTaskWithAI } from './ai-service.js';
@@ -51,6 +51,9 @@ function init() {
         
         const changeUsernameBtn = document.getElementById('change-username-btn');
         if (changeUsernameBtn) changeUsernameBtn.addEventListener('click', handleChangeUsername);
+        
+        const saveGoalsBtn = document.getElementById('save-goals-btn');
+        if (saveGoalsBtn) saveGoalsBtn.addEventListener('click', handleSaveGoals);
         
         const changePasswordBtn = document.getElementById('change-password-btn');
         if (changePasswordBtn) changePasswordBtn.addEventListener('click', handleChangePassword);
@@ -189,7 +192,7 @@ async function handleAddTask(e) {
     
     if (!name || !duration || !hardness) return;
     
-    await addTask(username, name, duration, hardness);
+    await addTask(username, name, duration, hardness, 'medium', 5, 'other');
     closeModals();
     document.getElementById('task-form').reset();
     document.getElementById('hardness-value').textContent = '5';
@@ -263,6 +266,16 @@ async function handleChangePassword() {
     }
 }
 
+async function handleSaveGoals() {
+    const username = getCurrentUser();
+    if (!username) return;
+    
+    const result = await saveGoals(username);
+    if (result) {
+        alert(t('goalsSaved'));
+    }
+}
+
 async function handleChangeUsername() {
     const username = getCurrentUser();
     if (!username) return;
@@ -310,8 +323,9 @@ async function handleAITaskSubmit() {
     showLoadingSection();
     
     try {
-        const taskData = await rateTaskWithAI(description);
-        await addTask(username, taskData.name, taskData.duration, taskData.hardness);
+        const goals = userData?.goals || '';
+        const taskData = await rateTaskWithAI(description, goals);
+        await addTask(username, taskData.name, taskData.duration, taskData.hardness, taskData.taskSize, taskData.usefulness, taskData.category);
         closeModals();
         document.getElementById('ai-task-input').value = '';
         refreshTasks(username);
