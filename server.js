@@ -55,6 +55,12 @@ db.serialize(() => {
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         completed_at TEXT
     )`);
+
+    db.run(`ALTER TABLE tasks ADD COLUMN task_size TEXT DEFAULT 'medium'`, (err) => { if (err && !err.message.includes('duplicate column')) console.log('task_size column:', err.message); });
+    db.run(`ALTER TABLE tasks ADD COLUMN usefulness INTEGER DEFAULT 5`, (err) => { if (err && !err.message.includes('duplicate column')) console.log('usefulness column:', err.message); });
+    db.run(`ALTER TABLE tasks ADD COLUMN category TEXT DEFAULT 'other'`, (err) => { if (err && !err.message.includes('duplicate column')) console.log('category column:', err.message); });
+    
+    db.run(`ALTER TABLE users ADD COLUMN goals TEXT DEFAULT ''`, (err) => { if (err && !err.message.includes('duplicate column')) console.log('goals column:', err.message); });
 });
 
 function hashPassword(password) {
@@ -67,7 +73,11 @@ function getUserByUsername(username) {
             if (err) reject(err);
             else if (!row) resolve(null);
             else {
-                row.friends = JSON.parse(row.friends || '[]');
+                try {
+                    row.friends = JSON.parse(row.friends || '[]');
+                } catch (e) {
+                    row.friends = [];
+                }
                 resolve(row);
             }
         });
@@ -226,6 +236,57 @@ app.post('/api/users/:username/avatar', async (req, res) => {
         res.json({ success: true, avatar: `/avatars/${req.params.username}.png` });
     } catch (error) {
         res.status(500).json({ success: false, error: 'Failed to upload avatar' });
+    }
+});
+
+app.post('/api/users/:username/change-username', async (req, res) => {
+    try {
+        const { newUsername } = req.body;
+        if (!newUsername || newUsername.length < 3) {
+            return res.status(400).json({ success: false, error: 'Username must be at least 3 characters' });
+        }
+
+        const oldUser = await getUserByUsername(req.params.username);
+        if (!oldUser) {
+            return res.status(404).json({ success: false, error: 'User not found' });
+        }
+
+        const existingUser = await getUserByUsername(newUsername);
+        if (existingUser && existingUser.username.toLowerCase() !== req.params.username.toLowerCase()) {
+            return res.status(400).json({ success: false, error: 'Username already taken' });
+        }
+
+        await new Promise((resolve, reject) => {
+            db.run('INSERT OR REPLACE INTO users (username, password_hash, xp, level, rank, friends, language, avatar, goals, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [newUsername, oldUser.password_hash, oldUser.xp, oldUser.level, oldUser.rank, JSON.stringify(oldUser.friends || []), oldUser.language, oldUser.avatar, oldUser.goals || '', oldUser.created_at],
+                (err) => {
+                    if (err) reject(err);
+                    else resolve();
+                }
+            );
+        });
+
+        const tasks = await getUserTasks(req.params.username);
+        for (const task of tasks) {
+            await new Promise((resolve, reject) => {
+                db.run('UPDATE tasks SET user_id = ? WHERE id = ?', [newUsername, task.id], (err) => {
+                    if (err) reject(err);
+                    else resolve();
+                });
+            });
+        }
+
+        await new Promise((resolve, reject) => {
+            db.run('DELETE FROM users WHERE username = ?', [req.params.username], (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+
+        res.json({ success: true, newUsername });
+    } catch (error) {
+        console.error('Change username error:', error);
+        res.status(500).json({ success: false, error: 'Failed to change username' });
     }
 });
 

@@ -189,13 +189,18 @@ async function handleAddTask(e) {
     const name = document.getElementById('task-name').value.trim();
     const duration = document.getElementById('task-duration').value;
     const hardness = document.getElementById('task-hardness').value;
+    const taskSize = document.getElementById('task-size')?.value || 'medium';
+    const usefulness = document.getElementById('task-usefulness')?.value || 5;
+    const category = 'other';
     
     if (!name || !duration || !hardness) return;
     
-    await addTask(username, name, duration, hardness, 'medium', 5, 'other');
+    await addTask(username, name, duration, hardness, taskSize, usefulness, category);
     closeModals();
     document.getElementById('task-form').reset();
     document.getElementById('hardness-value').textContent = '5';
+    document.getElementById('usefulness-value').textContent = '5';
+    document.getElementById('task-size').value = 'medium';
     document.getElementById('xp-preview').textContent = '25 XP';
     refreshTasks(username);
 }
@@ -252,17 +257,21 @@ async function handleChangePassword() {
     if (!username) return;
     
     const newPassword = document.getElementById('settings-new-password').value.trim();
-    if (!newPassword) {
+    if (!newPassword || newPassword.length < 4) {
         alert(t('invalidPassword'));
         return;
     }
     
-    const result = await changePassword(username, newPassword);
-    if (result.success) {
-        alert(t('passwordChanged'));
-        document.getElementById('settings-new-password').value = '';
-    } else {
-        alert(result.error);
+    try {
+        const result = await changePassword(username, newPassword);
+        if (result.success) {
+            alert(t('passwordChanged'));
+            document.getElementById('settings-new-password').value = '';
+        } else {
+            alert(result.error || 'Failed to change password');
+        }
+    } catch (error) {
+        alert(error.message || 'Failed to change password');
     }
 }
 
@@ -286,12 +295,18 @@ async function handleChangeUsername() {
         return;
     }
     
-    const result = await changeUsername(username, newUsername);
-    if (result.success) {
-        alert(t('usernameChanged'));
-        signOut();
-    } else {
-        alert(result.error);
+    try {
+        const result = await changeUsername(username, newUsername);
+        if (result.success) {
+            localStorage.setItem('productivity_tracker_user', newUsername);
+            sessionStorage.setItem('productivity_tracker_user', newUsername);
+            alert(t('usernameChanged'));
+            signOut();
+        } else {
+            alert(result.error);
+        }
+    } catch (error) {
+        alert(error.message || 'Failed to change username');
     }
 }
 

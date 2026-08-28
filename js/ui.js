@@ -62,13 +62,29 @@ function initUI() {
         });
         
         durationInput.addEventListener('input', updateXPPreview);
+        
+        const taskSize = document.getElementById('task-size');
+        if (taskSize) {
+            taskSize.addEventListener('change', updateXPPreview);
+        }
+        
+        const usefulnessSlider = document.getElementById('task-usefulness');
+        const usefulnessValue = document.getElementById('usefulness-value');
+        if (usefulnessSlider && usefulnessValue) {
+            usefulnessSlider.addEventListener('input', () => {
+                usefulnessValue.textContent = usefulnessSlider.value;
+                updateXPPreview();
+            });
+        }
     }
 }
 
 function updateXPPreview() {
     const duration = parseInt(document.getElementById('task-duration').value) || 0;
     const hardness = parseInt(document.getElementById('task-hardness').value) || 1;
-    const xp = window.app.calculateXP ? window.app.calculateXP(duration, hardness) : 0;
+    const taskSize = document.getElementById('task-size')?.value || 'medium';
+    const usefulness = parseInt(document.getElementById('task-usefulness')?.value) || 5;
+    const xp = window.app.calculateXP ? window.app.calculateXP(duration, hardness, taskSize, usefulness) : 0;
     document.getElementById('xp-preview').textContent = `${xp} XP`;
 }
 

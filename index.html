@@ -229,6 +229,21 @@
                         <span id="hardness-value" class="slider-value">5</span>
                     </div>
                     <div class="form-group">
+                        <label for="task-size" data-i18n="taskSize">Task Size</label>
+                        <select id="task-size" class="slider">
+                            <option value="mini">Mini (5 XP)</option>
+                            <option value="small">Small (10 XP)</option>
+                            <option value="medium" selected>Medium (20 XP)</option>
+                            <option value="big">Big (40 XP)</option>
+                            <option value="extreme">Extreme (60 XP)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="task-usefulness" data-i18n="usefulness">Usefulness (1-10)</label>
+                        <input type="range" id="task-usefulness" min="1" max="10" value="5" class="slider">
+                        <span id="usefulness-value" class="slider-value">5</span>
+                    </div>
+                    <div class="form-group">
                         <label data-i18n="xpPreview">XP Preview</label>
                         <span id="xp-preview" class="xp-preview-value">25 XP</span>
                     </div>

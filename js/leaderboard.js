@@ -30,8 +30,9 @@ function renderLeaderboard(entries) {
     
     entries.forEach((entry, index) => {
         const tr = document.createElement('tr');
-        const avatarHtml = entry.avatar 
-            ? `<img src="${entry.avatar}" class="leaderboard-avatar" alt="avatar">` 
+        const avatarSrc = entry.avatar ? entry.avatar + '?t=' + Date.now() : null;
+        const avatarHtml = avatarSrc 
+            ? `<img src="${avatarSrc}" class="leaderboard-avatar" alt="avatar">` 
             : `<span class="leaderboard-avatar-placeholder">👤</span>`;
         
         tr.innerHTML = `

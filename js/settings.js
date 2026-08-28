@@ -1,4 +1,15 @@
 import { api } from './firebase.js';
+
+api.changeUsername = async (oldUsername, newUsername) => {
+    const response = await fetch(`/api/users/${encodeURIComponent(oldUsername)}/change-username`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newUsername })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to change username');
+    return data;
+};
 import { setLanguage, getCurrentLang } from './i18n.js';
 
 async function changePassword(username, newPassword) {
@@ -101,18 +112,8 @@ async function changeUsername(oldUsername, newUsername) {
         return { success: false, error: 'Username already taken' };
     }
     
-    const userData = await api.getUser(oldUsername);
-    const tasks = await api.getTasks(oldUsername);
-    
-    await api.updateUser(newUsername, { ...userData, username: newUsername });
-    
-    for (const task of tasks) {
-        await api.updateTask(task.id, { userId: newUsername });
-    }
-    
-    await api.updateUser(oldUsername, { username: '__deleted__' });
-    
-    return { success: true, newUsername };
+    const result = await api.changeUsername(oldUsername, newUsername);
+    return result;
 }
 
 async function saveGoals(username) {
