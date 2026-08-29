@@ -1,0 +1,178 @@
+# Productivity Tracker - Project Overview
+
+## What is this?
+A web app for competing with friends on productivity. Users sign in, complete tasks to earn XP, level up through ranks, and compare on a leaderboard. Data syncs across devices. It's a gamified task management app.
+
+## Architecture
+- **Frontend**: Vanilla JavaScript (ES modules), CSS, single-page app in `index.html`
+- **Backend**: Express.js server (`server.js`) with SQLite database
+- **Data Storage**: SQLite (local) via `sqlite3` package
+- **AI Integration**: Groq API for AI-powered task rating (optional feature)
+- **Serving**: Express serves static files from project root; app runs on port 3000
+
+## Tech Stack
+- **Frontend**: HTML, CSS, Vanilla JS (no framework)
+- **Backend**: Node.js + Express
+- **Database**: SQLite3 (file-based, `data/app.db`)
+- **AI**: Groq API (compound model) for task rating
+- **Dependencies**: express, cors, sqlite3
+
+## File Structure
+
+```
+productivity-tracker/
+├── index.html              # Main SPA - single page with auth/app screens, modals
+├── server.js               # Express backend - all API routes + DB logic
+├── package.json            # Dependencies: express, cors, sqlite3
+├── README.md               # Original project README (mentions Firebase but that's legacy)
+├── css/
+│   └── styles.css          # All styling - dark theme, responsive, mobile-first
+├── js/
+│   ├── app.js              # Main app controller - initializes all modules, handles auth/tasks/friends
+│   ├── auth.js             # Session management - register, login, logout, remember me
+│   ├── firebase.js         # Re-exports api.js (legacy name, Firebase is no longer used)
+│   ├── api.js              # Frontend API client - all fetch calls to backend
+│   ├── tasks.js            # Task operations - CRUD, XP calculation, rank progression, rendering
+│   ├── leaderboard.js      # Leaderboard logic - load and render with avatars
+│   ├── settings.js         # Settings panel - username change, password, avatar, goals, language
+│   ├── ui.js               # UI utilities - sidebar, modals, navigation, swipe gestures
+│   ├── i18n.js             # Internationalization - English/German translations
+│   ├── ai-service.js       # AI task rating service - calls Groq API
+│   └── ai-rating-config.js # AI configuration - prompts, rules, categories, task sizes
+├── avatars/                # Uploaded user avatars stored as PNG files
+├── data/                   # SQLite database file (app.db)
+├── assets/                 # Static assets (icons, etc.)
+├── Badges/                 # Rank badge images
+└── firestore.rules         # Legacy Firebase rules (no longer used)
+```
+
+## Database Schema (SQLite)
+
+### users table
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| id | INTEGER | AUTO | Primary key |
+| username | TEXT | - | Unique username (login ID) |
+| password_hash | TEXT | - | SHA256 hashed password |
+| xp | INTEGER | 0 | Total experience points |
+| level | INTEGER | 0 | Current level (floor(xp/100)) |
+| rank | TEXT | 'Newcomer' | Current rank name |
+| friends | TEXT | '[]' | JSON array of {username, addedAt} |
+| language | TEXT | 'en' | UI language preference |
+| avatar | TEXT | NULL | Path to avatar PNG (/avatars/username.png) |
+| goals | TEXT | '' | User's 5-year goals text |
+| created_at | TEXT | CURRENT_TIMESTAMP | Account creation time |
+
+### tasks table
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| id | TEXT | - | Primary key (timestamp + random) |
+| user_id | TEXT | - | Owner's username |
+| name | TEXT | - | Task name |
+| duration | INTEGER | - | Duration in minutes |
+| hardness | INTEGER | - | Hardness 1-10 |
+| xp | INTEGER | - | Calculated XP reward |
+| task_size | TEXT | 'medium' | mini/small/medium/big/extreme |
+| usefulness | INTEGER | 5 | Usefulness 1-10 |
+| category | TEXT | 'other' | Task category |
+| completed | INTEGER | 0 | 0=pending, 1=completed |
+| created_at | TEXT | CURRENT_TIMESTAMP | Creation time |
+| completed_at | TEXT | NULL | Completion time |
+
+## API Routes
+
+### Auth
+- `POST /api/auth/register` - Register new user
+- `POST /api/auth/login` - Login user
+
+### Users
+- `GET /api/users/:username` - Get user data (no password_hash)
+- `PUT /api/users/:username` - Update user fields
+- `POST /api/users/:username/avatar` - Upload avatar (base64 PNG)
+- `POST /api/users/:username/change-username` - Change username (migrates all data)
+
+### Tasks
+- `GET /api/tasks?userId=X` - Get all tasks for user
+- `POST /api/tasks` - Create new task
+- `PUT /api/tasks/:id` - Update task (mark complete)
+- `DELETE /api/tasks/:id` - Delete task
+
+### Social
+- `GET /api/leaderboard?userId=X` - Get leaderboard (user + friends, sorted by XP)
+- `POST /api/friends` - Add friend by username
+
+### AI
+- `POST /api/ai/rate` - Rate a task with AI (Groq API)
+
+## Key Business Logic
+
+### XP Calculation
+```
+XP = taskSizeValue × ((hardness/10) + (usefulness/10)) × (duration/10)
+```
+Where taskSizeValue = {mini:5, small:10, medium:20, big:40, extreme:60}
+
+### Rank Progression
+- Newcomer: 0-99 XP
+- Bronze: 100-299 XP
+- Silver: 300-599 XP
+- Gold: 600-1199 XP
+- Platinum: 1200-2399 XP
+- Diamond: 2400-4999 XP
+- Master: 5000+ XP
+
+Level = floor(totalXP / 100)
+
+### Session Management
+- Uses localStorage for "remember me" persistence
+- Uses sessionStorage for session-only persistence
+- No server-side sessions - fully client-side auth state
+- Auth is username + password (SHA256 hash comparison)
+
+### AI Task Rating
+When a user describes a task, the AI (via Groq API) returns:
+- Task name (max 60 chars)
+- Duration in minutes
+- Hardness (1-10)
+- Category (deep-work, learning, exercise, creative, admin, social, other)
+- Task size (mini/small/medium/big/extreme)
+- Usefulness (1-10 based on alignment with user's goals)
+
+Timeout: 10 seconds. Falls back to manual form if AI fails.
+
+## Frontend Architecture
+- **SPA with sections**: Auth screen and App screen (with Tasks, Leaderboard, Settings sections)
+- **Module pattern**: ES modules with exports, window.app global for cross-module access
+- **i18n**: Simple translation object with `data-i18n` attributes
+- **State**: Client-side only - userData, currentTasks, currentUser
+- **Real-time**: No WebSockets - data reloads on actions
+
+## Important Notes for New Chat
+
+1. **No Firebase anymore**: The README still mentions Firebase/Firestore, but the current code uses SQLite via Express. `js/firebase.js` is a legacy name that just re-exports `api.js`.
+
+2. **Server required**: The app requires the Express server running (`node server.js`). It won't work as a static file alone because all data operations go through the API.
+
+3. **Environment variable**: `GROQ_API_KEY` must be set for AI features to work.
+
+4. **Avatar storage**: Avatars are stored as PNG files in the `avatars/` directory and served statically via Express at `/avatars/username.png`.
+
+5. **Leaderboard avatar bug (known issue)**: The leaderboard has an `onerror` handler that hides broken images and shows placeholders. Avatars sometimes show as placeholders due to race conditions or missing files. Debug logging is added in `js/leaderboard.js`.
+
+6. **Task size/usefulness**: These were added later and are stored in the DB but the XP formula uses them. The original README formula (duration × tiered multiplier) is outdated.
+
+7. **Username as primary identifier**: Usernames are used everywhere as the user ID. Changing username migrates all data (user record + all tasks).
+
+8. **Friends stored as JSON**: The friends list is a JSON string in the users table, not a separate table.
+
+9. **Password hashing**: SHA256 (not bcrypt) - simple hash for local use.
+
+10. **i18n**: Only English and German supported. Translations in `js/i18n.js`.
+
+## Recent Changes / Known Issues
+
+- Login was broken because `initSettings()` crashed before the auth form listener was attached. Fixed by adding null checks.
+- Leaderboard avatars have error handling but sometimes still show placeholders.
+- `data.json` exists but is unused (legacy from earlier versions).
+- `render.yaml` exists but is unused deployment config.
+- Server listens on `0.0.0.0` for LAN access.

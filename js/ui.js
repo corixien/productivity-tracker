@@ -84,7 +84,7 @@ function updateXPPreview() {
     const hardness = parseInt(document.getElementById('task-hardness').value) || 1;
     const taskSize = document.getElementById('task-size')?.value || 'medium';
     const usefulness = parseInt(document.getElementById('task-usefulness')?.value) || 5;
-    const xp = window.app.calculateXP ? window.app.calculateXP(duration, hardness, taskSize, usefulness) : 0;
+    const xp = (window.app && window.app.calculateXP) ? window.app.calculateXP(duration, hardness, taskSize, usefulness) : 0;
     document.getElementById('xp-preview').textContent = `${xp} XP`;
 }
 

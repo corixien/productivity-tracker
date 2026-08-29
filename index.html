@@ -12,6 +12,7 @@
             <div class="auth-card">
                 <h1 data-i18n="appTitle">Productivity Tracker</h1>
                 <p data-i18n="authSubtitle">Sign in with your username to start tracking</p>
+                    <p id="auth-mode" class="auth-mode">Sign In Mode</p>
                 <form id="auth-form">
                     <input type="text" id="auth-username" required placeholder="Username" data-i18n-placeholder="usernamePlaceholder">
                     <input type="password" id="auth-password" required placeholder="Password" data-i18n-placeholder="passwordPlaceholder">
@@ -165,7 +166,10 @@
                         <img id="current-avatar" src="" alt="Avatar" class="current-avatar" style="display:none;">
                         <div id="avatar-placeholder" class="avatar-placeholder">👤</div>
                         <input type="file" id="avatar-input" accept="image/*" style="display:none;">
-                        <button id="upload-avatar-btn" class="secondary-btn" data-i18n="uploadAvatar">Upload Avatar</button>
+                        <div class="avatar-buttons">
+                            <button id="upload-avatar-btn" class="secondary-btn" data-i18n="uploadAvatar">Upload Avatar</button>
+                            <button id="save-avatar-btn" class="primary-btn" data-i18n="saveAvatar" style="display:none;">Save Avatar</button>
+                        </div>
                     </div>
                 </div>
                 <div class="settings-group">

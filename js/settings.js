@@ -39,7 +39,7 @@ async function uploadAvatar(username, base64Data) {
 function initSettings() {
     const usernameDisplay = document.getElementById('settings-username-display');
     if (usernameDisplay) {
-        const username = window.app.getCurrentUser ? window.app.getCurrentUser() : '';
+        const username = (window.app && window.app.getCurrentUser) ? window.app.getCurrentUser() : '';
         usernameDisplay.textContent = username;
     }
     
@@ -50,7 +50,7 @@ function initSettings() {
     
     const currentAvatar = document.getElementById('current-avatar');
     const avatarPlaceholder = document.getElementById('avatar-placeholder');
-    const username = window.app.getCurrentUser ? window.app.getCurrentUser() : '';
+    const username = (window.app && window.app.getCurrentUser) ? window.app.getCurrentUser() : '';
     
     if (username && currentAvatar) {
         api.getUser(username).then(user => {
@@ -63,32 +63,57 @@ function initSettings() {
     }
     
     const uploadBtn = document.getElementById('upload-avatar-btn');
+    const saveAvatarBtn = document.getElementById('save-avatar-btn');
     const avatarInput = document.getElementById('avatar-input');
+    let selectedAvatarBase64 = null;
     
     if (uploadBtn && avatarInput) {
         uploadBtn.addEventListener('click', () => {
             avatarInput.click();
         });
         
-        avatarInput.addEventListener('change', async (e) => {
+        avatarInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
             
             const reader = new FileReader();
-            reader.onload = async (event) => {
-                const base64 = event.target.result.split(',')[1];
-                const result = await uploadAvatar(username, base64);
-                if (result.success) {
-                    if (currentAvatar && avatarPlaceholder) {
-                        currentAvatar.src = result.avatar + '?t=' + Date.now();
-                        currentAvatar.style.display = 'block';
-                        avatarPlaceholder.style.display = 'none';
-                    }
-                } else {
-                    alert(result.error || 'Failed to upload avatar');
+            reader.onload = (event) => {
+                selectedAvatarBase64 = event.target.result.split(',')[1];
+                if (currentAvatar && avatarPlaceholder) {
+                    currentAvatar.src = event.target.result;
+                    currentAvatar.style.display = 'block';
+                    avatarPlaceholder.style.display = 'none';
+                }
+                if (saveAvatarBtn) {
+                    saveAvatarBtn.style.display = 'inline-block';
                 }
             };
             reader.readAsDataURL(file);
+        });
+    }
+    
+    if (saveAvatarBtn) {
+        saveAvatarBtn.addEventListener('click', async () => {
+            if (!selectedAvatarBase64) {
+                alert('Please select an image first');
+                return;
+            }
+            
+            const result = await uploadAvatar(username, selectedAvatarBase64);
+            if (result.success) {
+                if (currentAvatar && avatarPlaceholder) {
+                    currentAvatar.src = result.avatar + '?t=' + Date.now();
+                    currentAvatar.style.display = 'block';
+                    avatarPlaceholder.style.display = 'none';
+                }
+                if (saveAvatarBtn) {
+                    saveAvatarBtn.style.display = 'none';
+                }
+                selectedAvatarBase64 = null;
+                alert('Avatar saved!');
+            } else {
+                alert(result.error || 'Failed to save avatar');
+            }
         });
     }
     

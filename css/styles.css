@@ -933,25 +933,26 @@ body {
 }
 
 .leaderboard-avatar {
-    width: 32px;
-    height: 32px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     object-fit: cover;
-    margin-right: 10px;
-    vertical-align: middle;
+    margin-right: 12px;
     border: 2px solid var(--bg-tertiary);
+    flex-shrink: 0;
 }
 
 .leaderboard-avatar-placeholder {
-    display: inline-block;
-    width: 32px;
-    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     background-color: var(--bg-tertiary);
-    text-align: center;
-    line-height: 32px;
-    margin-right: 10px;
-    font-size: 1rem;
+    margin-right: 12px;
+    font-size: 1.3rem;
+    flex-shrink: 0;
 }
 
 .leaderboard-user-cell {
@@ -1027,4 +1028,23 @@ input:-moz-autofill:focus {
 
 #save-goals-btn {
     margin-top: 12px;
+}
+
+.avatar-buttons {
+    display: flex;
+    gap: 12px;
+    margin-top: 12px;
+}
+
+#save-avatar-btn {
+    display: none;
+}
+
+/* Auth mode indicator */
+.auth-mode {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-top: 8px;
+    margin-bottom: 16px;
+    text-align: center;
 }

@@ -76,6 +76,7 @@ function init() {
         if (backToAiBtn) backToAiBtn.addEventListener('click', showAISection);
         
         const authToggle = document.getElementById('auth-toggle');
+        const authMode = document.getElementById('auth-mode');
         if (authToggle) {
             authToggle.addEventListener('click', () => {
                 isRegisterMode = !isRegisterMode;
@@ -84,9 +85,11 @@ function init() {
                 if (isRegisterMode) {
                     btn.textContent = t('register');
                     if (subtitle) subtitle.textContent = t('registerSubtitle');
+                    if (authMode) { authMode.textContent = 'Register Mode'; authMode.style.color = '#4caf50'; }
                 } else {
                     btn.textContent = t('signIn');
                     if (subtitle) subtitle.textContent = t('authSubtitle');
+                    if (authMode) { authMode.textContent = 'Sign In Mode'; authMode.style.color = '#4a90d9'; }
                 }
             });
         }
@@ -125,7 +128,6 @@ function showApp(username) {
 }
 
 async function handleAuth(e) {
-    console.log('handleAuth called');
     e.preventDefault();
     const username = document.getElementById('auth-username').value.trim();
     const password = document.getElementById('auth-password').value;
@@ -137,21 +139,25 @@ async function handleAuth(e) {
         return;
     }
     
-    errorEl.textContent = '';
-    console.log('Attempting auth for:', username);
+    errorEl.textContent = 'Signing in...';
     
-    let result;
-    if (isRegisterMode) {
-        result = await register(username, password, remember);
-    } else {
-        result = await signIn(username, password, remember);
-    }
-    console.log('Auth result:', result);
-    
-    if (result.success) {
-        showApp(result.username);
-    } else {
-        errorEl.textContent = result.error;
+    try {
+        let result;
+        if (isRegisterMode) {
+            result = await register(username, password, remember);
+        } else {
+            result = await signIn(username, password, remember);
+        }
+        
+        if (result.success) {
+            errorEl.textContent = '';
+            showApp(result.username);
+        } else {
+            errorEl.textContent = result.error || 'Authentication failed';
+        }
+    } catch (error) {
+        console.error('Auth handler error:', error);
+        errorEl.textContent = 'An error occurred. Please try again.';
     }
 }
 

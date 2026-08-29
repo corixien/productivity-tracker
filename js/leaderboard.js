@@ -16,6 +16,7 @@ async function addFriend(username, friendUsername) {
 
 async function loadLeaderboard(username) {
     const entries = await api.getLeaderboard(username);
+    console.log('Leaderboard entries:', entries);
     return entries;
 }
 
@@ -31,9 +32,10 @@ function renderLeaderboard(entries) {
     entries.forEach((entry, index) => {
         const tr = document.createElement('tr');
         const avatarSrc = entry.avatar ? entry.avatar + '?t=' + Date.now() : null;
+        const avatarId = 'avatar-' + index;
         const avatarHtml = avatarSrc 
-            ? `<img src="${avatarSrc}" class="leaderboard-avatar" alt="avatar">` 
-            : `<span class="leaderboard-avatar-placeholder">👤</span>`;
+            ? `<img src="${avatarSrc}" class="leaderboard-avatar" alt="avatar" id="${avatarId}" onerror="this.style.display='none';document.getElementById('placeholder-${avatarId}').style.display='flex';">` 
+            : `<span class="leaderboard-avatar-placeholder" id="placeholder-${avatarId}">👤</span>`;
         
         tr.innerHTML = `
             <td>#${index + 1}</td>
