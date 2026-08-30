@@ -450,6 +450,38 @@ function showManualSection() {
     resetAddTaskModal();
 }
 
+async function handleAITaskSubmit() {
+    const username = getCurrentUser();
+    if (!username) return;
+    
+    const description = document.getElementById('ai-task-input').value.trim();
+    if (!description) return;
+    
+    document.getElementById('ai-loading').style.display = 'flex';
+    document.getElementById('ai-task-section').style.display = 'none';
+    
+    try {
+        const goals = userData?.goals || '';
+        const taskData = await rateTaskWithAI(description, goals);
+        
+        document.getElementById('task-name').value = taskData.name;
+        document.getElementById('task-duration').value = taskData.duration;
+        document.getElementById('task-hardness').value = taskData.hardness;
+        document.getElementById('hardness-value').textContent = taskData.hardness;
+        document.getElementById('task-size').value = taskData.taskSize || 'medium';
+        document.getElementById('task-usefulness').value = taskData.usefulness || 5;
+        document.getElementById('usefulness-value').textContent = taskData.usefulness || 5;
+        updateXPPreview();
+        
+        showManualSection();
+    } catch (error) {
+        console.error('AI task submission failed:', error);
+        const errorKey = error.name === 'AbortError' ? 'aiTimeout' : 'aiFailed';
+        alert(t(errorKey));
+        showAISection();
+    }
+}
+
 export { init, calculateXP, getCurrentUser, completeTask, deleteTask };
 
 window.app = { init, calculateXP, getCurrentUser, completeTask, deleteTask };
