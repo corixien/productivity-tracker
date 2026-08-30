@@ -476,7 +476,12 @@ async function handleAITaskSubmit() {
         showManualSection();
     } catch (error) {
         console.error('AI task submission failed:', error);
-        const errorKey = error.name === 'AbortError' ? 'aiTimeout' : 'aiFailed';
+        let errorKey = 'aiFailed';
+        if (error.name === 'AbortError') {
+            errorKey = 'aiTimeout';
+        } else if (error.message && error.message.includes('not configured')) {
+            errorKey = 'aiNotConfigured';
+        }
         alert(t(errorKey));
         showAISection();
     }

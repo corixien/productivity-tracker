@@ -464,6 +464,11 @@ app.post('/api/friends', async (req, res) => {
 
 app.post('/api/ai/rate', async (req, res) => {
     try {
+        if (!GROQ_API_KEY) {
+            console.error('GROQ_API_KEY is not set');
+            return res.status(500).json({ error: 'AI service is not configured on the server. Please set GROQ_API_KEY environment variable.' });
+        }
+
         const { description, goals } = req.body;
         if (!description || !description.trim()) {
             return res.status(400).json({ error: 'Description is required' });
@@ -492,6 +497,9 @@ app.post('/api/ai/rate', async (req, res) => {
         if (!groqResponse.ok) {
             const errorText = await groqResponse.text();
             console.error('Groq API error:', groqResponse.status, errorText);
+            if (groqResponse.status === 401) {
+                return res.status(500).json({ error: 'AI service authentication failed. Check GROQ_API_KEY.' });
+            }
             return res.status(500).json({ error: 'AI service error' });
         }
 
