@@ -98,6 +98,13 @@ function attachEventListeners() {
     const aiSubmitBtn = document.getElementById('ai-submit-btn');
     if (aiSubmitBtn) aiSubmitBtn.addEventListener('click', handleAITaskSubmit);
     
+    const aiSkipBtn = document.getElementById('ai-skip-btn');
+    if (aiSkipBtn) {
+        aiSkipBtn.addEventListener('click', () => {
+            showManualSection();
+        });
+    }
+    
     const addPendingBtn = document.getElementById('add-pending-btn');
     if (addPendingBtn) {
         addPendingBtn.addEventListener('click', () => {
@@ -106,7 +113,11 @@ function attachEventListeners() {
     }
     
     const addCompletedBtn = document.getElementById('add-completed-btn');
-    if (addCompletedBtn) addCompletedBtn.addEventListener('click', handleAddCompletedTask);
+    if (addCompletedBtn) {
+        addCompletedBtn.addEventListener('click', () => {
+            taskMode = 'completed';
+        });
+    }
     
     const addPendingTaskBtn = document.getElementById('add-pending-task-btn');
     if (addPendingTaskBtn) {
@@ -280,7 +291,7 @@ async function handleAddTask(e) {
     if (!name || !duration || !hardness) return;
     
     if (taskMode === 'completed') {
-        await handleAddCompletedTask(username, name, duration, hardness, taskSize, usefulness, category);
+        await handleAddCompletedTask();
     } else {
         await addTask(username, name, duration, hardness, taskSize, usefulness, category);
         closeModals();
@@ -293,7 +304,19 @@ async function handleAddTask(e) {
     }
 }
 
-async function handleAddCompletedTask(username, name, duration, hardness, taskSize, usefulness, category) {
+async function handleAddCompletedTask() {
+    const username = getCurrentUser();
+    if (!username) return;
+    
+    const name = document.getElementById('task-name').value.trim();
+    const duration = document.getElementById('task-duration').value;
+    const hardness = document.getElementById('task-hardness').value;
+    const taskSize = document.getElementById('task-size')?.value || 'medium';
+    const usefulness = document.getElementById('task-usefulness')?.value || 5;
+    const category = 'other';
+    
+    if (!name || !duration || !hardness) return;
+    
     const task = await addTask(username, name, duration, hardness, taskSize, usefulness, category);
     const result = await completeTaskOp(username, task.id);
     closeModals();
@@ -417,45 +440,14 @@ function showAISection() {
     document.getElementById('ai-task-section').style.display = 'block';
     document.getElementById('ai-loading').style.display = 'none';
     document.getElementById('manual-fallback-section').style.display = 'none';
+    document.getElementById('ai-task-input').value = '';
 }
 
-function showLoadingSection() {
+function showManualSection() {
     document.getElementById('ai-task-section').style.display = 'none';
-    document.getElementById('ai-loading').style.display = 'flex';
-    document.getElementById('manual-fallback-section').style.display = 'none';
-}
-
-async function handleAITaskSubmit() {
-    const username = getCurrentUser();
-    if (!username) return;
-    
-    const description = document.getElementById('ai-task-input').value.trim();
-    if (!description) return;
-    
-    showLoadingSection();
-    
-    try {
-        const goals = userData?.goals || '';
-        const taskData = await rateTaskWithAI(description, goals);
-        
-        document.getElementById('task-name').value = taskData.name;
-        document.getElementById('task-duration').value = taskData.duration;
-        document.getElementById('task-hardness').value = taskData.hardness;
-        document.getElementById('hardness-value').textContent = taskData.hardness;
-        document.getElementById('task-size').value = taskData.taskSize || 'medium';
-        document.getElementById('task-usefulness').value = taskData.usefulness || 5;
-        document.getElementById('usefulness-value').textContent = taskData.usefulness || 5;
-        updateXPPreview();
-        
-        document.getElementById('ai-task-section').style.display = 'none';
-        document.getElementById('ai-loading').style.display = 'none';
-        document.getElementById('manual-fallback-section').style.display = 'block';
-    } catch (error) {
-        console.error('AI task submission failed:', error);
-        const errorKey = error.name === 'AbortError' ? 'aiTimeout' : 'aiFailed';
-        alert(t(errorKey));
-        showAISection();
-    }
+    document.getElementById('ai-loading').style.display = 'none';
+    document.getElementById('manual-fallback-section').style.display = 'block';
+    resetAddTaskModal();
 }
 
 export { init, calculateXP, getCurrentUser, completeTask, deleteTask };

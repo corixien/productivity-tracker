@@ -4,3 +4,4 @@ avatars/
 *.db
 data.json
 .DS_Store
+.env

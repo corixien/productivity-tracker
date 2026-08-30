@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const sqlite3 = require('sqlite3').verbose();
+require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
