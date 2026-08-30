@@ -54,7 +54,7 @@ async function validateUser(username) {
     }
 }
 
-async function register(username, password) {
+async function register(username, password, remember) {
     const trimmed = username.trim();
     
     if (!trimmed) return { success: false, error: 'Username is required' };
@@ -71,6 +71,7 @@ async function register(username, password) {
         const result = await api.register(trimmed, password);
         if (result.success) {
             currentUser = trimmed;
+            storeUsername(trimmed, remember);
             emit('auth:login', { username: trimmed });
             return { success: true, username: trimmed };
         }
@@ -81,7 +82,7 @@ async function register(username, password) {
     }
 }
 
-async function signIn(username, password) {
+async function signIn(username, password, remember) {
     const trimmed = username.trim();
     
     if (!trimmed) return { success: false, error: 'Username is required' };
@@ -91,6 +92,7 @@ async function signIn(username, password) {
         const result = await api.login(trimmed, password);
         if (result.success) {
             currentUser = trimmed;
+            storeUsername(trimmed, remember);
             
             loadUserPreferences(trimmed);
             

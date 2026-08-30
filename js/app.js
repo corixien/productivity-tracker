@@ -12,7 +12,7 @@ let userData = null;
 let taskMode = 'pending';
 let authUnsubscribe = null;
 
-function init() {
+async function init() {
     console.log('App init starting...');
     
     try {
@@ -21,7 +21,7 @@ function init() {
         
         subscribeToAuthEvents();
         
-        const username = restoreSession();
+        const username = await restoreSession();
         console.log('Restored session:', username);
         if (username) {
             showApp(username);
@@ -168,6 +168,16 @@ function showAuth() {
     document.getElementById('auth-screen').classList.add('active');
     document.getElementById('app-screen').classList.remove('active');
     updateAuthUI(getAuthMode());
+    
+    const errorEl = document.getElementById('auth-error');
+    const usernameInput = document.getElementById('auth-username');
+    const passwordInput = document.getElementById('auth-password');
+    const rememberCheckbox = document.getElementById('auth-remember');
+    
+    if (errorEl) errorEl.textContent = '';
+    if (usernameInput) usernameInput.value = '';
+    if (passwordInput) passwordInput.value = '';
+    if (rememberCheckbox) rememberCheckbox.checked = true;
 }
 
 function showApp(username) {
@@ -175,11 +185,6 @@ function showApp(username) {
     document.getElementById('app-screen').classList.add('active');
     
     loadUserData(username);
-    subscribeToUser((data) => {
-        userData = data;
-        updateXPDisplay(data.xp);
-        refreshTasks(username);
-    });
 }
 
 function openTaskModal() {
@@ -218,7 +223,6 @@ async function handleAuth(e) {
         
         if (result.success) {
             errorEl.textContent = '';
-            storeUsername(result.username, remember);
         } else {
             errorEl.textContent = result.error || 'Authentication failed';
         }
@@ -232,6 +236,7 @@ async function handleAuth(e) {
 
 function handleSignOut() {
     signOut();
+    showAuth();
 }
 
 async function loadUserData(username) {
