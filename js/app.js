@@ -3,7 +3,7 @@ import { api } from './firebase.js';
 import { calculateXP, getRankName, getProgressPercent, addTask, completeTask as completeTaskOp, deleteTask as deleteTaskOp, renderTasks, updateXPDisplay } from './tasks.js';
 import { addFriend, loadLeaderboard, renderLeaderboard } from './leaderboard.js';
 import { changePassword, changeUsername, uploadAvatar, saveGoals, initSettings } from './settings.js';
-import { initUI, showSection, closeModals, updateXPPreview } from './ui.js';
+import { initUI, showSection, closeModals, updateXPPreview, resetAddTaskModal } from './ui.js';
 import { setLanguage, getCurrentLang, t } from './i18n.js';
 import { rateTaskWithAI } from './ai-service.js';
 

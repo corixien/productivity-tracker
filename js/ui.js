@@ -153,4 +153,4 @@ function resetAddTaskModal() {
     if (xpPreview) xpPreview.textContent = '25 XP';
 }
 
-export { initUI, showSection, closeModals, updateXPPreview };
+export { initUI, showSection, closeModals, updateXPPreview, resetAddTaskModal };
