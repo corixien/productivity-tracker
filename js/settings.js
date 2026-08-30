@@ -11,6 +11,7 @@ api.changeUsername = async (oldUsername, newUsername) => {
     return data;
 };
 import { setLanguage, getCurrentLang } from './i18n.js';
+import { getCurrentUser } from './auth.js';
 
 async function changePassword(username, newPassword) {
     if (!newPassword || newPassword.length < 4) {
@@ -39,7 +40,7 @@ async function uploadAvatar(username, base64Data) {
 function initSettings() {
     const usernameDisplay = document.getElementById('settings-username-display');
     if (usernameDisplay) {
-        const username = (window.app && window.app.getCurrentUser) ? window.app.getCurrentUser() : '';
+        const username = getCurrentUser() || '';
         usernameDisplay.textContent = username;
     }
     
@@ -50,7 +51,7 @@ function initSettings() {
     
     const currentAvatar = document.getElementById('current-avatar');
     const avatarPlaceholder = document.getElementById('avatar-placeholder');
-    const username = (window.app && window.app.getCurrentUser) ? window.app.getCurrentUser() : '';
+    const username = getCurrentUser() || '';
     
     if (username && currentAvatar) {
         api.getUser(username).then(user => {

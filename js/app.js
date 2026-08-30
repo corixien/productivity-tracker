@@ -1,4 +1,4 @@
-import { register, signIn, signOut, restoreSession, subscribeToUser, getCurrentUser } from './auth.js';
+import { register, signIn, signOut, restoreSession, subscribe, getCurrentUser, getAuthMode, setAuthMode, toggleAuthMode } from './auth.js';
 import { api } from './firebase.js';
 import { calculateXP, getRankName, getProgressPercent, addTask, completeTask as completeTaskOp, deleteTask as deleteTaskOp, renderTasks, updateXPDisplay } from './tasks.js';
 import { addFriend, loadLeaderboard, renderLeaderboard } from './leaderboard.js';
@@ -9,14 +9,17 @@ import { rateTaskWithAI } from './ai-service.js';
 
 let currentTasks = { pending: [], completed: [] };
 let userData = null;
-let isRegisterMode = false;
 let taskMode = 'pending';
+let authUnsubscribe = null;
 
 function init() {
     console.log('App init starting...');
+    
     try {
         initUI();
         initSettings();
+        
+        subscribeToAuthEvents();
         
         const username = restoreSession();
         console.log('Restored session:', username);
@@ -26,119 +29,145 @@ function init() {
             showAuth();
         }
         
-        const authForm = document.getElementById('auth-form');
-        if (authForm) authForm.addEventListener('submit', handleAuth);
+        attachEventListeners();
         
-        const taskForm = document.getElementById('task-form');
-        if (taskForm) taskForm.addEventListener('submit', handleAddTask);
-        
-        const friendForm = document.getElementById('friend-form');
-        if (friendForm) friendForm.addEventListener('submit', handleAddFriend);
-        
-        const addFriendBtn = document.getElementById('add-friend-btn');
-        if (addFriendBtn) {
-            addFriendBtn.addEventListener('click', () => {
-                document.getElementById('add-friend-modal').classList.add('active');
-                document.getElementById('overlay').classList.add('active');
-                document.getElementById('friend-username').value = '';
-            });
-        }
-        
-        const closeFriendModal = document.getElementById('close-friend-modal');
-        if (closeFriendModal) closeFriendModal.addEventListener('click', closeModals);
-        
-        const cancelFriendBtn = document.getElementById('cancel-friend-btn');
-        if (cancelFriendBtn) cancelFriendBtn.addEventListener('click', closeModals);
-        
-        const changeUsernameBtn = document.getElementById('change-username-btn');
-        if (changeUsernameBtn) changeUsernameBtn.addEventListener('click', handleChangeUsername);
-        
-        const saveGoalsBtn = document.getElementById('save-goals-btn');
-        if (saveGoalsBtn) saveGoalsBtn.addEventListener('click', handleSaveGoals);
-        
-        const changePasswordBtn = document.getElementById('change-password-btn');
-        if (changePasswordBtn) changePasswordBtn.addEventListener('click', handleChangePassword);
-        
-        const signOutBtn = document.getElementById('sign-out-btn');
-        if (signOutBtn) signOutBtn.addEventListener('click', signOut);
-        
-        const languageSelect = document.getElementById('language-select');
-        if (languageSelect) languageSelect.addEventListener('change', (e) => {
-            setLanguage(e.target.value);
-        });
-        
-        const aiSubmitBtn = document.getElementById('ai-submit-btn');
-        if (aiSubmitBtn) aiSubmitBtn.addEventListener('click', handleAITaskSubmit);
-        
-        const addPendingBtn = document.getElementById('add-pending-btn');
-        if (addPendingBtn) {
-            addPendingBtn.addEventListener('click', () => {
-                taskMode = 'pending';
-            });
-        }
-        
-        const taskForm = document.getElementById('task-form');
-        if (taskForm) {
-            taskForm.addEventListener('submit', handleAddTask);
-        }
-        
-        const addCompletedBtn = document.getElementById('add-completed-btn');
-        if (addCompletedBtn) addCompletedBtn.addEventListener('click', handleAddCompletedTask);
-        
-        const addPendingTaskBtn = document.getElementById('add-pending-task-btn');
-        if (addPendingTaskBtn) {
-            addPendingTaskBtn.addEventListener('click', () => {
-                taskMode = 'pending';
-                openTaskModal();
-            });
-        }
-        
-        const addCompletedTaskBtn = document.getElementById('add-completed-task-btn');
-        if (addCompletedTaskBtn) {
-            addCompletedTaskBtn.addEventListener('click', () => {
-                taskMode = 'completed';
-                openTaskModal();
-            });
-        }
-        
-        const authToggle = document.getElementById('auth-toggle');
-        const authMode = document.getElementById('auth-mode');
-        if (authToggle) {
-            authToggle.addEventListener('click', () => {
-                isRegisterMode = !isRegisterMode;
-                const btn = document.querySelector('#auth-form button[type="submit"]');
-                const subtitle = document.querySelector('.auth-card p');
-                if (isRegisterMode) {
-                    btn.textContent = t('register');
-                    if (subtitle) subtitle.textContent = t('registerSubtitle');
-                    if (authMode) { authMode.textContent = 'Register Mode'; authMode.style.color = '#4caf50'; }
-                } else {
-                    btn.textContent = t('signIn');
-                    if (subtitle) subtitle.textContent = t('authSubtitle');
-                    if (authMode) { authMode.textContent = 'Sign In Mode'; authMode.style.color = '#4a90d9'; }
-                }
-            });
-        }
-        
-        document.querySelectorAll('.nav-item').forEach(item => {
-            item.addEventListener('click', () => {
-                const section = item.getAttribute('data-section');
-                if (section === 'leaderboard') {
-                    const username = getCurrentUser();
-                    if (username) loadAndRenderLeaderboard(username);
-                }
-            });
-        });
         console.log('App init complete');
     } catch (error) {
         console.error('App init failed:', error);
-        document.getElementById('auth-error').textContent = 'Failed to initialize app. Check console for details.';
+        const errorEl = document.getElementById('auth-error');
+        if (errorEl) errorEl.textContent = 'Failed to initialize app. Check console for details.';
+    }
+}
+
+function subscribeToAuthEvents() {
+    authUnsubscribe = subscribe((event, data) => {
+        if (event === 'auth:login') {
+            showApp(data.username);
+        } else if (event === 'auth:logout') {
+            showAuth();
+        } else if (event === 'auth:modeChange') {
+            updateAuthUI(data.mode);
+        } else if (event === 'auth:restore') {
+            updateAuthUI(getAuthMode());
+        }
+    });
+}
+
+function attachEventListeners() {
+    const authForm = document.getElementById('auth-form');
+    if (authForm) authForm.addEventListener('submit', handleAuth);
+    
+    const taskForm = document.getElementById('task-form');
+    if (taskForm) taskForm.addEventListener('submit', handleAddTask);
+    
+    const friendForm = document.getElementById('friend-form');
+    if (friendForm) friendForm.addEventListener('submit', handleAddFriend);
+    
+    const addFriendBtn = document.getElementById('add-friend-btn');
+    if (addFriendBtn) {
+        addFriendBtn.addEventListener('click', () => {
+            document.getElementById('add-friend-modal').classList.add('active');
+            document.getElementById('overlay').classList.add('active');
+            document.getElementById('friend-username').value = '';
+        });
+    }
+    
+    const closeFriendModal = document.getElementById('close-friend-modal');
+    if (closeFriendModal) closeFriendModal.addEventListener('click', closeModals);
+    
+    const cancelFriendBtn = document.getElementById('cancel-friend-btn');
+    if (cancelFriendBtn) cancelFriendBtn.addEventListener('click', closeModals);
+    
+    const changeUsernameBtn = document.getElementById('change-username-btn');
+    if (changeUsernameBtn) changeUsernameBtn.addEventListener('click', handleChangeUsername);
+    
+    const saveGoalsBtn = document.getElementById('save-goals-btn');
+    if (saveGoalsBtn) saveGoalsBtn.addEventListener('click', handleSaveGoals);
+    
+    const changePasswordBtn = document.getElementById('change-password-btn');
+    if (changePasswordBtn) changePasswordBtn.addEventListener('click', handleChangePassword);
+    
+    const signOutBtn = document.getElementById('sign-out-btn');
+    if (signOutBtn) signOutBtn.addEventListener('click', handleSignOut);
+    
+    const languageSelect = document.getElementById('language-select');
+    if (languageSelect) languageSelect.addEventListener('change', (e) => {
+        setLanguage(e.target.value);
+    });
+    
+    const aiSubmitBtn = document.getElementById('ai-submit-btn');
+    if (aiSubmitBtn) aiSubmitBtn.addEventListener('click', handleAITaskSubmit);
+    
+    const addPendingBtn = document.getElementById('add-pending-btn');
+    if (addPendingBtn) {
+        addPendingBtn.addEventListener('click', () => {
+            taskMode = 'pending';
+        });
+    }
+    
+    const addCompletedBtn = document.getElementById('add-completed-btn');
+    if (addCompletedBtn) addCompletedBtn.addEventListener('click', handleAddCompletedTask);
+    
+    const addPendingTaskBtn = document.getElementById('add-pending-task-btn');
+    if (addPendingTaskBtn) {
+        addPendingTaskBtn.addEventListener('click', () => {
+            taskMode = 'pending';
+            openTaskModal();
+        });
+    }
+    
+    const addCompletedTaskBtn = document.getElementById('add-completed-task-btn');
+    if (addCompletedTaskBtn) {
+        addCompletedTaskBtn.addEventListener('click', () => {
+            taskMode = 'completed';
+            openTaskModal();
+        });
+    }
+    
+    const authToggle = document.getElementById('auth-toggle');
+    if (authToggle) {
+        authToggle.addEventListener('click', () => {
+            toggleAuthMode();
+        });
+    }
+    
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const section = item.getAttribute('data-section');
+            if (section === 'leaderboard') {
+                const username = getCurrentUser();
+                if (username) loadAndRenderLeaderboard(username);
+            }
+        });
+    });
+}
+
+function updateAuthUI(mode) {
+    const submitBtn = document.querySelector('#auth-form button[type="submit"]');
+    const subtitle = document.querySelector('.auth-card p');
+    const modeIndicator = document.getElementById('auth-mode');
+    
+    if (mode === 'signup') {
+        if (submitBtn) submitBtn.textContent = t('register');
+        if (subtitle) subtitle.textContent = t('registerSubtitle');
+        if (modeIndicator) {
+            modeIndicator.textContent = 'Register Mode';
+            modeIndicator.style.color = '#4caf50';
+        }
+    } else {
+        if (submitBtn) submitBtn.textContent = t('signIn');
+        if (subtitle) subtitle.textContent = t('authSubtitle');
+        if (modeIndicator) {
+            modeIndicator.textContent = 'Sign In Mode';
+            modeIndicator.style.color = '#4a90d9';
+        }
     }
 }
 
 function showAuth() {
     document.getElementById('auth-screen').classList.add('active');
     document.getElementById('app-screen').classList.remove('active');
+    updateAuthUI(getAuthMode());
 }
 
 function showApp(username) {
@@ -169,32 +198,40 @@ async function handleAuth(e) {
     const password = document.getElementById('auth-password').value;
     const remember = document.getElementById('auth-remember').checked;
     const errorEl = document.getElementById('auth-error');
+    const submitBtn = document.querySelector('#auth-form button[type="submit"]');
     
     if (!username || !password) {
         errorEl.textContent = t('invalidUsername');
         return;
     }
     
-    errorEl.textContent = 'Signing in...';
+    errorEl.textContent = getAuthMode() === 'signup' ? 'Creating account...' : 'Signing in...';
+    if (submitBtn) submitBtn.disabled = true;
     
     try {
         let result;
-        if (isRegisterMode) {
-            result = await register(username, password, remember);
+        if (getAuthMode() === 'signup') {
+            result = await register(username, password);
         } else {
-            result = await signIn(username, password, remember);
+            result = await signIn(username, password);
         }
         
         if (result.success) {
             errorEl.textContent = '';
-            showApp(result.username);
+            storeUsername(result.username, remember);
         } else {
             errorEl.textContent = result.error || 'Authentication failed';
         }
     } catch (error) {
         console.error('Auth handler error:', error);
         errorEl.textContent = 'An error occurred. Please try again.';
+    } finally {
+        if (submitBtn) submitBtn.disabled = false;
     }
+}
+
+function handleSignOut() {
+    signOut();
 }
 
 async function loadUserData(username) {
@@ -251,19 +288,7 @@ async function handleAddTask(e) {
     }
 }
 
-async function handleAddCompletedTask() {
-    const username = getCurrentUser();
-    if (!username) return;
-    
-    const name = document.getElementById('task-name').value.trim();
-    const duration = document.getElementById('task-duration').value;
-    const hardness = document.getElementById('task-hardness').value;
-    const taskSize = document.getElementById('task-size')?.value || 'medium';
-    const usefulness = document.getElementById('task-usefulness')?.value || 5;
-    const category = 'other';
-    
-    if (!name || !duration || !hardness) return;
-    
+async function handleAddCompletedTask(username, name, duration, hardness, taskSize, usefulness, category) {
     const task = await addTask(username, name, duration, hardness, taskSize, usefulness, category);
     const result = await completeTaskOp(username, task.id);
     closeModals();
