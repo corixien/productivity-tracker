@@ -483,7 +483,7 @@ async function handleAITaskSubmit() {
             errorKey = 'aiNotConfigured';
         }
         alert(t(errorKey));
-        showAISection();
+        showManualSection();
     }
 }
 
