@@ -40,7 +40,6 @@ const translations = {
         duration: "Duration (minutes)",
         hardness: "Hardness (1-10)",
         xpPreview: "XP Preview",
-        createTask: "Create Task",
         close: "Close",
         noPendingTasks: "No pending tasks. Add one to get started!",
         noCompletedTasks: "No completed tasks yet.",
@@ -65,11 +64,11 @@ const translations = {
         describeTask: "Describe your task",
         aiTaskPlaceholder: "e.g., I studied React hooks for 45 minutes...",
         aiSubmit: "Let AI Rate It",
-        fillManually: "Fill in manually",
         aiRating: "AI is rating your task...",
-        backToAI: "Back to AI",
-        aiFailed: "AI rating failed. Please fill in manually.",
-        aiTimeout: "AI rating timed out. Please fill in manually."
+        addPendingTask: "Add Pending Task",
+        addCompletedTask: "Add Completed Task",
+        aiFailed: "AI rating failed. Please try again.",
+        aiTimeout: "AI rating timed out. Please try again."
     },
     de: {
         appTitle: "Produktivitäts-Tracker",
@@ -112,7 +111,6 @@ const translations = {
         duration: "Dauer (Minuten)",
         hardness: "Schwierigkeit (1-10)",
         xpPreview: "XP-Vorschau",
-        createTask: "Aufgabe erstellen",
         close: "Schließen",
         noPendingTasks: "Keine ausstehenden Aufgaben. Füge eine hinzu!",
         noCompletedTasks: "Noch keine erledigten Aufgaben.",
@@ -137,11 +135,11 @@ const translations = {
         describeTask: "Beschreibe deine Aufgabe",
         aiTaskPlaceholder: "z.B. Ich habe React 45 Minuten lang gelernt...",
         aiSubmit: "Von KI bewerten lassen",
-        fillManually: "Manuell ausfüllen",
         aiRating: "KI bewertet deine Aufgabe...",
-        backToAI: "Zurück zur KI",
-        aiFailed: "KI-Bewertung fehlgeschlagen. Bitte fülle manuell aus.",
-        aiTimeout: "KI-Bewertung dauerte zu lange. Bitte fülle manuell aus."
+        addPendingTask: "Ausstehende Aufgabe hinzufügen",
+        addCompletedTask: "Erledigte Aufgabe hinzufügen",
+        aiFailed: "KI-Bewertung fehlgeschlagen. Bitte versuche es erneut.",
+        aiTimeout: "KI-Bewertung dauerte zu lange. Bitte versuche es erneut."
     }
 };
 

@@ -31,21 +31,12 @@ function initUI() {
         handleSwipe();
     }, false);
     
-    const addTaskBtn = document.getElementById('add-task-btn');
     const taskModal = document.getElementById('add-task-modal');
     const closeTaskModal = document.getElementById('close-task-modal');
     const hardnessSlider = document.getElementById('task-hardness');
     const hardnessValue = document.getElementById('hardness-value');
     const xpPreview = document.getElementById('xp-preview');
     const durationInput = document.getElementById('task-duration');
-    
-    if (addTaskBtn && taskModal) {
-        addTaskBtn.addEventListener('click', () => {
-            resetAddTaskModal();
-            taskModal.classList.add('active');
-            overlay.classList.add('active');
-        });
-    }
     
     if (closeTaskModal && taskModal) {
         closeTaskModal.addEventListener('click', closeModals);

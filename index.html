@@ -91,14 +91,19 @@
                         <div class="xp-fill" id="xp-fill" style="width: 0%"></div>
                     </div>
                 </div>
-                <button id="add-task-btn" class="primary-btn" data-i18n="addTask">Add Task</button>
                 <div class="task-lists">
                     <div class="task-column">
-                        <h3 data-i18n="pendingTasks">Pending Tasks</h3>
+                        <div class="column-header">
+                            <h3 data-i18n="pendingTasks">Pending Tasks</h3>
+                            <button id="add-pending-task-btn" class="column-btn" data-i18n="addPendingTask">Add Pending Task</button>
+                        </div>
                         <ul id="pending-list" class="task-list"></ul>
                     </div>
                     <div class="task-column">
-                        <h3 data-i18n="completedTasks">Completed Tasks</h3>
+                        <div class="column-header">
+                            <h3 data-i18n="completedTasks">Completed Tasks</h3>
+                            <button id="add-completed-task-btn" class="column-btn" data-i18n="addCompletedTask">Add Completed Task</button>
+                        </div>
                         <ul id="completed-list" class="task-list"></ul>
                     </div>
                 </div>
@@ -207,7 +212,6 @@
                 </div>
                 <div class="ai-buttons">
                     <button type="button" id="ai-submit-btn" class="primary-btn" data-i18n="aiSubmit">Let AI Rate It</button>
-                    <button type="button" id="ai-fallback-btn" class="secondary-btn" data-i18n="fillManually">Fill in manually</button>
                 </div>
             </div>
             
@@ -217,7 +221,6 @@
             </div>
             
             <div id="manual-fallback-section" style="display:none;">
-                <button type="button" id="back-to-ai-btn" class="secondary-btn" data-i18n="backToAI">Back to AI</button>
                 <form id="task-form">
                     <div class="form-group">
                         <label for="task-name" data-i18n="taskName">Task Name</label>
@@ -251,7 +254,10 @@
                         <label data-i18n="xpPreview">XP Preview</label>
                         <span id="xp-preview" class="xp-preview-value">25 XP</span>
                     </div>
-                    <button type="submit" class="primary-btn" data-i18n="createTask">Create Task</button>
+                    <div class="ai-buttons">
+                        <button type="submit" class="primary-btn" id="add-pending-btn" data-i18n="addPendingTask">Add Pending Task</button>
+                        <button type="button" class="secondary-btn" id="add-completed-btn" data-i18n="addCompletedTask">Add Completed Task</button>
+                    </div>
                 </form>
             </div>
         </div>

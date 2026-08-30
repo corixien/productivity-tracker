@@ -10,6 +10,7 @@ import { rateTaskWithAI } from './ai-service.js';
 let currentTasks = { pending: [], completed: [] };
 let userData = null;
 let isRegisterMode = false;
+let taskMode = 'pending';
 
 function init() {
     console.log('App init starting...');
@@ -69,11 +70,36 @@ function init() {
         const aiSubmitBtn = document.getElementById('ai-submit-btn');
         if (aiSubmitBtn) aiSubmitBtn.addEventListener('click', handleAITaskSubmit);
         
-        const aiFallbackBtn = document.getElementById('ai-fallback-btn');
-        if (aiFallbackBtn) aiFallbackBtn.addEventListener('click', showManualSection);
+        const addPendingBtn = document.getElementById('add-pending-btn');
+        if (addPendingBtn) {
+            addPendingBtn.addEventListener('click', () => {
+                taskMode = 'pending';
+            });
+        }
         
-        const backToAiBtn = document.getElementById('back-to-ai-btn');
-        if (backToAiBtn) backToAiBtn.addEventListener('click', showAISection);
+        const taskForm = document.getElementById('task-form');
+        if (taskForm) {
+            taskForm.addEventListener('submit', handleAddTask);
+        }
+        
+        const addCompletedBtn = document.getElementById('add-completed-btn');
+        if (addCompletedBtn) addCompletedBtn.addEventListener('click', handleAddCompletedTask);
+        
+        const addPendingTaskBtn = document.getElementById('add-pending-task-btn');
+        if (addPendingTaskBtn) {
+            addPendingTaskBtn.addEventListener('click', () => {
+                taskMode = 'pending';
+                openTaskModal();
+            });
+        }
+        
+        const addCompletedTaskBtn = document.getElementById('add-completed-task-btn');
+        if (addCompletedTaskBtn) {
+            addCompletedTaskBtn.addEventListener('click', () => {
+                taskMode = 'completed';
+                openTaskModal();
+            });
+        }
         
         const authToggle = document.getElementById('auth-toggle');
         const authMode = document.getElementById('auth-mode');
@@ -125,6 +151,16 @@ function showApp(username) {
         updateXPDisplay(data.xp);
         refreshTasks(username);
     });
+}
+
+function openTaskModal() {
+    const modal = document.getElementById('add-task-modal');
+    const overlay = document.getElementById('overlay');
+    if (modal) {
+        modal.classList.add('active');
+        overlay.classList.add('active');
+        resetAddTaskModal();
+    }
 }
 
 async function handleAuth(e) {
@@ -188,7 +224,7 @@ async function refreshTasks(username) {
 }
 
 async function handleAddTask(e) {
-    e.preventDefault();
+    if (e) e.preventDefault();
     const username = getCurrentUser();
     if (!username) return;
     
@@ -201,7 +237,35 @@ async function handleAddTask(e) {
     
     if (!name || !duration || !hardness) return;
     
-    await addTask(username, name, duration, hardness, taskSize, usefulness, category);
+    if (taskMode === 'completed') {
+        await handleAddCompletedTask(username, name, duration, hardness, taskSize, usefulness, category);
+    } else {
+        await addTask(username, name, duration, hardness, taskSize, usefulness, category);
+        closeModals();
+        document.getElementById('task-form').reset();
+        document.getElementById('hardness-value').textContent = '5';
+        document.getElementById('usefulness-value').textContent = '5';
+        document.getElementById('task-size').value = 'medium';
+        document.getElementById('xp-preview').textContent = '25 XP';
+        refreshTasks(username);
+    }
+}
+
+async function handleAddCompletedTask() {
+    const username = getCurrentUser();
+    if (!username) return;
+    
+    const name = document.getElementById('task-name').value.trim();
+    const duration = document.getElementById('task-duration').value;
+    const hardness = document.getElementById('task-hardness').value;
+    const taskSize = document.getElementById('task-size')?.value || 'medium';
+    const usefulness = document.getElementById('task-usefulness')?.value || 5;
+    const category = 'other';
+    
+    if (!name || !duration || !hardness) return;
+    
+    const task = await addTask(username, name, duration, hardness, taskSize, usefulness, category);
+    const result = await completeTaskOp(username, task.id);
     closeModals();
     document.getElementById('task-form').reset();
     document.getElementById('hardness-value').textContent = '5';
@@ -209,6 +273,9 @@ async function handleAddTask(e) {
     document.getElementById('task-size').value = 'medium';
     document.getElementById('xp-preview').textContent = '25 XP';
     refreshTasks(username);
+    if (result.success) {
+        updateXPDisplay(result.newXP);
+    }
 }
 
 async function completeTask(taskId) {
@@ -322,12 +389,6 @@ function showAISection() {
     document.getElementById('manual-fallback-section').style.display = 'none';
 }
 
-function showManualSection() {
-    document.getElementById('ai-task-section').style.display = 'none';
-    document.getElementById('ai-loading').style.display = 'none';
-    document.getElementById('manual-fallback-section').style.display = 'block';
-}
-
 function showLoadingSection() {
     document.getElementById('ai-task-section').style.display = 'none';
     document.getElementById('ai-loading').style.display = 'flex';
@@ -346,16 +407,24 @@ async function handleAITaskSubmit() {
     try {
         const goals = userData?.goals || '';
         const taskData = await rateTaskWithAI(description, goals);
-        await addTask(username, taskData.name, taskData.duration, taskData.hardness, taskData.taskSize, taskData.usefulness, taskData.category);
-        closeModals();
-        document.getElementById('ai-task-input').value = '';
-        refreshTasks(username);
-        showAISection();
+        
+        document.getElementById('task-name').value = taskData.name;
+        document.getElementById('task-duration').value = taskData.duration;
+        document.getElementById('task-hardness').value = taskData.hardness;
+        document.getElementById('hardness-value').textContent = taskData.hardness;
+        document.getElementById('task-size').value = taskData.taskSize || 'medium';
+        document.getElementById('task-usefulness').value = taskData.usefulness || 5;
+        document.getElementById('usefulness-value').textContent = taskData.usefulness || 5;
+        updateXPPreview();
+        
+        document.getElementById('ai-task-section').style.display = 'none';
+        document.getElementById('ai-loading').style.display = 'none';
+        document.getElementById('manual-fallback-section').style.display = 'block';
     } catch (error) {
         console.error('AI task submission failed:', error);
         const errorKey = error.name === 'AbortError' ? 'aiTimeout' : 'aiFailed';
         alert(t(errorKey));
-        showManualSection();
+        showAISection();
     }
 }
 
