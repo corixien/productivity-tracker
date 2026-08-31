@@ -500,7 +500,16 @@ app.post('/api/ai/rate', async (req, res) => {
             if (groqResponse.status === 401) {
                 return res.status(500).json({ error: 'AI service authentication failed. Check GROQ_API_KEY.' });
             }
-            return res.status(500).json({ error: 'AI service error' });
+            if (groqResponse.status === 404) {
+                return res.status(500).json({ error: 'AI model not found. Check model name.' });
+            }
+            if (groqResponse.status === 429) {
+                return res.status(500).json({ error: 'AI rate limit exceeded. Try again later.' });
+            }
+            return res.status(500).json({ 
+                error: `AI service error (HTTP ${groqResponse.status})`,
+                details: errorText 
+            });
         }
 
         const groqData = await groqResponse.json();
