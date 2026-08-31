@@ -47,7 +47,9 @@ function clearStoredUsername() {
 
 async function validateUser(username) {
     try {
-        const user = await api.getUser(username);
+        const response = await fetch(`/api/users/${encodeURIComponent(username)}`);
+        if (!response.ok) return null;
+        const user = await response.json();
         return user && user.username ? user : null;
     } catch (e) {
         return null;
@@ -78,7 +80,7 @@ async function register(username, password, remember) {
         return result;
     } catch (error) {
         console.error('Registration error:', error);
-        return { success: false, error: 'Registration failed. Please try again.' };
+        return { success: false, error: error.message || 'Registration failed. Please try again.' };
     }
 }
 
@@ -102,7 +104,7 @@ async function signIn(username, password, remember) {
         return result;
     } catch (error) {
         console.error('Sign in error:', error);
-        return { success: false, error: 'Login failed. Please try again.' };
+        return { success: false, error: error.message || 'Login failed. Please try again.' };
     }
 }
 
