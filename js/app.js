@@ -458,6 +458,7 @@ async function handleAITaskSubmit() {
     
     document.getElementById('ai-loading').style.display = 'flex';
     document.getElementById('ai-task-section').style.display = 'none';
+    document.getElementById('manual-fallback-section').style.display = 'none';
     
     try {
         const goals = userData?.goals || '';
@@ -472,7 +473,8 @@ async function handleAITaskSubmit() {
         document.getElementById('usefulness-value').textContent = taskData.usefulness || 5;
         updateXPPreview();
         
-        showManualSection();
+        document.getElementById('ai-loading').style.display = 'none';
+        document.getElementById('manual-fallback-section').style.display = 'block';
     } catch (error) {
         console.error('AI task submission failed:', error);
         let errorKey = 'aiFailed';
@@ -482,7 +484,7 @@ async function handleAITaskSubmit() {
             errorKey = 'aiNotConfigured';
         }
         alert(t(errorKey));
-        showManualSection();
+        showAISection();
     }
 }
 

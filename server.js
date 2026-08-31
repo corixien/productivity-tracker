@@ -466,7 +466,7 @@ app.post('/api/ai/rate', async (req, res) => {
     try {
         if (!GROQ_API_KEY) {
             console.error('GROQ_API_KEY is not set');
-            return res.status(500).json({ error: 'AI service is not configured on the server. Please set GROQ_API_KEY environment variable.' });
+            return res.status(500).json({ error: 'AI service is not configured on the server.' });
         }
 
         const { description, goals } = req.body;
