@@ -3,7 +3,7 @@ import { api } from './firebase.js';
 import { calculateXP, getRankName, getProgressPercent, addTask, completeTask as completeTaskOp, deleteTask as deleteTaskOp, renderTasks, updateXPDisplay } from './tasks.js';
 import { addFriend, loadLeaderboard, renderLeaderboard } from './leaderboard.js';
 import { changePassword, changeUsername, uploadAvatar, saveGoals, initSettings } from './settings.js';
-import { initUI, showSection, closeModals, updateXPPreview, resetAddTaskModal } from './ui.js';
+import { initUI, showSection, closeModals } from './ui.js';
 import { setLanguage, getCurrentLang, t } from './i18n.js';
 import { rateTaskWithAI } from './ai-service.js';
 
@@ -57,9 +57,6 @@ function attachEventListeners() {
     const authForm = document.getElementById('auth-form');
     if (authForm) authForm.addEventListener('submit', handleAuth);
     
-    const taskForm = document.getElementById('task-form');
-    if (taskForm) taskForm.addEventListener('submit', handleAddTask);
-    
     const friendForm = document.getElementById('friend-form');
     if (friendForm) friendForm.addEventListener('submit', handleAddFriend);
     
@@ -98,27 +95,6 @@ function attachEventListeners() {
     const aiSubmitBtn = document.getElementById('ai-submit-btn');
     if (aiSubmitBtn) aiSubmitBtn.addEventListener('click', handleAITaskSubmit);
     
-    const aiSkipBtn = document.getElementById('ai-skip-btn');
-    if (aiSkipBtn) {
-        aiSkipBtn.addEventListener('click', () => {
-            showManualSection();
-        });
-    }
-    
-    const addPendingBtn = document.getElementById('add-pending-btn');
-    if (addPendingBtn) {
-        addPendingBtn.addEventListener('click', () => {
-            taskMode = 'pending';
-        });
-    }
-    
-    const addCompletedBtn = document.getElementById('add-completed-btn');
-    if (addCompletedBtn) {
-        addCompletedBtn.addEventListener('click', () => {
-            taskMode = 'completed';
-        });
-    }
-    
     const addPendingTaskBtn = document.getElementById('add-pending-task-btn');
     if (addPendingTaskBtn) {
         addPendingTaskBtn.addEventListener('click', () => {
@@ -134,6 +110,9 @@ function attachEventListeners() {
             openTaskModal();
         });
     }
+    
+    const closeTaskModal = document.getElementById('close-task-modal');
+    if (closeTaskModal) closeTaskModal.addEventListener('click', closeModals);
     
     const authToggle = document.getElementById('auth-toggle');
     if (authToggle) {
@@ -204,7 +183,9 @@ function openTaskModal() {
     if (modal) {
         modal.classList.add('active');
         overlay.classList.add('active');
-        resetAddTaskModal();
+        document.getElementById('ai-task-input').value = '';
+        document.getElementById('ai-task-section').style.display = 'block';
+        document.getElementById('ai-loading').style.display = 'none';
     }
 }
 
@@ -274,61 +255,6 @@ async function refreshTasks(username) {
     
     currentTasks = { pending, completed };
     renderTasks(pending, completed);
-}
-
-async function handleAddTask(e) {
-    if (e) e.preventDefault();
-    const username = getCurrentUser();
-    if (!username) return;
-    
-    const name = document.getElementById('task-name').value.trim();
-    const duration = document.getElementById('task-duration').value;
-    const hardness = document.getElementById('task-hardness').value;
-    const taskSize = document.getElementById('task-size')?.value || 'medium';
-    const usefulness = document.getElementById('task-usefulness')?.value || 5;
-    const category = 'other';
-    
-    if (!name || !duration || !hardness) return;
-    
-    if (taskMode === 'completed') {
-        await handleAddCompletedTask();
-    } else {
-        await addTask(username, name, duration, hardness, taskSize, usefulness, category);
-        closeModals();
-        document.getElementById('task-form').reset();
-        document.getElementById('hardness-value').textContent = '5';
-        document.getElementById('usefulness-value').textContent = '5';
-        document.getElementById('task-size').value = 'medium';
-        document.getElementById('xp-preview').textContent = '25 XP';
-        refreshTasks(username);
-    }
-}
-
-async function handleAddCompletedTask() {
-    const username = getCurrentUser();
-    if (!username) return;
-    
-    const name = document.getElementById('task-name').value.trim();
-    const duration = document.getElementById('task-duration').value;
-    const hardness = document.getElementById('task-hardness').value;
-    const taskSize = document.getElementById('task-size')?.value || 'medium';
-    const usefulness = document.getElementById('task-usefulness')?.value || 5;
-    const category = 'other';
-    
-    if (!name || !duration || !hardness) return;
-    
-    const task = await addTask(username, name, duration, hardness, taskSize, usefulness, category);
-    const result = await completeTaskOp(username, task.id);
-    closeModals();
-    document.getElementById('task-form').reset();
-    document.getElementById('hardness-value').textContent = '5';
-    document.getElementById('usefulness-value').textContent = '5';
-    document.getElementById('task-size').value = 'medium';
-    document.getElementById('xp-preview').textContent = '25 XP';
-    refreshTasks(username);
-    if (result.success) {
-        updateXPDisplay(result.newXP);
-    }
 }
 
 async function completeTask(taskId) {
@@ -436,19 +362,6 @@ async function handleChangeUsername() {
     }
 }
 
-function showAISection() {
-    document.getElementById('ai-task-section').style.display = 'block';
-    document.getElementById('ai-loading').style.display = 'none';
-    document.getElementById('manual-fallback-section').style.display = 'none';
-    document.getElementById('ai-task-input').value = '';
-}
-
-function showManualSection() {
-    document.getElementById('ai-task-section').style.display = 'none';
-    document.getElementById('ai-loading').style.display = 'none';
-    document.getElementById('manual-fallback-section').style.display = 'block';
-}
-
 async function handleAITaskSubmit() {
     const username = getCurrentUser();
     if (!username) return;
@@ -458,33 +371,41 @@ async function handleAITaskSubmit() {
     
     document.getElementById('ai-loading').style.display = 'flex';
     document.getElementById('ai-task-section').style.display = 'none';
-    document.getElementById('manual-fallback-section').style.display = 'none';
     
     try {
         const goals = userData?.goals || '';
         const taskData = await rateTaskWithAI(description, goals);
         
-        document.getElementById('task-name').value = taskData.name;
-        document.getElementById('task-duration').value = taskData.duration;
-        document.getElementById('task-hardness').value = taskData.hardness;
-        document.getElementById('hardness-value').textContent = taskData.hardness;
-        document.getElementById('task-size').value = taskData.taskSize || 'medium';
-        document.getElementById('task-usefulness').value = taskData.usefulness || 5;
-        document.getElementById('usefulness-value').textContent = taskData.usefulness || 5;
-        updateXPPreview();
+        const task = await addTask(
+            username,
+            taskData.name,
+            taskData.duration,
+            taskData.hardness,
+            taskData.taskSize || 'medium',
+            taskData.usefulness || 5,
+            taskData.category || 'other'
+        );
         
-        document.getElementById('ai-loading').style.display = 'none';
-        document.getElementById('manual-fallback-section').style.display = 'block';
+        if (taskMode === 'completed') {
+            const result = await completeTaskOp(username, task.id);
+            if (result.success) {
+                updateXPDisplay(result.newXP);
+            }
+        }
+        
+        closeModals();
+        refreshTasks(username);
     } catch (error) {
         console.error('AI task submission failed:', error);
         let errorKey = 'aiFailed';
-        if (error.name === 'AbortError') {
+        if (error.name === 'AbortError' || error.message?.includes('timed out')) {
             errorKey = 'aiTimeout';
         } else if (error.message && error.message.includes('not configured')) {
             errorKey = 'aiNotConfigured';
         }
         alert(t(errorKey));
-        showAISection();
+        document.getElementById('ai-loading').style.display = 'none';
+        document.getElementById('ai-task-section').style.display = 'block';
     }
 }
 
