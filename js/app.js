@@ -447,7 +447,6 @@ function showManualSection() {
     document.getElementById('ai-task-section').style.display = 'none';
     document.getElementById('ai-loading').style.display = 'none';
     document.getElementById('manual-fallback-section').style.display = 'block';
-    resetAddTaskModal();
 }
 
 async function handleAITaskSubmit() {
