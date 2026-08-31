@@ -13,6 +13,7 @@ const DB_PATH = path.join(DATA_DIR, 'app.db');
 const AVATARS_DIR = path.join(__dirname, 'avatars');
 const aiRatingConfig = require('./js/ai-rating-config');
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
+const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
 
 app.use(cors());
 app.use(express.json());
@@ -464,9 +465,11 @@ app.post('/api/friends', async (req, res) => {
 
 app.post('/api/ai/rate', async (req, res) => {
     try {
-        if (!GROQ_API_KEY) {
-            console.error('GROQ_API_KEY is not set');
-            return res.status(500).json({ error: 'AI service is not configured on the server.' });
+        if (!GROQ_API_KEY || GROQ_API_KEY === 'undefined' || GROQ_API_KEY.trim() === '') {
+            console.error('[AI] GROQ_API_KEY is not set or invalid');
+            return res.status(500).json({ 
+                error: 'AI service is not configured. The GROQ_API_KEY environment variable is missing on the server.' 
+            });
         }
 
         const { description, goals } = req.body;
@@ -477,6 +480,8 @@ app.post('/api/ai/rate', async (req, res) => {
         const goalsText = goals ? `\n\nUser's long-term goals:\n${goals}` : '';
         const userMessage = `${description.trim()}${goalsText}`;
 
+        console.log(`[AI] Sending request to Groq API with model: ${GROQ_MODEL}...`);
+        
         const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -484,21 +489,22 @@ app.post('/api/ai/rate', async (req, res) => {
                 'Authorization': `Bearer ${GROQ_API_KEY}`
             },
             body: JSON.stringify({
-                model: 'groq/compound',
+                model: GROQ_MODEL,
                 messages: [
                     { role: 'system', content: aiRatingConfig.systemPrompt },
                     { role: 'user', content: userMessage }
                 ],
                 temperature: 0.1,
-                max_tokens: 200
+                max_tokens: 500,
+                response_format: { type: 'json_object' }
             })
         });
 
         if (!groqResponse.ok) {
             const errorText = await groqResponse.text();
-            console.error('Groq API error:', groqResponse.status, errorText);
+            console.error('[AI] Groq API error:', groqResponse.status, errorText);
             if (groqResponse.status === 401) {
-                return res.status(500).json({ error: 'AI service authentication failed. Check GROQ_API_KEY.' });
+                return res.status(500).json({ error: 'AI service authentication failed. The GROQ_API_KEY is invalid or expired.' });
             }
             if (groqResponse.status === 404) {
                 return res.status(500).json({ error: 'AI model not found. Check model name.' });
@@ -507,15 +513,17 @@ app.post('/api/ai/rate', async (req, res) => {
                 return res.status(500).json({ error: 'AI rate limit exceeded. Try again later.' });
             }
             return res.status(500).json({ 
-                error: `AI service error (HTTP ${groqResponse.status})`,
-                details: errorText 
+                error: `AI service error (HTTP ${groqResponse.status})`
             });
         }
 
         const groqData = await groqResponse.json();
+        console.log('[AI] Groq response received');
+        
         const content = groqData.choices?.[0]?.message?.content;
 
         if (!content) {
+            console.error('[AI] Empty response from Groq');
             return res.status(500).json({ error: 'Empty AI response' });
         }
 
@@ -528,11 +536,12 @@ app.post('/api/ai/rate', async (req, res) => {
                 taskData = JSON.parse(content);
             }
         } catch (parseError) {
-            console.error('Failed to parse AI response:', content);
+            console.error('[AI] Failed to parse AI response:', content);
             return res.status(500).json({ error: 'Invalid AI response format' });
         }
 
         if (!taskData.name || !taskData.duration || !taskData.hardness) {
+            console.error('[AI] Incomplete task data:', taskData);
             return res.status(500).json({ error: 'Incomplete task data from AI' });
         }
 
@@ -541,6 +550,8 @@ app.post('/api/ai/rate', async (req, res) => {
         const usefulness = Math.max(1, Math.min(10, parseInt(taskData.usefulness) || 5));
         const duration = Math.max(1, Math.min(1440, parseInt(taskData.duration) || 30));
 
+        console.log('[AI] Successfully rated task:', taskData.name);
+        
         res.json({
             name: String(taskData.name).slice(0, 100),
             duration,
@@ -551,9 +562,17 @@ app.post('/api/ai/rate', async (req, res) => {
             xp: calculateXP(duration, hardness, taskSize, usefulness)
         });
     } catch (error) {
-        console.error('AI rating error:', error);
-        res.status(500).json({ error: 'AI service unavailable' });
+        console.error('[AI] Rating error:', error);
+        res.status(500).json({ error: 'AI service unavailable: ' + (error.message || 'Unknown error') });
     }
+});
+
+app.get('/api/ai/status', (req, res) => {
+    res.json({
+        configured: !!GROQ_API_KEY,
+        keyLength: GROQ_API_KEY ? GROQ_API_KEY.length : 0,
+        model: GROQ_MODEL
+    });
 });
 
 app.listen(PORT, '0.0.0.0', () => {
