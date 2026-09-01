@@ -13,7 +13,7 @@ const DB_PATH = path.join(DATA_DIR, 'app.db');
 const AVATARS_DIR = path.join(__dirname, 'avatars');
 const aiRatingConfig = require('./js/ai-rating-config');
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+const GROQ_MODEL = process.env.GROQ_MODEL || 'groq/compound';
 
 app.use(cors());
 app.use(express.json());
