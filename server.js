@@ -61,6 +61,9 @@ db.serialize(() => {
     db.run(`ALTER TABLE tasks ADD COLUMN task_size TEXT DEFAULT 'medium'`, (err) => { if (err && !err.message.includes('duplicate column')) console.log('task_size column:', err.message); });
     db.run(`ALTER TABLE tasks ADD COLUMN usefulness INTEGER DEFAULT 5`, (err) => { if (err && !err.message.includes('duplicate column')) console.log('usefulness column:', err.message); });
     db.run(`ALTER TABLE tasks ADD COLUMN category TEXT DEFAULT 'other'`, (err) => { if (err && !err.message.includes('duplicate column')) console.log('category column:', err.message); });
+    db.run(`ALTER TABLE tasks ADD COLUMN productivity INTEGER DEFAULT 0`, (err) => { if (err && !err.message.includes('duplicate column')) console.log('productivity column:', err.message); });
+    db.run(`ALTER TABLE tasks ADD COLUMN difficulty INTEGER DEFAULT 3`, (err) => { if (err && !err.message.includes('duplicate column')) console.log('difficulty column:', err.message); });
+    db.run(`ALTER TABLE tasks ADD COLUMN offline_bonus INTEGER DEFAULT 0`, (err) => { if (err && !err.message.includes('duplicate column')) console.log('offline_bonus column:', err.message); });
     
     db.run(`ALTER TABLE users ADD COLUMN goals TEXT DEFAULT ''`, (err) => { if (err && !err.message.includes('duplicate column')) console.log('goals column:', err.message); });
 });
@@ -108,9 +111,9 @@ function createUser(username, password) {
     });
 }
 
-function calculateXP(duration, hardness, taskSize, usefulness) {
-    const sizeValue = aiRatingConfig.taskSizes[taskSize] || 20;
-    return Math.round(sizeValue * (hardness / 10 + usefulness / 10) * duration / 10);
+function calculateXP(duration, productivity, difficulty, offlineBonus) {
+    if (productivity === 0) return 0;
+    return Math.round((productivity * difficulty) + (duration / 5) + (offlineBonus || 0));
 }
 
 app.post('/api/auth/register', async (req, res) => {
@@ -305,20 +308,35 @@ app.get('/api/tasks', async (req, res) => {
 
 app.post('/api/tasks', async (req, res) => {
     try {
-        const { userId, name, duration, hardness, taskSize, usefulness, category } = req.body;
-        if (!userId || !name || !duration || !hardness) {
+        const { userId, name, duration, productivity, difficulty, offlineBonus, hardness, taskSize, usefulness, category } = req.body;
+        if (!userId || !name || !duration) {
             return res.status(400).json({ error: 'Missing fields' });
+        }
+
+        const dur = parseInt(duration);
+        let prod, diff, offBonus, xp;
+
+        if (productivity !== undefined && difficulty !== undefined) {
+            prod = Math.max(0, Math.min(5, parseInt(productivity) || 0));
+            diff = Math.max(1, Math.min(5, parseInt(difficulty) || 3));
+            offBonus = parseInt(offlineBonus) || 0;
+            xp = calculateXP(dur, prod, diff, offBonus);
+        } else {
+            prod = 0;
+            diff = Math.max(1, Math.min(5, parseInt(hardness) || 3));
+            offBonus = 0;
+            xp = 0;
         }
 
         const task = {
             id: Date.now().toString() + Math.random().toString(36).slice(2, 8),
             userId,
             name,
-            duration: parseInt(duration),
-            hardness: parseInt(hardness),
-            xp: calculateXP(duration, hardness, taskSize, usefulness),
-            taskSize: taskSize || 'medium',
-            usefulness: usefulness || 5,
+            duration: dur,
+            xp,
+            productivity: prod,
+            difficulty: diff,
+            offlineBonus: offBonus,
             category: category || 'other',
             completed: 0,
             createdAt: new Date().toISOString(),
@@ -327,8 +345,8 @@ app.post('/api/tasks', async (req, res) => {
 
         await new Promise((resolve, reject) => {
             db.run(
-                'INSERT INTO tasks (id, user_id, name, duration, hardness, xp, task_size, usefulness, category, completed, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                [task.id, task.userId, task.name, task.duration, task.hardness, task.xp, task.taskSize, task.usefulness, task.category, task.completed, task.createdAt],
+                'INSERT INTO tasks (id, user_id, name, duration, hardness, xp, productivity, difficulty, offline_bonus, category, completed, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [task.id, task.userId, task.name, task.duration, 0, task.xp, task.productivity, task.difficulty, task.offlineBonus, task.category, task.completed, task.createdAt],
                 (err) => {
                     if (err) reject(err);
                     else resolve();
@@ -338,7 +356,8 @@ app.post('/api/tasks', async (req, res) => {
 
         res.json(task);
     } catch (error) {
-        res.status(500).json({ error: 'Failed to create task' });
+        console.error('[Tasks] Create error:', error);
+        res.status(500).json({ error: 'Failed to create task: ' + error.message });
     }
 });
 
@@ -540,26 +559,27 @@ app.post('/api/ai/rate', async (req, res) => {
             return res.status(500).json({ error: 'Invalid AI response format' });
         }
 
-        if (!taskData.name || !taskData.duration || !taskData.hardness) {
+        if (!taskData.name || !taskData.duration) {
             console.error('[AI] Incomplete task data:', taskData);
             return res.status(500).json({ error: 'Incomplete task data from AI' });
         }
 
-        const taskSize = taskData.taskSize || 'medium';
-        const hardness = Math.max(1, Math.min(10, parseInt(taskData.hardness) || 5));
-        const usefulness = Math.max(1, Math.min(10, parseInt(taskData.usefulness) || 5));
+        const productivity = Math.max(0, Math.min(5, parseInt(taskData.productivity) || 0));
+        const difficulty = Math.max(1, Math.min(5, parseInt(taskData.difficulty) || 3));
+        const offlineBonus = parseInt(taskData.offlineBonus) || 0;
         const duration = Math.max(1, Math.min(1440, parseInt(taskData.duration) || 30));
+        const xp = productivity === 0 ? 0 : Math.round((productivity * difficulty) + (duration / 5) + offlineBonus);
 
-        console.log('[AI] Successfully rated task:', taskData.name);
+        console.log('[AI] Successfully rated task:', taskData.name, 'XP:', xp);
         
         res.json({
             name: String(taskData.name).slice(0, 100),
             duration,
-            hardness,
-            taskSize,
-            usefulness,
+            productivity,
+            difficulty,
+            offlineBonus,
             category: taskData.category || 'other',
-            xp: calculateXP(duration, hardness, taskSize, usefulness)
+            xp
         });
     } catch (error) {
         console.error('[AI] Rating error:', error);

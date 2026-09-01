@@ -58,10 +58,10 @@ const api = {
         return result;
     },
 
-    async createTask(userId, name, duration, hardness, taskSize, usefulness, category) {
+    async createTask(userId, name, duration, productivity, difficulty, offlineBonus, category) {
         return apiRequest('/tasks', {
             method: 'POST',
-            body: JSON.stringify({ userId, name, duration, hardness, taskSize, usefulness, category })
+            body: JSON.stringify({ userId, name, duration, productivity, difficulty, offlineBonus, category })
         });
     },
 

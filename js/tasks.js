@@ -1,18 +1,6 @@
 import { api } from './firebase.js';
 import { t } from './i18n.js';
 
-function calculateXP(duration, hardness, taskSize, usefulness) {
-    const sizeValue = {
-        mini: 5,
-        small: 10,
-        medium: 20,
-        big: 40,
-        extreme: 60
-    }[taskSize] || 20;
-    
-    return Math.round(sizeValue * (hardness / 10 + usefulness / 10) * duration / 10);
-}
-
 const RANK_THRESHOLDS = [
     { name: 'Newcomer', min: 0, next: 100 },
     { name: 'Bronze', min: 100, next: 300 },
@@ -45,8 +33,8 @@ function getProgressPercent(xp) {
     return Math.min(100, Math.max(0, (progress / range) * 100));
 }
 
-async function addTask(userEmail, name, duration, hardness, taskSize, usefulness, category) {
-    return api.createTask(userEmail, name, duration, hardness, taskSize, usefulness, category);
+async function addTask(userEmail, name, duration, productivity, difficulty, offlineBonus, category) {
+    return api.createTask(userEmail, name, duration, productivity, difficulty, offlineBonus, category);
 }
 
 async function completeTask(userEmail, taskId) {
@@ -100,9 +88,9 @@ function renderTasks(pendingTasks, completedTasks) {
                 </div>
                 <div class="task-meta">
                     <span>${t('duration')}: ${task.duration} min</span>
-                    <span>${t('hardness')}: ${task.hardness}/10</span>
-                    <span>${t('size')}: ${task.taskSize || 'medium'}</span>
-                    <span>${t('usefulness')}: ${task.usefulness || 5}/10</span>
+                    <span>${t('productivity')}: ${task.productivity || 0}/5</span>
+                    <span>${t('difficulty')}: ${task.difficulty || 3}/5</span>
+                    <span>${t('offlineBonus')}: +${task.offlineBonus || 0}</span>
                 </div>
                 <div class="task-actions">
                     <button class="btn-complete" onclick="app.completeTask('${task.id}')">${t('taskCompleted')}</button>
@@ -126,9 +114,9 @@ function renderTasks(pendingTasks, completedTasks) {
                 </div>
                 <div class="task-meta">
                     <span>${t('duration')}: ${task.duration} min</span>
-                    <span>${t('hardness')}: ${task.hardness}/10</span>
-                    <span>${t('size')}: ${task.taskSize || 'medium'}</span>
-                    <span>${t('usefulness')}: ${task.usefulness || 5}/10</span>
+                    <span>${t('productivity')}: ${task.productivity || 0}/5</span>
+                    <span>${t('difficulty')}: ${task.difficulty || 3}/5</span>
+                    <span>${t('offlineBonus')}: +${task.offlineBonus || 0}</span>
                 </div>
                 <div class="task-actions">
                     <button class="btn-delete" onclick="app.deleteTask('${task.id}')">${t('delete')}</button>
@@ -175,4 +163,4 @@ function capitalize(str) {
     return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
-export { calculateXP, getRankName, getProgressPercent, getRankInfo, addTask, completeTask, deleteTask, renderTasks, updateXPDisplay };
+export { getRankName, getProgressPercent, getRankInfo, addTask, completeTask, deleteTask, renderTasks, updateXPDisplay };

@@ -1,6 +1,6 @@
 import { register, signIn, signOut, restoreSession, subscribe, getCurrentUser, getAuthMode, setAuthMode, toggleAuthMode } from './auth.js';
 import { api } from './firebase.js';
-import { calculateXP, getRankName, getProgressPercent, addTask, completeTask as completeTaskOp, deleteTask as deleteTaskOp, renderTasks, updateXPDisplay } from './tasks.js';
+import { getRankName, getProgressPercent, addTask, completeTask as completeTaskOp, deleteTask as deleteTaskOp, renderTasks, updateXPDisplay } from './tasks.js';
 import { addFriend, loadLeaderboard, renderLeaderboard } from './leaderboard.js';
 import { changePassword, changeUsername, uploadAvatar, saveGoals, initSettings } from './settings.js';
 import { initUI, showSection, closeModals } from './ui.js';
@@ -380,9 +380,9 @@ async function handleAITaskSubmit() {
             username,
             taskData.name,
             taskData.duration,
-            taskData.hardness,
-            taskData.taskSize || 'medium',
-            taskData.usefulness || 5,
+            taskData.productivity,
+            taskData.difficulty,
+            taskData.offlineBonus,
             taskData.category || 'other'
         );
         
@@ -409,8 +409,8 @@ async function handleAITaskSubmit() {
     }
 }
 
-export { init, calculateXP, getCurrentUser, completeTask, deleteTask };
+export { init, getCurrentUser, completeTask, deleteTask };
 
-window.app = { init, calculateXP, getCurrentUser, completeTask, deleteTask };
+window.app = { init, getCurrentUser, completeTask, deleteTask };
 
 init();
