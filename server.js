@@ -13,7 +13,7 @@ const DB_PATH = path.join(DATA_DIR, 'app.db');
 const AVATARS_DIR = path.join(__dirname, 'avatars');
 const aiRatingConfig = require('./js/ai-rating-config');
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
+const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
 
 app.use(cors());
 app.use(express.json());
@@ -537,9 +537,9 @@ app.post('/api/ai/rate', async (req, res) => {
         }
 
         const groqData = await groqResponse.json();
-        console.log('[AI] Groq response received');
         
         const content = groqData.choices?.[0]?.message?.content;
+        console.log('[AI] Raw response content:', content);
 
         if (!content) {
             console.error('[AI] Empty response from Groq');
