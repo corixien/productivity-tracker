@@ -33,8 +33,8 @@ function getProgressPercent(xp) {
     return Math.min(100, Math.max(0, (progress / range) * 100));
 }
 
-async function addTask(userEmail, name, duration, productivity, difficulty, offlineBonus, category) {
-    return api.createTask(userEmail, name, duration, productivity, difficulty, offlineBonus, category);
+async function addTask(userEmail, name, duration, productivity, difficulty, bonus, category) {
+    return api.createTask(userEmail, name, duration, productivity, difficulty, bonus, category);
 }
 
 async function completeTask(userEmail, taskId) {
@@ -90,7 +90,7 @@ function renderTasks(pendingTasks, completedTasks) {
                     <span>${t('duration')}: ${task.duration} min</span>
                     <span>${t('productivity')}: ${task.productivity || 0}/5</span>
                     <span>${t('difficulty')}: ${task.difficulty || 3}/5</span>
-                    <span>${t('offlineBonus')}: +${task.offlineBonus || 0}</span>
+                    <span>${t('bonus')}: +${task.bonus || 0}</span>
                 </div>
                 <div class="task-actions">
                     <button class="btn-complete" onclick="app.completeTask('${task.id}')">${t('taskCompleted')}</button>
@@ -116,7 +116,7 @@ function renderTasks(pendingTasks, completedTasks) {
                     <span>${t('duration')}: ${task.duration} min</span>
                     <span>${t('productivity')}: ${task.productivity || 0}/5</span>
                     <span>${t('difficulty')}: ${task.difficulty || 3}/5</span>
-                    <span>${t('offlineBonus')}: +${task.offlineBonus || 0}</span>
+                    <span>${t('bonus')}: +${task.bonus || 0}</span>
                 </div>
                 <div class="task-actions">
                     <button class="btn-delete" onclick="app.deleteTask('${task.id}')">${t('delete')}</button>

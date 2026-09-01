@@ -308,23 +308,23 @@ app.get('/api/tasks', async (req, res) => {
 
 app.post('/api/tasks', async (req, res) => {
     try {
-        const { userId, name, duration, productivity, difficulty, offlineBonus, hardness, taskSize, usefulness, category } = req.body;
+        const { userId, name, duration, productivity, difficulty, bonus, offlineBonus, hardness, taskSize, usefulness, category } = req.body;
         if (!userId || !name || !duration) {
             return res.status(400).json({ error: 'Missing fields' });
         }
 
         const dur = parseInt(duration);
-        let prod, diff, offBonus, xp;
+        let prod, diff, bon, xp;
 
         if (productivity !== undefined && difficulty !== undefined) {
             prod = Math.max(0, Math.min(5, parseInt(productivity) || 0));
             diff = Math.max(1, Math.min(5, parseInt(difficulty) || 3));
-            offBonus = parseInt(offlineBonus) || 0;
-            xp = calculateXP(dur, prod, diff, offBonus);
+            bon = parseInt(bonus !== undefined ? bonus : (offlineBonus !== undefined ? offlineBonus : 0));
+            xp = prod === 0 ? 0 : Math.round((prod * diff) + (dur / 5) + bon);
         } else {
             prod = 0;
             diff = Math.max(1, Math.min(5, parseInt(hardness) || 3));
-            offBonus = 0;
+            bon = 0;
             xp = 0;
         }
 
@@ -336,7 +336,7 @@ app.post('/api/tasks', async (req, res) => {
             xp,
             productivity: prod,
             difficulty: diff,
-            offlineBonus: offBonus,
+            bonus: bon,
             category: category || 'other',
             completed: 0,
             createdAt: new Date().toISOString(),
@@ -346,7 +346,7 @@ app.post('/api/tasks', async (req, res) => {
         await new Promise((resolve, reject) => {
             db.run(
                 'INSERT INTO tasks (id, user_id, name, duration, hardness, xp, productivity, difficulty, offline_bonus, category, completed, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                [task.id, task.userId, task.name, task.duration, 0, task.xp, task.productivity, task.difficulty, task.offlineBonus, task.category, task.completed, task.createdAt],
+                [task.id, task.userId, task.name, task.duration, 0, task.xp, task.productivity, task.difficulty, task.bonus, task.category, task.completed, task.createdAt],
                 (err) => {
                     if (err) reject(err);
                     else resolve();
@@ -500,23 +500,38 @@ app.post('/api/ai/rate', async (req, res) => {
         const userMessage = `${description.trim()}${goalsText}`;
 
         console.log(`[AI] Sending request to Groq API with model: ${GROQ_MODEL}...`);
-        
-        const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${GROQ_API_KEY}`
-            },
-            body: JSON.stringify({
-                model: GROQ_MODEL,
-                messages: [
-                    { role: 'system', content: aiRatingConfig.systemPrompt },
-                    { role: 'user', content: userMessage }
-                ],
-                temperature: 0,
-                max_tokens: 300
-            })
-        });
+
+        const MAX_RETRIES = 3;
+        let groqResponse = null;
+        let lastError = null;
+
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${GROQ_API_KEY}`
+                },
+                body: JSON.stringify({
+                    model: GROQ_MODEL,
+                    messages: [
+                        { role: 'system', content: aiRatingConfig.systemPrompt },
+                        { role: 'user', content: userMessage }
+                    ],
+                    temperature: 0,
+                    max_tokens: 300
+                })
+            });
+
+            if (groqResponse.status === 429 && attempt < MAX_RETRIES) {
+                const waitTime = Math.pow(2, attempt) * 2000;
+                console.log(`[AI] Rate limited. Retrying in ${waitTime}ms (attempt ${attempt + 1}/${MAX_RETRIES})...`);
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+                continue;
+            }
+
+            break;
+        }
 
         if (!groqResponse.ok) {
             const errorText = await groqResponse.text();
@@ -528,7 +543,7 @@ app.post('/api/ai/rate', async (req, res) => {
                 return res.status(500).json({ error: 'AI model not found. Check model name.' });
             }
             if (groqResponse.status === 429) {
-                return res.status(500).json({ error: 'AI rate limit exceeded. Try again later.' });
+                return res.status(500).json({ error: 'AI rate limit exceeded. Please try again in a minute.' });
             }
             return res.status(500).json({ 
                 error: `AI service error (HTTP ${groqResponse.status})`
@@ -576,18 +591,18 @@ app.post('/api/ai/rate', async (req, res) => {
 
         const productivity = taskData.productivity !== undefined ? Math.max(0, Math.min(5, parseInt(taskData.productivity))) : 3;
         const difficulty = taskData.difficulty !== undefined ? Math.max(1, Math.min(5, parseInt(taskData.difficulty))) : 3;
-        const offlineBonus = taskData.offlineBonus !== undefined ? parseInt(taskData.offlineBonus) : 0;
+        const bonus = taskData.bonus !== undefined ? parseInt(taskData.bonus) : (taskData.offlineBonus !== undefined ? parseInt(taskData.offlineBonus) : 0);
         const duration = Math.max(1, Math.min(1440, parseInt(taskData.duration) || 30));
-        const xp = productivity === 0 ? 0 : Math.round((productivity * difficulty) + (duration / 5) + offlineBonus);
+        const xp = productivity === 0 ? 0 : Math.round((productivity * difficulty) + (duration / 5) + bonus);
 
-        console.log('[AI] Scored:', taskData.name, 'prod:', productivity, 'diff:', difficulty, 'dur:', duration, 'offline:', offlineBonus, 'xp:', xp);
+        console.log('[AI] Scored:', taskData.name, 'prod:', productivity, 'diff:', difficulty, 'dur:', duration, 'bonus:', bonus, 'xp:', xp);
         
         res.json({
             name: String(taskData.name).slice(0, 100),
             duration,
             productivity,
             difficulty,
-            offlineBonus,
+            bonus,
             category: taskData.category || 'other',
             xp
         });

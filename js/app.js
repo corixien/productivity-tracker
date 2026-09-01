@@ -382,7 +382,7 @@ async function handleAITaskSubmit() {
             taskData.duration,
             taskData.productivity,
             taskData.difficulty,
-            taskData.offlineBonus,
+            taskData.bonus,
             taskData.category || 'other'
         );
         
