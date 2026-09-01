@@ -513,9 +513,8 @@ app.post('/api/ai/rate', async (req, res) => {
                     { role: 'system', content: aiRatingConfig.systemPrompt },
                     { role: 'user', content: userMessage }
                 ],
-                temperature: 0.1,
-                max_tokens: 500,
-                response_format: { type: 'json_object' }
+                temperature: 0,
+                max_tokens: 300
             })
         });
 
@@ -559,18 +558,29 @@ app.post('/api/ai/rate', async (req, res) => {
             return res.status(500).json({ error: 'Invalid AI response format' });
         }
 
-        if (!taskData.name || !taskData.duration) {
-            console.error('[AI] Incomplete task data:', taskData);
-            return res.status(500).json({ error: 'Incomplete task data from AI' });
+        if (!taskData.name) {
+            taskData.name = description.substring(0, 50);
+        }
+        if (!taskData.duration) {
+            const durMatch = description.match(/(\d+)\s*(?:min|minute|hour|hr)/i);
+            if (durMatch) {
+                let val = parseInt(durMatch[1]);
+                if (description.toLowerCase().includes('hour') || description.toLowerCase().includes('hr')) {
+                    val *= 60;
+                }
+                taskData.duration = val;
+            } else {
+                taskData.duration = 30;
+            }
         }
 
-        const productivity = Math.max(0, Math.min(5, parseInt(taskData.productivity) || 0));
-        const difficulty = Math.max(1, Math.min(5, parseInt(taskData.difficulty) || 3));
-        const offlineBonus = parseInt(taskData.offlineBonus) || 0;
+        const productivity = taskData.productivity !== undefined ? Math.max(0, Math.min(5, parseInt(taskData.productivity))) : 3;
+        const difficulty = taskData.difficulty !== undefined ? Math.max(1, Math.min(5, parseInt(taskData.difficulty))) : 3;
+        const offlineBonus = taskData.offlineBonus !== undefined ? parseInt(taskData.offlineBonus) : 0;
         const duration = Math.max(1, Math.min(1440, parseInt(taskData.duration) || 30));
         const xp = productivity === 0 ? 0 : Math.round((productivity * difficulty) + (duration / 5) + offlineBonus);
 
-        console.log('[AI] Successfully rated task:', taskData.name, 'XP:', xp);
+        console.log('[AI] Scored:', taskData.name, 'prod:', productivity, 'diff:', difficulty, 'dur:', duration, 'offline:', offlineBonus, 'xp:', xp);
         
         res.json({
             name: String(taskData.name).slice(0, 100),
