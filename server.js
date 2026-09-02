@@ -594,20 +594,41 @@ app.post('/api/ai/rate', async (req, res) => {
         const duration = Math.max(1, Math.min(1440, parseInt(taskData.duration) || 30));
 
         const descLower = description.toLowerCase();
-        const withPeople = /\b(with\s+\w+)\b/i.test(description) || /\b(partner|spouse|wife|husband|girlfriend|boyfriend|teammate|colleague)\b/i.test(descLower);
-        const offlineKeywords = /\b(piano|guitar|drums|violin|sing|jog|run|cycl|bike|gym|workout|exercise|yoga|meditat|read\s+(a\s+)?book|clean|cook|walk|hike|draw|paint|journal|stretch|swim|danc|play\s+sport|football|soccer|tennis|swimming|skateboard|surf|climb|garden|wash\s+car|tidy|organiz|move|furniture|stair|studied|studying|practice|rehears|train|skate|snowboard)\b/i;
-        const screenKeywords = /\b(youtube|tiktok|instagram|netflix|coding|programming|brows|watch|scroll|gaming|video\s*game|computer|phone|tv|television|stream)\b/i;
+        const screenActivities = ['youtube', 'tiktok', 'instagram', 'netflix', 'cod', 'programm', 'brows', 'scroll', 'gaming', 'video game', 'computer', 'phone', 'tv', 'television', 'stream', 'discord', 'twitter', 'facebook', 'reddit'];
+        const offlineActivities = ['piano', 'guitar', 'drums', 'violin', 'sing', 'jog', 'run', 'cycl', 'bike', 'gym', 'workout', 'exercise', 'yoga', 'meditat', 'read', 'book', 'clean', 'cook', 'walk', 'hike', 'draw', 'paint', 'journal', 'stretch', 'swim', 'danc', 'football', 'soccer', 'tennis', 'basketball', 'skate', 'snowboard', 'surf', 'climb', 'garden', 'wash', 'tidy', 'organiz', 'move', 'furniture', 'stair', 'studi', 'practic', 'rehears', 'train', 'work', 'chess', 'board game', 'card', 'cook', 'bake', 'shop', 'errand', 'driv', 'commut'];
+        const socialKeywords = ['with friends', 'with family', 'with my', 'with the', 'with team', 'with class', 'with coworker', 'with colleague', 'with girlfriend', 'with boyfriend', 'with wife', 'with husband', 'with partner', 'with brother', 'with sister', 'with mom', 'with dad', 'with mother', 'with father', 'with kids', 'with children', 'with people', 'together', 'and i', 'and we', 'and my', 'and the', 'played with', 'went with'];
+
+        let aiBonus = taskData.bonus;
+        if (typeof aiBonus === 'string') {
+            aiBonus = aiBonus.toLowerCase() === 'yes' ? 3 : 0;
+        } else if (aiBonus !== undefined) {
+            aiBonus = parseInt(aiBonus) || 0;
+        } else if (taskData.offlineBonus !== undefined) {
+            aiBonus = parseInt(taskData.offlineBonus) || 0;
+        } else {
+            aiBonus = 0;
+        }
+
+        const isScreen = screenActivities.some(kw => descLower.includes(kw));
+        const isOffline = offlineActivities.some(kw => descLower.includes(kw));
+        const isSocial = socialKeywords.some(kw => descLower.includes(kw));
 
         let bonus = 0;
-        if (withPeople && !screenKeywords.test(descLower)) {
-            bonus = 3;
-            console.log('[AI] Bonus: with people detected -> 3');
-        } else if (offlineKeywords.test(descLower) && !screenKeywords.test(descLower)) {
-            bonus = 3;
-            console.log('[AI] Bonus: offline activity detected -> 3');
-        } else {
-            console.log('[AI] Bonus: no bonus (screen activity or unrecognized)');
+        if (!isScreen) {
+            if (isSocial || isOffline) {
+                bonus = 3;
+            }
         }
+
+        if (aiBonus === 3 && bonus === 0 && !isScreen) {
+            bonus = 3;
+        }
+
+        if (isScreen) {
+            bonus = 0;
+        }
+
+        console.log('[AI] Bonus detection: screen=' + isScreen + ' offline=' + isOffline + ' social=' + isSocial + ' aiBonus=' + aiBonus + ' final=' + bonus);
 
         const xp = productivity === 0 ? 0 : Math.round((productivity * difficulty) + (duration / 5) + bonus);
 
