@@ -591,25 +591,22 @@ app.post('/api/ai/rate', async (req, res) => {
 
         const productivity = taskData.productivity !== undefined ? Math.max(0, Math.min(5, parseInt(taskData.productivity))) : 3;
         const difficulty = taskData.difficulty !== undefined ? Math.max(1, Math.min(5, parseInt(taskData.difficulty))) : 3;
-        let bonus = taskData.bonus !== undefined ? parseInt(taskData.bonus) : (taskData.offlineBonus !== undefined ? parseInt(taskData.offlineBonus) : 0);
         const duration = Math.max(1, Math.min(1440, parseInt(taskData.duration) || 30));
 
         const descLower = description.toLowerCase();
-        const withPeople = /\b(with\s+(friends|family|my\s+\w+|team|class|coworker|colleague|girlfriend|boyfriend|wife|husband|partner|brother|sister|mom|dad|dad|mother|father|kids|children))\b/i.test(description);
-        const offlineKeywords = /\b(piano|guitar|drums|violin|sing|jog|run|cycle|bike|gym|workout|exercise|yoga|meditat|read\s+(a\s+)?book|clean|cook|walk|hike|draw|paint|journal|stretch|swim|dance|play\s+sport|football|soccer|tennis|swimming)\b/i;
+        const withPeople = /\b(with\s+\w+)\b/i.test(description) || /\b(partner|spouse|wife|husband|girlfriend|boyfriend|teammate|colleague)\b/i.test(descLower);
+        const offlineKeywords = /\b(piano|guitar|drums|violin|sing|jog|run|cycl|bike|gym|workout|exercise|yoga|meditat|read\s+(a\s+)?book|clean|cook|walk|hike|draw|paint|journal|stretch|swim|danc|play\s+sport|football|soccer|tennis|swimming|skateboard|surf|climb|garden|wash\s+car|tidy|organiz|move|furniture|stair|studied|studying|practice|rehears|train|skate|snowboard)\b/i;
         const screenKeywords = /\b(youtube|tiktok|instagram|netflix|coding|programming|brows|watch|scroll|gaming|video\s*game|computer|phone|tv|television|stream)\b/i;
 
-        if (bonus === 0) {
-            if (withPeople) {
-                bonus = 5;
-                console.log('[AI] Override bonus: with people detected -> 5');
-            } else if (offlineKeywords.test(descLower) && !screenKeywords.test(descLower)) {
-                bonus = 3;
-                console.log('[AI] Override bonus: offline activity detected -> 3');
-            }
-        } else if (bonus < 3 && offlineKeywords.test(descLower) && !screenKeywords.test(descLower) && !withPeople) {
+        let bonus = 0;
+        if (withPeople && !screenKeywords.test(descLower)) {
             bonus = 3;
-            console.log('[AI] Override bonus: offline activity detected, AI returned', bonus);
+            console.log('[AI] Bonus: with people detected -> 3');
+        } else if (offlineKeywords.test(descLower) && !screenKeywords.test(descLower)) {
+            bonus = 3;
+            console.log('[AI] Bonus: offline activity detected -> 3');
+        } else {
+            console.log('[AI] Bonus: no bonus (screen activity or unrecognized)');
         }
 
         const xp = productivity === 0 ? 0 : Math.round((productivity * difficulty) + (duration / 5) + bonus);
