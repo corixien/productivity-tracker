@@ -598,37 +598,21 @@ app.post('/api/ai/rate', async (req, res) => {
         const offlineActivities = ['piano', 'guitar', 'drums', 'violin', 'sing', 'jog', 'run', 'cycl', 'bike', 'gym', 'workout', 'exercise', 'yoga', 'meditat', 'read', 'book', 'clean', 'cook', 'walk', 'hike', 'draw', 'paint', 'journal', 'stretch', 'swim', 'danc', 'football', 'soccer', 'tennis', 'basketball', 'skate', 'snowboard', 'surf', 'climb', 'garden', 'wash', 'tidy', 'organiz', 'move', 'furniture', 'stair', 'studi', 'practic', 'rehears', 'train', 'work', 'chess', 'board game', 'card', 'cook', 'bake', 'shop', 'errand', 'driv', 'commut'];
         const socialKeywords = ['with friends', 'with family', 'with my', 'with the', 'with team', 'with class', 'with coworker', 'with colleague', 'with girlfriend', 'with boyfriend', 'with wife', 'with husband', 'with partner', 'with brother', 'with sister', 'with mom', 'with dad', 'with mother', 'with father', 'with kids', 'with children', 'with people', 'together', 'and i', 'and we', 'and my', 'and the', 'played with', 'went with'];
 
-        let aiBonus = taskData.bonus;
-        if (typeof aiBonus === 'string') {
-            aiBonus = aiBonus.toLowerCase() === 'yes' ? 3 : 0;
-        } else if (aiBonus !== undefined) {
-            aiBonus = parseInt(aiBonus) || 0;
-        } else if (taskData.offlineBonus !== undefined) {
-            aiBonus = parseInt(taskData.offlineBonus) || 0;
-        } else {
-            aiBonus = 0;
-        }
-
         const isScreen = screenActivities.some(kw => descLower.includes(kw));
         const isOffline = offlineActivities.some(kw => descLower.includes(kw));
         const isSocial = socialKeywords.some(kw => descLower.includes(kw));
 
-        let bonus = 0;
-        if (!isScreen) {
-            if (isSocial || isOffline) {
-                bonus = 3;
-            }
-        }
-
-        if (aiBonus === 3 && bonus === 0 && !isScreen) {
-            bonus = 3;
-        }
-
+        let bonus;
         if (isScreen) {
             bonus = 0;
+        } else if (isOffline || isSocial) {
+            bonus = 3;
+        } else {
+            const aiBonusVal = taskData.bonus !== undefined ? parseInt(taskData.bonus) : (taskData.offlineBonus !== undefined ? parseInt(taskData.offlineBonus) : 0);
+            bonus = aiBonusVal === 3 ? 3 : 0;
         }
 
-        console.log('[AI] Bonus detection: screen=' + isScreen + ' offline=' + isOffline + ' social=' + isSocial + ' aiBonus=' + aiBonus + ' final=' + bonus);
+        console.log('[AI] Bonus detection: screen=' + isScreen + ' offline=' + isOffline + ' social=' + isSocial + ' aiBonus=' + (taskData.bonus !== undefined ? taskData.bonus : 'N/A') + ' final=' + bonus);
 
         const xp = productivity === 0 ? 0 : Math.round((productivity * difficulty) + (duration / 5) + bonus);
 
