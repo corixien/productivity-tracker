@@ -93,7 +93,23 @@ function getUserTasks(username) {
     return new Promise((resolve, reject) => {
         db.all('SELECT * FROM tasks WHERE user_id = ?', [username], (err, rows) => {
             if (err) reject(err);
-            else resolve(rows || []);
+            else {
+                const tasks = (rows || []).map(row => ({
+                    id: row.id,
+                    userId: row.user_id,
+                    name: row.name,
+                    duration: row.duration,
+                    xp: row.xp,
+                    productivity: row.productivity || 0,
+                    difficulty: row.difficulty || 3,
+                    bonus: row.offline_bonus || 0,
+                    category: row.category || 'other',
+                    completed: row.completed,
+                    createdAt: row.created_at,
+                    completedAt: row.completed_at
+                }));
+                resolve(tasks);
+            }
         });
     });
 }
@@ -598,8 +614,23 @@ app.post('/api/ai/rate', async (req, res) => {
 
         const productivity = taskData.productivity !== undefined ? Math.max(0, Math.min(5, parseInt(taskData.productivity))) : 3;
         const difficulty = taskData.difficulty !== undefined ? Math.max(1, Math.min(5, parseInt(taskData.difficulty))) : 3;
-        const bonus = taskData.bonus !== undefined ? (parseInt(taskData.bonus) === 3 ? 3 : 0) : 0;
         const duration = Math.max(1, Math.min(1440, parseInt(taskData.duration) || 30));
+
+        let bonus;
+        const aiBonusVal = taskData.bonus !== undefined && taskData.bonus !== null ? parseInt(taskData.bonus) : null;
+        if (aiBonusVal === 3 || aiBonusVal === 0) {
+            bonus = aiBonusVal;
+        } else {
+            const dl = description.toLowerCase();
+            const screenKw = ['youtube','tiktok','instagram','netflix','cod','program','brows','scroll','gaming','video game','computer','phone','tv','stream','discord','twitter','facebook','reddit'];
+            const offlineKw = ['piano','guitar','drums','violin','sing','jog','run','cycl','bike','gym','workout','exercise','yoga','meditat','read','book','clean','cook','walk','hike','draw','paint','studi','practic','train','wash','tidy','organiz','swim','danc','football','soccer','tennis','basketball','skate','snowboard','surf','climb','garden','chess','bake','shop','driv','commut','homework'];
+            const socialKw = ['with friends','with family','with my','with team','with class','together'];
+            const isScreen = screenKw.some(k => dl.includes(k));
+            const isOffline = offlineKw.some(k => dl.includes(k));
+            const isSocial = socialKw.some(k => dl.includes(k));
+            bonus = (!isScreen && (isOffline || isSocial)) ? 3 : 0;
+            console.log('[AI] Bonus fallback: screen=' + isScreen + ' offline=' + isOffline + ' social=' + isSocial);
+        }
 
         const xp = productivity === 0 ? 0 : Math.round((productivity * difficulty) + (duration / 5) + bonus);
 
