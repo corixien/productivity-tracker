@@ -13,7 +13,7 @@ const DB_PATH = path.join(DATA_DIR, 'app.db');
 const AVATARS_DIR = path.join(__dirname, 'avatars');
 const aiRatingConfig = require('./js/ai-rating-config');
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const GROQ_MODEL = process.env.GROQ_MODEL || 'meta-llama/llama-4-scout-17b-16e-instruct';
+const GROQ_MODEL = process.env.GROQ_MODEL || 'groq/compound';
 
 app.use(cors());
 app.use(express.json());
@@ -563,12 +563,18 @@ app.post('/api/ai/rate', async (req, res) => {
 
         let taskData;
         try {
-            const jsonMatch = content.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-                taskData = JSON.parse(jsonMatch[0]);
+            let jsonStr = content;
+            const codeBlockMatch = content.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+            if (codeBlockMatch) {
+                jsonStr = codeBlockMatch[1];
             } else {
-                taskData = JSON.parse(content);
+                const jsonMatch = content.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                    jsonStr = jsonMatch[0];
+                }
             }
+            taskData = JSON.parse(jsonStr);
+            console.log('[AI] Parsed taskData:', JSON.stringify(taskData));
         } catch (parseError) {
             console.error('[AI] Failed to parse AI response:', content);
             return res.status(500).json({ error: 'Invalid AI response format' });
