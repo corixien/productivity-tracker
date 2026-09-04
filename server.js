@@ -13,7 +13,7 @@ const DB_PATH = path.join(DATA_DIR, 'app.db');
 const AVATARS_DIR = path.join(__dirname, 'avatars');
 const aiRatingConfig = require('./js/ai-rating-config');
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const GROQ_MODEL = process.env.GROQ_MODEL || 'groq/compound';
+const GROQ_MODEL = process.env.GROQ_MODEL || 'meta-llama/llama-4-scout-17b-16e-instruct';
 
 app.use(cors());
 app.use(express.json());
@@ -519,7 +519,8 @@ app.post('/api/ai/rate', async (req, res) => {
                         { role: 'user', content: userMessage }
                     ],
                     temperature: 0,
-                    max_tokens: 300
+                    max_tokens: 300,
+                    response_format: { type: 'json_object' }
                 })
             });
 
