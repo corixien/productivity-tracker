@@ -96,10 +96,23 @@ function attachEventListeners() {
     if (aiSubmitBtn) aiSubmitBtn.addEventListener('click', handleAITaskSubmit);
     
     const reviewConfirmBtn = document.getElementById('review-confirm-btn');
-    if (reviewConfirmBtn) reviewConfirmBtn.addEventListener('click', handleReviewConfirm);
+    if (reviewConfirmBtn) reviewConfirmBtn.addEventListener('click', handleReviewNext);
     
     const reviewCancelBtn = document.getElementById('review-cancel-btn');
-    if (reviewCancelBtn) reviewCancelBtn.addEventListener('click', handleReviewCancel);
+    if (reviewCancelBtn) {
+        reviewCancelBtn.addEventListener('click', () => {
+            currentAIRating = null;
+            document.getElementById('ai-review-section').style.display = 'none';
+            document.getElementById('ai-task-section').style.display = 'block';
+            document.getElementById('ai-loading').style.display = 'none';
+        });
+    }
+    
+    const editConfirmBtn = document.getElementById('edit-confirm-btn');
+    if (editConfirmBtn) editConfirmBtn.addEventListener('click', handleEditConfirm);
+    
+    const editCancelBtn = document.getElementById('edit-cancel-btn');
+    if (editCancelBtn) editCancelBtn.addEventListener('click', handleEditCancel);
     
     const addPendingTaskBtn = document.getElementById('add-pending-task-btn');
     if (addPendingTaskBtn) {
@@ -411,47 +424,82 @@ async function handleAITaskSubmit() {
 function showReviewSection() {
     if (!currentAIRating) return;
     
-    const r = currentAIRating;
-    const baseXP = r.productivity === 0 ? 0 : Math.round((r.productivity * r.difficulty) + (r.duration / 5));
-    
-    document.getElementById('review-name').textContent = r.name;
-    document.getElementById('review-duration').textContent = r.duration;
-    document.getElementById('review-productivity').textContent = r.productivity;
-    document.getElementById('review-difficulty').textContent = r.difficulty;
-    document.getElementById('review-xp').textContent = baseXP + ' XP';
-    
     const checkbox = document.getElementById('review-bonus-checkbox');
     checkbox.checked = false;
-    
-    const finalXPElement = document.getElementById('review-final-xp');
-    finalXPElement.textContent = baseXP + ' XP';
-    
-    checkbox.onchange = () => {
-        const finalXP = checkbox.checked ? baseXP + 3 : baseXP;
-        finalXPElement.textContent = finalXP + ' XP';
-    };
     
     document.getElementById('ai-review-section').style.display = 'block';
     document.getElementById('ai-loading').style.display = 'none';
     document.getElementById('ai-task-section').style.display = 'none';
+    document.getElementById('ai-edit-section').style.display = 'none';
 }
 
-async function handleReviewConfirm() {
+function showEditSection() {
+    if (!currentAIRating) return;
+    
+    const r = currentAIRating;
+    const bonus = document.getElementById('review-bonus-checkbox').checked ? 3 : 0;
+    
+    document.getElementById('edit-task-name').value = r.name;
+    document.getElementById('edit-task-duration').value = r.duration;
+    document.getElementById('edit-task-productivity').value = r.productivity;
+    document.getElementById('edit-productivity-value').textContent = r.productivity;
+    document.getElementById('edit-task-difficulty').value = r.difficulty;
+    document.getElementById('edit-difficulty-value').textContent = r.difficulty;
+    
+    currentAIRating.bonus = bonus;
+    
+    function updateFinalXP() {
+        const prod = parseInt(document.getElementById('edit-task-productivity').value) || 0;
+        const diff = parseInt(document.getElementById('edit-task-difficulty').value) || 1;
+        const dur = parseInt(document.getElementById('edit-task-duration').value) || 30;
+        const b = document.getElementById('review-bonus-checkbox').checked ? 3 : 0;
+        const xp = prod === 0 ? 0 : Math.round((prod * diff) + (dur / 5) + b);
+        document.getElementById('edit-final-xp').textContent = xp + ' XP';
+    }
+    
+    updateFinalXP();
+    
+    const prodSlider = document.getElementById('edit-task-productivity');
+    const diffSlider = document.getElementById('edit-task-difficulty');
+    const durInput = document.getElementById('edit-task-duration');
+    
+    prodSlider.oninput = () => {
+        document.getElementById('edit-productivity-value').textContent = prodSlider.value;
+        updateFinalXP();
+    };
+    diffSlider.oninput = () => {
+        document.getElementById('edit-difficulty-value').textContent = diffSlider.value;
+        updateFinalXP();
+    };
+    durInput.oninput = updateFinalXP;
+    
+    document.getElementById('ai-review-section').style.display = 'none';
+    document.getElementById('ai-edit-section').style.display = 'block';
+}
+
+function handleReviewNext() {
+    showEditSection();
+}
+
+async function handleEditConfirm() {
     const username = getCurrentUser();
     if (!username || !currentAIRating) return;
     
+    const name = document.getElementById('edit-task-name').value.trim() || 'Task';
+    const duration = parseInt(document.getElementById('edit-task-duration').value) || 30;
+    const productivity = parseInt(document.getElementById('edit-task-productivity').value) || 3;
+    const difficulty = parseInt(document.getElementById('edit-task-difficulty').value) || 3;
     const bonus = document.getElementById('review-bonus-checkbox').checked ? 3 : 0;
-    const r = currentAIRating;
     
     try {
         const task = await addTask(
             username,
-            r.name,
-            r.duration,
-            r.productivity,
-            r.difficulty,
+            name,
+            duration,
+            productivity,
+            difficulty,
             bonus,
-            r.category
+            currentAIRating.category || 'other'
         );
         
         if (taskMode === 'completed') {
@@ -465,6 +513,7 @@ async function handleReviewConfirm() {
         closeModals();
         document.getElementById('ai-task-input').value = '';
         document.getElementById('ai-review-section').style.display = 'none';
+        document.getElementById('ai-edit-section').style.display = 'none';
         refreshTasks(username);
     } catch (error) {
         console.error('Task creation failed:', error);
@@ -472,11 +521,9 @@ async function handleReviewConfirm() {
     }
 }
 
-function handleReviewCancel() {
-    currentAIRating = null;
-    document.getElementById('ai-review-section').style.display = 'none';
-    document.getElementById('ai-task-section').style.display = 'block';
-    document.getElementById('ai-loading').style.display = 'none';
+function handleEditCancel() {
+    document.getElementById('ai-edit-section').style.display = 'none';
+    document.getElementById('ai-review-section').style.display = 'block';
 }
 
 export { init, getCurrentUser, completeTask, deleteTask };
