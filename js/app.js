@@ -95,6 +95,12 @@ function attachEventListeners() {
     const aiSubmitBtn = document.getElementById('ai-submit-btn');
     if (aiSubmitBtn) aiSubmitBtn.addEventListener('click', handleAITaskSubmit);
     
+    const reviewConfirmBtn = document.getElementById('review-confirm-btn');
+    if (reviewConfirmBtn) reviewConfirmBtn.addEventListener('click', handleReviewConfirm);
+    
+    const reviewCancelBtn = document.getElementById('review-cancel-btn');
+    if (reviewCancelBtn) reviewCancelBtn.addEventListener('click', handleReviewCancel);
+    
     const addPendingTaskBtn = document.getElementById('add-pending-task-btn');
     if (addPendingTaskBtn) {
         addPendingTaskBtn.addEventListener('click', () => {
@@ -362,6 +368,8 @@ async function handleChangeUsername() {
     }
 }
 
+let currentAIRating = null;
+
 async function handleAITaskSubmit() {
     const username = getCurrentUser();
     if (!username) return;
@@ -376,25 +384,16 @@ async function handleAITaskSubmit() {
         const goals = userData?.goals || '';
         const taskData = await rateTaskWithAI(description, goals);
         
-        const task = await addTask(
-            username,
-            taskData.name,
-            taskData.duration,
-            taskData.productivity,
-            taskData.difficulty,
-            taskData.bonus,
-            taskData.category || 'other'
-        );
+        currentAIRating = {
+            name: taskData.name || description.substring(0, 50),
+            duration: taskData.duration || 30,
+            productivity: taskData.productivity !== undefined ? taskData.productivity : 3,
+            difficulty: taskData.difficulty !== undefined ? taskData.difficulty : 3,
+            category: taskData.category || 'other'
+        };
         
-        if (taskMode === 'completed') {
-            const result = await completeTaskOp(username, task.id);
-            if (result.success) {
-                updateXPDisplay(result.newXP);
-            }
-        }
-        
-        closeModals();
-        refreshTasks(username);
+        document.getElementById('ai-loading').style.display = 'none';
+        showReviewSection();
     } catch (error) {
         console.error('AI task submission failed:', error);
         let errorKey = 'aiFailed';
@@ -407,6 +406,77 @@ async function handleAITaskSubmit() {
         document.getElementById('ai-loading').style.display = 'none';
         document.getElementById('ai-task-section').style.display = 'block';
     }
+}
+
+function showReviewSection() {
+    if (!currentAIRating) return;
+    
+    const r = currentAIRating;
+    const baseXP = r.productivity === 0 ? 0 : Math.round((r.productivity * r.difficulty) + (r.duration / 5));
+    
+    document.getElementById('review-name').textContent = r.name;
+    document.getElementById('review-duration').textContent = r.duration;
+    document.getElementById('review-productivity').textContent = r.productivity;
+    document.getElementById('review-difficulty').textContent = r.difficulty;
+    document.getElementById('review-xp').textContent = baseXP + ' XP';
+    
+    const checkbox = document.getElementById('review-bonus-checkbox');
+    checkbox.checked = false;
+    
+    const finalXPElement = document.getElementById('review-final-xp');
+    finalXPElement.textContent = baseXP + ' XP';
+    
+    checkbox.onchange = () => {
+        const finalXP = checkbox.checked ? baseXP + 3 : baseXP;
+        finalXPElement.textContent = finalXP + ' XP';
+    };
+    
+    document.getElementById('ai-review-section').style.display = 'block';
+    document.getElementById('ai-loading').style.display = 'none';
+    document.getElementById('ai-task-section').style.display = 'none';
+}
+
+async function handleReviewConfirm() {
+    const username = getCurrentUser();
+    if (!username || !currentAIRating) return;
+    
+    const bonus = document.getElementById('review-bonus-checkbox').checked ? 3 : 0;
+    const r = currentAIRating;
+    
+    try {
+        const task = await addTask(
+            username,
+            r.name,
+            r.duration,
+            r.productivity,
+            r.difficulty,
+            bonus,
+            r.category
+        );
+        
+        if (taskMode === 'completed') {
+            const result = await completeTaskOp(username, task.id);
+            if (result.success) {
+                updateXPDisplay(result.newXP);
+            }
+        }
+        
+        currentAIRating = null;
+        closeModals();
+        document.getElementById('ai-task-input').value = '';
+        document.getElementById('ai-review-section').style.display = 'none';
+        refreshTasks(username);
+    } catch (error) {
+        console.error('Task creation failed:', error);
+        alert('Failed to create task');
+    }
+}
+
+function handleReviewCancel() {
+    currentAIRating = null;
+    document.getElementById('ai-review-section').style.display = 'none';
+    document.getElementById('ai-task-section').style.display = 'block';
+    document.getElementById('ai-loading').style.display = 'none';
 }
 
 export { init, getCurrentUser, completeTask, deleteTask };

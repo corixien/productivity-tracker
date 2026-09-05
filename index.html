@@ -219,6 +219,29 @@
                 <div class="spinner"></div>
                 <p data-i18n="aiRating">AI is rating your task...</p>
             </div>
+            
+            <div id="ai-review-section" style="display:none;">
+                <div class="form-group">
+                    <label data-i18n="aiReviewTitle">AI rated your task:</label>
+                    <div class="review-row"><span data-i18n="taskName">Task Name</span>: <strong id="review-name"></strong></div>
+                    <div class="review-row"><span data-i18n="duration">Duration</span>: <strong id="review-duration"></strong> min</div>
+                    <div class="review-row"><span data-i18n="productivity">Productivity</span>: <strong id="review-productivity"></strong>/5</div>
+                    <div class="review-row"><span data-i18n="difficulty">Difficulty</span>: <strong id="review-difficulty"></strong>/5</div>
+                    <div class="review-row"><span data-i18n="xpPreview">XP</span>: <strong id="review-xp"></strong></div>
+                </div>
+                <div class="form-group bonus-checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="review-bonus-checkbox">
+                        <span data-i18n="bonus">Bonus (offline/with friends)</span> (+3 XP)
+                    </label>
+                </div>
+                <div class="form-group">
+                    <span data-i18n="finalXP">Final XP</span>: <strong id="review-final-xp"></strong></div>
+                <div class="ai-buttons">
+                    <button type="button" id="review-confirm-btn" class="primary-btn" data-i18n="confirm">Confirm</button>
+                    <button type="button" id="review-cancel-btn" class="secondary-btn" data-i18n="cancel">Cancel</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -242,14 +265,14 @@
         }, 2000);
     </script>
 
-    <script type="module" src="js/i18n.js?v=22"></script>
-    <script type="module" src="js/firebase.js?v=22"></script>
-    <script type="module" src="js/auth.js?v=22"></script>
-    <script type="module" src="js/tasks.js?v=22"></script>
-    <script type="module" src="js/leaderboard.js?v=22"></script>
-    <script type="module" src="js/settings.js?v=22"></script>
-    <script type="module" src="js/ui.js?v=22"></script>
-    <script type="module" src="js/ai-service.js?v=22"></script>
-    <script type="module" src="js/app.js?v=22"></script>
+    <script type="module" src="js/i18n.js?v=23"></script>
+    <script type="module" src="js/firebase.js?v=23"></script>
+    <script type="module" src="js/auth.js?v=23"></script>
+    <script type="module" src="js/tasks.js?v=23"></script>
+    <script type="module" src="js/leaderboard.js?v=23"></script>
+    <script type="module" src="js/settings.js?v=23"></script>
+    <script type="module" src="js/ui.js?v=23"></script>
+    <script type="module" src="js/ai-service.js?v=23"></script>
+    <script type="module" src="js/app.js?v=23"></script>
 </body>
 </html>
