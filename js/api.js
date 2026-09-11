@@ -1,4 +1,37 @@
 const API_BASE = '/api';
+const TOKEN_KEY = 'productivity_tracker_token';
+const TOKEN_SESSION_KEY = 'productivity_tracker_session_token';
+
+function getAuthToken() {
+    try {
+        return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_SESSION_KEY);
+    } catch (e) {
+        return null;
+    }
+}
+
+function setAuthToken(token, remember) {
+    try {
+        if (remember) {
+            localStorage.setItem(TOKEN_KEY, token);
+            sessionStorage.removeItem(TOKEN_SESSION_KEY);
+        } else {
+            sessionStorage.setItem(TOKEN_SESSION_KEY, token);
+            localStorage.removeItem(TOKEN_KEY);
+        }
+    } catch (e) {
+        console.error('Token storage error:', e);
+    }
+}
+
+function removeAuthToken() {
+    try {
+        localStorage.removeItem(TOKEN_KEY);
+        sessionStorage.removeItem(TOKEN_SESSION_KEY);
+    } catch (e) {
+        console.error('Token storage error:', e);
+    }
+}
 
 async function apiRequest(endpoint, options = {}) {
     const url = `${API_BASE}${endpoint}`;
@@ -6,7 +39,12 @@ async function apiRequest(endpoint, options = {}) {
         headers: { 'Content-Type': 'application/json' },
         ...options
     };
-    
+
+    const token = getAuthToken();
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+
     try {
         const response = await fetch(url, config);
         const data = await response.json();
@@ -35,6 +73,10 @@ const api = {
         });
     },
 
+    async getMe() {
+        return apiRequest('/auth/me');
+    },
+
     async getUser(username) {
         return apiRequest(`/users/${encodeURIComponent(username)}`);
     },
@@ -53,9 +95,15 @@ const api = {
         });
     },
 
+    async changeUsername(oldUsername, newUsername) {
+        return apiRequest(`/users/${encodeURIComponent(oldUsername)}/change-username`, {
+            method: 'POST',
+            body: JSON.stringify({ newUsername })
+        });
+    },
+
     async getTasks(userId) {
-        const result = await apiRequest(`/tasks?userId=${encodeURIComponent(userId)}`);
-        return result;
+        return apiRequest(`/tasks?userId=${encodeURIComponent(userId)}`);
     },
 
     async createTask(userId, name, duration, productivity, difficulty, bonus, category) {
@@ -78,17 +126,33 @@ const api = {
         });
     },
 
-    async getLeaderboard(userId) {
-        const result = await apiRequest(`/leaderboard?userId=${encodeURIComponent(userId)}`);
-        return result;
+    async completeTask(taskId) {
+        return apiRequest(`/tasks/${taskId}/complete`, {
+            method: 'POST'
+        });
     },
 
-    async addFriend(username, friendUsername) {
-        return apiRequest('/friends', {
+    async getLeaderboard(userId) {
+        return apiRequest(`/leaderboard?userId=${encodeURIComponent(userId)}`);
+    },
+
+    async addFriend(friendUsername) {
+        return apiRequest('/users/friends', {
             method: 'POST',
-            body: JSON.stringify({ username, friendUsername })
+            body: JSON.stringify({ friendUsername })
+        });
+    },
+
+    async getSettings() {
+        return apiRequest('/settings');
+    },
+
+    async updateSettings(data) {
+        return apiRequest('/settings', {
+            method: 'PUT',
+            body: JSON.stringify(data)
         });
     }
 };
 
-export { api };
+export { api, getAuthToken, setAuthToken, removeAuthToken };

@@ -1,15 +1,29 @@
 {
   "name": "productivity-tracker",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js"
+    "start": "node backend/index.js",
+    "dev": "node --watch backend/index.js",
+    "backend": "node backend/index.js",
+    "migrate": "node database/migrate.js",
+    "migrate:data": "node database/migrate-data.js",
+    "check": "node --check backend/index.js && node --check backend/config.js && node --check backend/services/groqService.js && node --check backend/services/avatarService.js && node --check database/migrate.js && node --check database/migrate-data.js"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.45.6",
+    "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
     "dotenv": "^17.4.2",
     "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.11.3",
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
     "sqlite3": "^5.1.6"
   }
 }

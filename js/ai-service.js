@@ -1,16 +1,27 @@
 const AI_TIMEOUT = 15000;
+const GROQ_ROUTE = '/api/groq';
+const AI_RATE_ROUTE = '/api/ai/rate';
 
 async function rateTaskWithAI(description, goals) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT);
 
     try {
-        const response = await fetch('/api/ai/rate', {
+        let response = await fetch(GROQ_ROUTE, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ description, goals }),
             signal: controller.signal
         });
+
+        if (response.status === 404) {
+            response = await fetch(AI_RATE_ROUTE, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ description, goals }),
+                signal: controller.signal
+            });
+        }
 
         clearTimeout(timeoutId);
 

@@ -1,13 +1,13 @@
-import { api } from './firebase.js';
+import { api } from './api.js';
 import { t } from './i18n.js';
 
-async function addFriend(username, friendUsername) {
-    if (friendUsername.toLowerCase() === username.toLowerCase()) {
+async function addFriend(friendUsername) {
+    if (!friendUsername) {
         return { success: false, error: t('invalidUsername') };
     }
-    
+
     try {
-        await api.addFriend(username, friendUsername);
+        await api.addFriend(friendUsername);
         return { success: true };
     } catch (error) {
         return { success: false, error: error.message };
@@ -23,20 +23,20 @@ async function loadLeaderboard(username) {
 function renderLeaderboard(entries) {
     const tbody = document.getElementById('leaderboard-body');
     tbody.innerHTML = '';
-    
+
     if (entries.length === 0) {
         tbody.innerHTML = `<tr><td colspan="4" class="empty-state">${t('noFriends')}</td></tr>`;
         return;
     }
-    
+
     entries.forEach((entry, index) => {
         const tr = document.createElement('tr');
         const avatarSrc = entry.avatar ? entry.avatar + '?t=' + Date.now() : null;
         const avatarId = 'avatar-' + index;
-        const avatarHtml = avatarSrc 
-            ? `<img src="${avatarSrc}" class="leaderboard-avatar" alt="avatar" id="${avatarId}" onerror="this.style.display='none';document.getElementById('placeholder-${avatarId}').style.display='flex';">` 
+        const avatarHtml = avatarSrc
+            ? `<img src="${avatarSrc}" class="leaderboard-avatar" alt="avatar" id="${avatarId}" onerror="this.style.display='none';document.getElementById('placeholder-${avatarId}').style.display='flex';">`
             : `<span class="leaderboard-avatar-placeholder" id="placeholder-${avatarId}">👤</span>`;
-        
+
         tr.innerHTML = `
             <td>#${index + 1}</td>
             <td><div class="leaderboard-user-cell">${avatarHtml}<span>${escapeHtml(entry.username)}</span></div></td>

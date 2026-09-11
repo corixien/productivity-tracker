@@ -1,4 +1,4 @@
-import { api } from './firebase.js';
+import { api, getAuthToken, setAuthToken, removeAuthToken } from './api.js';
 import { setLanguage, getCurrentLang } from './i18n.js';
 
 const STORAGE_KEY = 'productivity_tracker_user';
@@ -45,6 +45,12 @@ function clearStoredUsername() {
     }
 }
 
+function updateSession(username, token, remember) {
+    currentUser = username;
+    storeUsername(username, remember);
+    setAuthToken(token, remember);
+}
+
 async function validateUser(username) {
     try {
         const response = await fetch(`/api/users/${encodeURIComponent(username)}`);
@@ -58,22 +64,21 @@ async function validateUser(username) {
 
 async function register(username, password, remember) {
     const trimmed = username.trim();
-    
+
     if (!trimmed) return { success: false, error: 'Username is required' };
     if (trimmed.length < 3) return { success: false, error: 'Username must be at least 3 characters' };
     if (!password) return { success: false, error: 'Password is required' };
     if (password.length < 4) return { success: false, error: 'Password must be at least 4 characters' };
-    
+
     try {
         const existing = await validateUser(trimmed);
         if (existing) {
             return { success: false, error: 'Username already taken' };
         }
-        
+
         const result = await api.register(trimmed, password);
         if (result.success) {
-            currentUser = trimmed;
-            storeUsername(trimmed, remember);
+            updateSession(trimmed, result.token, remember);
             emit('auth:login', { username: trimmed });
             return { success: true, username: trimmed };
         }
@@ -86,18 +91,15 @@ async function register(username, password, remember) {
 
 async function signIn(username, password, remember) {
     const trimmed = username.trim();
-    
+
     if (!trimmed) return { success: false, error: 'Username is required' };
     if (!password) return { success: false, error: 'Password is required' };
-    
+
     try {
         const result = await api.login(trimmed, password);
         if (result.success) {
-            currentUser = trimmed;
-            storeUsername(trimmed, remember);
-            
+            updateSession(trimmed, result.token, remember);
             loadUserPreferences(trimmed);
-            
             emit('auth:login', { username: trimmed });
             return { success: true, username: trimmed };
         }
@@ -122,6 +124,7 @@ async function loadUserPreferences(username) {
 function signOut() {
     currentUser = null;
     clearStoredUsername();
+    removeAuthToken();
     emit('auth:logout', {});
 }
 
@@ -145,17 +148,29 @@ function toggleAuthMode() {
 }
 
 async function restoreSession() {
+    try {
+        const user = await api.getMe();
+        if (user && user.username) {
+            currentUser = user.username;
+            emit('auth:restore', { username: user.username, user });
+            return user.username;
+        }
+    } catch (e) {
+        // Token invalid or expired
+    }
+
     const username = getStoredUsername();
     if (!username) return null;
-    
+
     const user = await validateUser(username);
     if (user) {
         currentUser = username;
         emit('auth:restore', { username, user });
         return username;
     }
-    
+
     clearStoredUsername();
+    removeAuthToken();
     return null;
 }
 
@@ -173,5 +188,6 @@ export {
     subscribe,
     setAuthMode,
     getAuthMode,
-    toggleAuthMode
+    toggleAuthMode,
+    updateSession
 };

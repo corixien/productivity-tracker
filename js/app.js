@@ -1,5 +1,5 @@
-import { register, signIn, signOut, restoreSession, subscribe, getCurrentUser, getAuthMode, setAuthMode, toggleAuthMode } from './auth.js';
-import { api } from './firebase.js';
+import { register, signIn, signOut, restoreSession, subscribe, getCurrentUser, getAuthMode, setAuthMode, toggleAuthMode, updateSession } from './auth.js';
+import { api } from './api.js';
 import { getRankName, getProgressPercent, addTask, completeTask as completeTaskOp, deleteTask as deleteTaskOp, renderTasks, updateXPDisplay } from './tasks.js';
 import { addFriend, loadLeaderboard, renderLeaderboard } from './leaderboard.js';
 import { changePassword, changeUsername, uploadAvatar, saveGoals, initSettings } from './settings.js';
@@ -14,13 +14,13 @@ let authUnsubscribe = null;
 
 async function init() {
     console.log('App init starting...');
-    
+
     try {
         initUI();
         initSettings();
-        
+
         subscribeToAuthEvents();
-        
+
         const username = await restoreSession();
         console.log('Restored session:', username);
         if (username) {
@@ -28,9 +28,9 @@ async function init() {
         } else {
             showAuth();
         }
-        
+
         attachEventListeners();
-        
+
         console.log('App init complete');
     } catch (error) {
         console.error('App init failed:', error);
@@ -56,10 +56,10 @@ function subscribeToAuthEvents() {
 function attachEventListeners() {
     const authForm = document.getElementById('auth-form');
     if (authForm) authForm.addEventListener('submit', handleAuth);
-    
+
     const friendForm = document.getElementById('friend-form');
     if (friendForm) friendForm.addEventListener('submit', handleAddFriend);
-    
+
     const addFriendBtn = document.getElementById('add-friend-btn');
     if (addFriendBtn) {
         addFriendBtn.addEventListener('click', () => {
@@ -68,36 +68,36 @@ function attachEventListeners() {
             document.getElementById('friend-username').value = '';
         });
     }
-    
+
     const closeFriendModal = document.getElementById('close-friend-modal');
     if (closeFriendModal) closeFriendModal.addEventListener('click', closeModals);
-    
+
     const cancelFriendBtn = document.getElementById('cancel-friend-btn');
     if (cancelFriendBtn) cancelFriendBtn.addEventListener('click', closeModals);
-    
+
     const changeUsernameBtn = document.getElementById('change-username-btn');
     if (changeUsernameBtn) changeUsernameBtn.addEventListener('click', handleChangeUsername);
-    
+
     const saveGoalsBtn = document.getElementById('save-goals-btn');
     if (saveGoalsBtn) saveGoalsBtn.addEventListener('click', handleSaveGoals);
-    
+
     const changePasswordBtn = document.getElementById('change-password-btn');
     if (changePasswordBtn) changePasswordBtn.addEventListener('click', handleChangePassword);
-    
+
     const signOutBtn = document.getElementById('sign-out-btn');
     if (signOutBtn) signOutBtn.addEventListener('click', handleSignOut);
-    
+
     const languageSelect = document.getElementById('language-select');
     if (languageSelect) languageSelect.addEventListener('change', (e) => {
         setLanguage(e.target.value);
     });
-    
+
     const aiSubmitBtn = document.getElementById('ai-submit-btn');
     if (aiSubmitBtn) aiSubmitBtn.addEventListener('click', handleAITaskSubmit);
-    
+
     const reviewConfirmBtn = document.getElementById('review-confirm-btn');
     if (reviewConfirmBtn) reviewConfirmBtn.addEventListener('click', handleReviewNext);
-    
+
     const reviewCancelBtn = document.getElementById('review-cancel-btn');
     if (reviewCancelBtn) {
         reviewCancelBtn.addEventListener('click', () => {
@@ -107,13 +107,13 @@ function attachEventListeners() {
             document.getElementById('ai-loading').style.display = 'none';
         });
     }
-    
+
     const editConfirmBtn = document.getElementById('edit-confirm-btn');
     if (editConfirmBtn) editConfirmBtn.addEventListener('click', handleEditConfirm);
-    
+
     const editCancelBtn = document.getElementById('edit-cancel-btn');
     if (editCancelBtn) editCancelBtn.addEventListener('click', handleEditCancel);
-    
+
     const addPendingTaskBtn = document.getElementById('add-pending-task-btn');
     if (addPendingTaskBtn) {
         addPendingTaskBtn.addEventListener('click', () => {
@@ -121,7 +121,7 @@ function attachEventListeners() {
             openTaskModal();
         });
     }
-    
+
     const addCompletedTaskBtn = document.getElementById('add-completed-task-btn');
     if (addCompletedTaskBtn) {
         addCompletedTaskBtn.addEventListener('click', () => {
@@ -129,17 +129,17 @@ function attachEventListeners() {
             openTaskModal();
         });
     }
-    
+
     const closeTaskModal = document.getElementById('close-task-modal');
     if (closeTaskModal) closeTaskModal.addEventListener('click', closeModals);
-    
+
     const authToggle = document.getElementById('auth-toggle');
     if (authToggle) {
         authToggle.addEventListener('click', () => {
             toggleAuthMode();
         });
     }
-    
+
     document.querySelectorAll('.nav-item').forEach(item => {
         item.addEventListener('click', () => {
             const section = item.getAttribute('data-section');
@@ -155,7 +155,7 @@ function updateAuthUI(mode) {
     const submitBtn = document.querySelector('#auth-form button[type="submit"]');
     const subtitle = document.querySelector('.auth-card p');
     const modeIndicator = document.getElementById('auth-mode');
-    
+
     if (mode === 'signup') {
         if (submitBtn) submitBtn.textContent = t('register');
         if (subtitle) subtitle.textContent = t('registerSubtitle');
@@ -177,12 +177,12 @@ function showAuth() {
     document.getElementById('auth-screen').classList.add('active');
     document.getElementById('app-screen').classList.remove('active');
     updateAuthUI(getAuthMode());
-    
+
     const errorEl = document.getElementById('auth-error');
     const usernameInput = document.getElementById('auth-username');
     const passwordInput = document.getElementById('auth-password');
     const rememberCheckbox = document.getElementById('auth-remember');
-    
+
     if (errorEl) errorEl.textContent = '';
     if (usernameInput) usernameInput.value = '';
     if (passwordInput) passwordInput.value = '';
@@ -192,7 +192,7 @@ function showAuth() {
 function showApp(username) {
     document.getElementById('auth-screen').classList.remove('active');
     document.getElementById('app-screen').classList.add('active');
-    
+
     loadUserData(username);
 }
 
@@ -215,15 +215,15 @@ async function handleAuth(e) {
     const remember = document.getElementById('auth-remember').checked;
     const errorEl = document.getElementById('auth-error');
     const submitBtn = document.querySelector('#auth-form button[type="submit"]');
-    
+
     if (!username || !password) {
         errorEl.textContent = t('invalidUsername');
         return;
     }
-    
+
     errorEl.textContent = getAuthMode() === 'signup' ? 'Creating account...' : 'Signing in...';
     if (submitBtn) submitBtn.disabled = true;
-    
+
     try {
         let result;
         if (getAuthMode() === 'signup') {
@@ -231,7 +231,7 @@ async function handleAuth(e) {
         } else {
             result = await signIn(username, password);
         }
-        
+
         if (result.success) {
             errorEl.textContent = '';
         } else {
@@ -263,7 +263,7 @@ async function refreshTasks(username) {
     const tasks = await api.getTasks(username);
     const pending = [];
     const completed = [];
-    
+
     tasks.forEach(task => {
         if (task.completed) {
             completed.push(task);
@@ -271,7 +271,7 @@ async function refreshTasks(username) {
             pending.push(task);
         }
     });
-    
+
     currentTasks = { pending, completed };
     renderTasks(pending, completed);
 }
@@ -279,7 +279,7 @@ async function refreshTasks(username) {
 async function completeTask(taskId) {
     const username = getCurrentUser();
     if (!username) return;
-    
+
     const result = await completeTaskOp(username, taskId);
     if (result.success) {
         updateXPDisplay(result.newXP);
@@ -290,10 +290,10 @@ async function completeTask(taskId) {
 async function deleteTask(taskId) {
     const username = getCurrentUser();
     if (!username) return;
-    
+
     const confirmed = confirm('Delete this task? ' + (currentTasks.completed.some(t => t.id === taskId) ? 'This will remove its XP from your total.' : ''));
     if (!confirmed) return;
-    
+
     const result = await deleteTaskOp(username, taskId);
     if (result.success) {
         updateXPDisplay(result.newXP);
@@ -305,11 +305,11 @@ async function handleAddFriend(e) {
     e.preventDefault();
     const username = getCurrentUser();
     if (!username) return;
-    
+
     const friendUsername = document.getElementById('friend-username').value.trim();
     if (!friendUsername) return;
-    
-    const result = await addFriend(username, friendUsername);
+
+    const result = await addFriend(friendUsername);
     if (result.success) {
         closeModals();
         loadAndRenderLeaderboard(username);
@@ -326,13 +326,13 @@ async function loadAndRenderLeaderboard(username) {
 async function handleChangePassword() {
     const username = getCurrentUser();
     if (!username) return;
-    
+
     const newPassword = document.getElementById('settings-new-password').value.trim();
     if (!newPassword || newPassword.length < 4) {
         alert(t('invalidPassword'));
         return;
     }
-    
+
     try {
         const result = await changePassword(username, newPassword);
         if (result.success) {
@@ -349,7 +349,7 @@ async function handleChangePassword() {
 async function handleSaveGoals() {
     const username = getCurrentUser();
     if (!username) return;
-    
+
     const result = await saveGoals(username);
     if (result) {
         alert(t('goalsSaved'));
@@ -359,20 +359,21 @@ async function handleSaveGoals() {
 async function handleChangeUsername() {
     const username = getCurrentUser();
     if (!username) return;
-    
+
     const newUsername = document.getElementById('settings-new-username').value.trim();
     if (!newUsername || newUsername.length < 3) {
         alert(t('invalidUsername'));
         return;
     }
-    
+
     try {
         const result = await changeUsername(username, newUsername);
         if (result.success) {
-            localStorage.setItem('productivity_tracker_user', newUsername);
-            sessionStorage.setItem('productivity_tracker_user', newUsername);
+            const display = document.getElementById('settings-username-display');
+            if (display) display.textContent = newUsername;
+            const remember = localStorage.getItem('productivity_tracker_token') || sessionStorage.getItem('productivity_tracker_session_token');
+            updateSession(newUsername, result.token, !!remember);
             alert(t('usernameChanged'));
-            signOut();
         } else {
             alert(result.error);
         }
@@ -386,17 +387,17 @@ let currentAIRating = null;
 async function handleAITaskSubmit() {
     const username = getCurrentUser();
     if (!username) return;
-    
+
     const description = document.getElementById('ai-task-input').value.trim();
     if (!description) return;
-    
+
     document.getElementById('ai-loading').style.display = 'flex';
     document.getElementById('ai-task-section').style.display = 'none';
-    
+
     try {
         const goals = userData?.goals || '';
         const taskData = await rateTaskWithAI(description, goals);
-        
+
         currentAIRating = {
             name: taskData.name || description.substring(0, 50),
             duration: taskData.duration || 30,
@@ -404,7 +405,7 @@ async function handleAITaskSubmit() {
             difficulty: taskData.difficulty !== undefined ? taskData.difficulty : 3,
             category: taskData.category || 'other'
         };
-        
+
         document.getElementById('ai-loading').style.display = 'none';
         showReviewSection();
     } catch (error) {
@@ -423,10 +424,10 @@ async function handleAITaskSubmit() {
 
 function showReviewSection() {
     if (!currentAIRating) return;
-    
+
     const checkbox = document.getElementById('review-bonus-checkbox');
     checkbox.checked = false;
-    
+
     document.getElementById('ai-review-section').style.display = 'block';
     document.getElementById('ai-loading').style.display = 'none';
     document.getElementById('ai-task-section').style.display = 'none';
@@ -435,19 +436,19 @@ function showReviewSection() {
 
 function showEditSection() {
     if (!currentAIRating) return;
-    
+
     const r = currentAIRating;
     const bonus = document.getElementById('review-bonus-checkbox').checked ? 3 : 0;
-    
+
     document.getElementById('edit-task-name').value = r.name;
     document.getElementById('edit-task-duration').value = r.duration;
     document.getElementById('edit-task-productivity').value = r.productivity;
     document.getElementById('edit-productivity-value').textContent = r.productivity;
     document.getElementById('edit-task-difficulty').value = r.difficulty;
     document.getElementById('edit-difficulty-value').textContent = r.difficulty;
-    
+
     currentAIRating.bonus = bonus;
-    
+
     function updateFinalXP() {
         const prod = parseInt(document.getElementById('edit-task-productivity').value) || 0;
         const diff = parseInt(document.getElementById('edit-task-difficulty').value) || 1;
@@ -456,13 +457,13 @@ function showEditSection() {
         const xp = prod === 0 ? 0 : Math.round((prod * diff) + (dur / 5) + b);
         document.getElementById('edit-final-xp').textContent = xp + ' XP';
     }
-    
+
     updateFinalXP();
-    
+
     const prodSlider = document.getElementById('edit-task-productivity');
     const diffSlider = document.getElementById('edit-task-difficulty');
     const durInput = document.getElementById('edit-task-duration');
-    
+
     prodSlider.oninput = () => {
         document.getElementById('edit-productivity-value').textContent = prodSlider.value;
         updateFinalXP();
@@ -472,7 +473,7 @@ function showEditSection() {
         updateFinalXP();
     };
     durInput.oninput = updateFinalXP;
-    
+
     document.getElementById('ai-review-section').style.display = 'none';
     document.getElementById('ai-edit-section').style.display = 'block';
 }
@@ -484,13 +485,13 @@ function handleReviewNext() {
 async function handleEditConfirm() {
     const username = getCurrentUser();
     if (!username || !currentAIRating) return;
-    
+
     const name = document.getElementById('edit-task-name').value.trim() || 'Task';
     const duration = parseInt(document.getElementById('edit-task-duration').value) || 30;
     const productivity = parseInt(document.getElementById('edit-task-productivity').value) || 3;
     const difficulty = parseInt(document.getElementById('edit-task-difficulty').value) || 3;
     const bonus = document.getElementById('review-bonus-checkbox').checked ? 3 : 0;
-    
+
     try {
         const task = await addTask(
             username,
@@ -501,14 +502,14 @@ async function handleEditConfirm() {
             bonus,
             currentAIRating.category || 'other'
         );
-        
+
         if (taskMode === 'completed') {
             const result = await completeTaskOp(username, task.id);
             if (result.success) {
                 updateXPDisplay(result.newXP);
             }
         }
-        
+
         currentAIRating = null;
         closeModals();
         document.getElementById('ai-task-input').value = '';

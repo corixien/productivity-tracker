@@ -1,4 +1,4 @@
-import { api } from './firebase.js';
+import { api } from './api.js';
 import { t } from './i18n.js';
 
 const RANK_THRESHOLDS = [
@@ -38,43 +38,26 @@ async function addTask(userEmail, name, duration, productivity, difficulty, bonu
 }
 
 async function completeTask(userEmail, taskId) {
-    const task = await api.updateTask(taskId, { completed: true, completedAt: new Date().toISOString() });
-    if (!task) return { success: false };
-    
-    const userData = await api.getUser(userEmail);
-    const newXP = (userData.xp || 0) + task.xp;
-    const newRank = getRankName(newXP);
-    const newLevel = Math.floor(newXP / 100);
-    
-    await api.updateUser(userEmail, { xp: newXP, rank: newRank, level: newLevel });
-    
-    return { success: true, xpEarned: task.xp, newXP, newRank };
+    const result = await api.completeTask(taskId);
+    if (!result.success) return { success: false };
+
+    return { success: true, xpEarned: result.xpEarned, newXP: result.newXP, newRank: result.newRank };
 }
 
 async function deleteTask(userEmail, taskId) {
-    const task = await api.getTasks(userEmail).then(tasks => tasks.find(t => t.id === taskId));
-    if (!task) return { success: false };
-    
-    let newXP = (await api.getUser(userEmail)).xp || 0;
-    
-    if (task.completed) {
-        newXP = Math.max(0, newXP - task.xp);
-        const newRank = getRankName(newXP);
-        const newLevel = Math.floor(newXP / 100);
-        await api.updateUser(userEmail, { xp: newXP, rank: newRank, level: newLevel });
-    }
-    
-    await api.deleteTask(taskId);
-    return { success: true, newXP };
+    const result = await api.deleteTask(taskId);
+    if (!result.success) return { success: false };
+
+    return { success: true, newXP: result.newXP, xpChange: result.xpChange };
 }
 
 function renderTasks(pendingTasks, completedTasks) {
     const pendingList = document.getElementById('pending-list');
     const completedList = document.getElementById('completed-list');
-    
+
     pendingList.innerHTML = '';
     completedList.innerHTML = '';
-    
+
     if (pendingTasks.length === 0) {
         pendingList.innerHTML = `<li class="empty-state">${t('noPendingTasks')}</li>`;
     } else {
@@ -100,7 +83,7 @@ function renderTasks(pendingTasks, completedTasks) {
             pendingList.appendChild(li);
         });
     }
-    
+
     if (completedTasks.length === 0) {
         completedList.innerHTML = `<li class="empty-state">${t('noCompletedTasks')}</li>`;
     } else {
@@ -149,7 +132,7 @@ function updateXPDisplay(xp) {
     const percent = getProgressPercent(xp);
     const current = getRankInfo(xp);
     const nextMin = current.next || current.min;
-    
+
     const badge = document.getElementById('rank-badge');
     badge.setAttribute('data-rank', rank);
     badge.querySelector('.rank-icon').textContent = RANK_ICONS[rank] || '⭐';
