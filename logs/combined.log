@@ -1,3 +1,0 @@
-{"environment":"development","level":"info","message":"Productivity Tracker API running","port":"3000","service":"productivity-tracker","timestamp":"2026-09-11T19:16:36.916+02:00"}
-{"duration_ms":6,"event":"http_request","ip":"127.0.0.1","level":"info","message":"HTTP request completed","method":"GET","path":"/api/health","service":"productivity-tracker","status":200,"timestamp":"2026-09-11T19:16:38.525+02:00","user_agent":"curl/8.18.0"}
-{"level":"info","message":"Shutdown received","service":"productivity-tracker","signal":"SIGTERM","timestamp":"2026-09-11T19:16:38.528+02:00"}

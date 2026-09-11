@@ -1,6 +1,7 @@
 node_modules/
 data/
 avatars/
+logs/
 *.db
 data.json
 .DS_Store
