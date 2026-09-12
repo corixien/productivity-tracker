@@ -70,7 +70,7 @@ function initSettings() {
             reader.onload = (event) => {
                 selectedAvatarBase64 = event.target.result.split(',')[1];
                 if (currentAvatar && avatarPlaceholder) {
-                    currentAvatar.src = result.avatar;
+                    currentAvatar.src = event.target.result;
                     currentAvatar.style.display = 'block';
                     avatarPlaceholder.style.display = 'none';
                 }
