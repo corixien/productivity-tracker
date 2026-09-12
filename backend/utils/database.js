@@ -14,7 +14,8 @@ function getPool() {
             connectionTimeoutMillis: 3000,
             application_name: 'productivity-tracker',
             keepAlive: true,
-            keepAliveInitialDelayMillis: 10000
+            keepAliveInitialDelayMillis: 10000,
+            options: '-c statement_timeout=10000'
         });
         pool.on('error', (error) => {
             logger.error('Unexpected database pool error', { error: error.message });

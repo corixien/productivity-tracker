@@ -36,7 +36,7 @@ async function register(req, res) {
             token
         });
     } catch (error) {
-        await logError(error, { context: 'register', username: req.body.username });
+        logError(error, { context: 'register', username: req.body.username });
         return res.status(500).json({ success: false, error: 'Registration failed' });
     }
 }
@@ -46,7 +46,7 @@ async function login(req, res) {
         const { username, password } = req.body;
         const user = await User.verifyCredentials(username, password);
         if (!user) {
-            await logAuthAttempt(username, false, req.ip);
+            logAuthAttempt(username, false, req.ip);
             return res.status(401).json({ success: false, error: 'Invalid username or password' });
         }
 
@@ -75,7 +75,7 @@ async function getMe(req, res) {
         }
         return res.json(safeUser(user));
     } catch (error) {
-        await logError(error, { context: 'getMe', userId: req.user.id });
+        logError(error, { context: 'getMe', userId: req.user && req.user.id });
         return res.status(500).json({ success: false, error: 'Failed to get user' });
     }
 }
