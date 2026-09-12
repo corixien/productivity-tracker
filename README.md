@@ -107,6 +107,20 @@ productivity-tracker/
 └── README.md
 ```
 
+## Keeping the Service Awake
+
+Render's free tier spins the service down after inactivity. The first request after idle time can fail. The client automatically retries with backoff, but the most reliable fix is to keep the service warm:
+
+1. Sign up at https://uptimerobot.com (free tier).
+2. Add a new monitor.
+3. Set **Friendly Name** to `Productivity Tracker`.
+4. Set **Monitor Type** to `HTTP(s)`.
+5. Set **URL** to `https://productivity-tracker-uguq.onrender.com/api/health`.
+6. Set **Monitoring Interval** to `5 minutes`.
+7. Save.
+
+This keeps the service warm and prevents most cold-start failures.
+
 ## Known Limitations
 
 - Avatars are stored locally in `avatars/`; use a CDN or object storage for production.

@@ -34,8 +34,7 @@ async function init() {
         console.log('App init complete');
     } catch (error) {
         console.error('App init failed:', error);
-        const errorEl = document.getElementById('auth-error');
-        if (errorEl) errorEl.textContent = 'Failed to initialize app. Check console for details.';
+        showAuth();
     }
 }
 
