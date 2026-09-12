@@ -6,3 +6,4 @@ logs/
 data.json
 .DS_Store
 .env
+.neon
