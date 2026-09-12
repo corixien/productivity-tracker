@@ -20,7 +20,6 @@ See `.env.example` for required variables:
 - `JWT_EXPIRES_IN` - token expiry (default: `7d`)
 - `GROQ_API_KEY` - optional AI rating API key
 - `GROQ_MODEL` - AI model (default: `groq/compound`)
-- `DATABASE_SSL_REJECT_UNAUTHORIZED` - set to `false` in production if your Neon database requires SSL acceptance
 - `PORT` - server port (default: `3000`)
 - `NODE_ENV` - environment (`development` or `production`)
 
@@ -104,7 +103,6 @@ productivity-tracker/
 │   └── migrate-data.js   # SQLite to PostgreSQL data migration
 ├── avatars/                # Locally stored avatar images (gitignored)
 ├── Badges/                 # Rank badge images
-├── assets/                 # Static assets
 ├── .env.example            # Example environment variables
 └── README.md
 ```

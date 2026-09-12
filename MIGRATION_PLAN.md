@@ -43,7 +43,7 @@ Implemented. The backend now uses Express + PostgreSQL (Neon), bcrypt password h
 
 ## Cleanup Completed
 
-- Removed `server.js`, `firestore.rules`, `firestore.indexes.json`, `js/firebase.js`, backup AI services, `data.json`, `server.js`, and SQLite database files
+- Removed `server.js`, `firestore.rules`, `firestore.indexes.json`, `js/firebase.js`, backup AI services, `data.json` and SQLite database files
 - Removed `@supabase/supabase-js` dependency
 - Replaced Supabase Storage avatar upload with local file storage
 - Updated `README.md`, `PROJECT_OVERVIEW.txt`, `.env.example`, `package.json`, and this document
