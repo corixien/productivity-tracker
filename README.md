@@ -113,6 +113,7 @@ productivity-tracker/
 - Changing a password invalidates existing sessions only if the user logs in again with the new password; existing JWT tokens remain valid until expiry.
 - SQLite data migration script (`database/migrate-data.js`) requires the old SQLite database.
 - The app does not include an admin panel; database administration is done externally through Neon.
+- **Render free tier**: the service may spin down after inactivity. The first request can fail; the client automatically retries with backoff. To keep it warm, ping `https://productivity-tracker-uguq.onrender.com/api/health` every few minutes with a service like UptimeRobot.
 
 ## Credits
 

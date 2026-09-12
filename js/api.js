@@ -34,6 +34,8 @@ function removeAuthToken() {
 }
 
 async function apiRequest(endpoint, options = {}, retryCount = 0) {
+    const MAX_RETRIES = 3;
+    const DELAYS = [2000, 4000, 8000];
     const url = `${API_BASE}${endpoint}`;
     const config = {
         headers: { 'Content-Type': 'application/json' },
@@ -49,11 +51,21 @@ async function apiRequest(endpoint, options = {}, retryCount = 0) {
         const response = await fetch(url, config);
         const text = await response.text();
 
+        const shouldRetry = retryCount < MAX_RETRIES && (
+            !text ||
+            response.status >= 500 ||
+            response.status === 429 ||
+            response.status === 503 ||
+            response.status === 502 ||
+            response.status === 504
+        );
+
+        if (!text && shouldRetry) {
+            await new Promise(resolve => setTimeout(resolve, DELAYS[retryCount] || DELAYS[MAX_RETRIES - 1]));
+            return apiRequest(endpoint, options, retryCount + 1);
+        }
+
         if (!text) {
-            if (response.status >= 500 && retryCount < 1) {
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                return apiRequest(endpoint, options, retryCount + 1);
-            }
             throw new Error('Server returned an empty response. Please try again.');
         }
 
@@ -61,16 +73,16 @@ async function apiRequest(endpoint, options = {}, retryCount = 0) {
         try {
             data = JSON.parse(text);
         } catch (parseError) {
-            if (response.status >= 500 && retryCount < 1) {
-                await new Promise(resolve => setTimeout(resolve, 1000));
+            if (shouldRetry) {
+                await new Promise(resolve => setTimeout(resolve, DELAYS[retryCount] || DELAYS[MAX_RETRIES - 1]));
                 return apiRequest(endpoint, options, retryCount + 1);
             }
             throw new Error('Server returned an invalid response. Please try again.');
         }
 
         if (!response.ok) {
-            if (response.status >= 500 && retryCount < 1) {
-                await new Promise(resolve => setTimeout(resolve, 1000));
+            if (shouldRetry) {
+                await new Promise(resolve => setTimeout(resolve, DELAYS[retryCount] || DELAYS[MAX_RETRIES - 1]));
                 return apiRequest(endpoint, options, retryCount + 1);
             }
             throw new Error(data.error || data.message || 'API error');
