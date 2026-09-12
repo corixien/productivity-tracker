@@ -69,6 +69,7 @@ app.get('/', (req, res) => {
 });
 app.use('/js', express.static(path.join(FRONTEND_DIR, 'js'), { maxAge: '1h' }));
 app.use('/css', express.static(path.join(FRONTEND_DIR, 'css'), { maxAge: '1h' }));
+app.use('/avatars', express.static(path.join(FRONTEND_DIR, 'avatars'), { maxAge: '1h' }));
 app.use('/Badges', express.static(path.join(FRONTEND_DIR, 'Badges'), { maxAge: '1h' }));
 app.use('/assets', express.static(path.join(FRONTEND_DIR, 'assets'), { maxAge: '1h' }));
 

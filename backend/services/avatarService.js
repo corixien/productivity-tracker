@@ -1,6 +1,9 @@
-const { getSupabaseConfig, getSupabaseClient } = require('../config');
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
 const { logger } = require('../utils/logger');
 
+const AVATARS_DIR = path.join(__dirname, '..', 'avatars');
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
 
 function parseAvatar(avatar) {
@@ -68,36 +71,20 @@ async function uploadAvatar(userId, avatarBase64) {
         throw error;
     }
 
-    const config = getSupabaseConfig();
-    const supabase = getSupabaseClient();
-    const objectPath = `avatars/${userId}/${Date.now()}-${crypto.randomUUID()}.${parsed.ext}`;
+    const userDir = path.join(AVATARS_DIR, String(userId));
+    const fileName = `${Date.now()}-${crypto.randomUUID()}.${parsed.ext}`;
+    const filePath = path.join(userDir, fileName);
+    const relativePath = `/avatars/${userId}/${fileName}`;
 
     try {
-        const { data, error: uploadError } = await supabase.storage
-            .from(config.storageBucket)
-            .upload(objectPath, parsed.buffer, {
-                contentType: parsed.mime,
-                upsert: true
-            });
-
-        if (uploadError) {
-            const error = new Error(uploadError.message || 'Avatar upload failed');
-            error.statusCode = uploadError.status || 503;
-            throw error;
-        }
-
-        const { data: publicData } = supabase.storage.from(config.storageBucket).getPublicUrl(objectPath);
-        if (!publicData?.publicUrl) {
-            const error = new Error('Avatar upload completed but public URL unavailable');
-            error.statusCode = 503;
-            throw error;
-        }
-
-        return publicData.publicUrl;
+        await fs.promises.mkdir(userDir, { recursive: true });
+        await fs.promises.writeFile(filePath, parsed.buffer);
     } catch (error) {
-        logger.error('Avatar upload failed', { error: error.message, userId });
+        logger.error('Avatar file write failed', { error: error.message, userId });
         throw error;
     }
+
+    return relativePath;
 }
 
 module.exports = { uploadAvatar };

@@ -1,12 +1,12 @@
 # Productivity Tracker - Project Overview
 
 ## What is this?
-A web app for competing with friends on productivity. Users sign in, complete tasks to earn XP, level up through ranks, and compare on a leaderboard. Data is stored in PostgreSQL via Supabase.
+A web app for competing with friends on productivity. Users sign in, complete tasks to earn XP, level up through ranks, and compare on a leaderboard. Data is stored in PostgreSQL via Neon.
 
 ## Architecture
 - **Frontend**: Vanilla JavaScript (ES modules), CSS, single-page app in `index.html`
 - **Backend**: Node.js + Express
-- **Database**: PostgreSQL through Supabase
+- **Database**: PostgreSQL through Neon
 - **Authentication**: bcrypt password hashing + JWT tokens
 - **AI Integration**: GROQ API proxied through backend (never exposed to frontend)
 - **Logging**: Structured Winston logging + persisted system logs
@@ -15,7 +15,7 @@ A web app for competing with friends on productivity. Users sign in, complete ta
 ## Tech Stack
 - **Frontend**: HTML, CSS, Vanilla JS (no framework)
 - **Backend**: Node.js + Express
-- **Database**: PostgreSQL (Supabase)
+- **Database**: PostgreSQL (Neon)
 - **Auth**: bcrypt, JWT
 - **AI**: GROQ API
 - **Monitoring**: Winston structured logs, GROQ request/response logging
@@ -48,6 +48,7 @@ productivity-tracker/
 │   ├── migrations/       # SQL schema migrations
 │   ├── migrate.js        # Schema migration runner
 │   └── migrate-data.js   # SQLite to PostgreSQL data migration
+├── avatars/                # Locally stored avatar images (gitignored)
 ├── Badges/                 # Rank badge images
 ├── assets/                 # Static assets
 └── PROJECT_OVERVIEW.txt    # This file
@@ -65,7 +66,7 @@ productivity-tracker/
 | level | INTEGER | 0 | Current level (floor(xp/100)) |
 | rank | TEXT | 'Newcomer' | Current rank name |
 | language | TEXT | 'en' | UI language preference |
-| avatar_url | TEXT | NULL | Supabase Storage public URL |
+| avatar_url | TEXT | NULL | Local avatar path |
 | goals | TEXT | '' | User's 5-year goals text |
 | created_at | TIMESTAMPTZ | NOW() | Account creation time |
 | updated_at | TIMESTAMPTZ | NOW() | Last update time |
@@ -154,14 +155,16 @@ Level = floor(totalXP / 100)
 ### AI Task Rating
 When a user describes a task, the backend sends the request to GROQ and returns standardized task data. Every request/response/error is logged in `groq_logs`. The GROQ API key only exists in backend environment variables.
 
+### Avatar Storage
+Avatars are stored as local files under `avatars/{userId}/` and served by Express at `/avatars/...`.
+
 ## Important Notes for New Chat
 
-1. **No Firebase anymore**: This version uses Express + PostgreSQL/Supabase. Firebase files were removed.
-2. **Server required**: The app requires the Express server running (`node backend/index.js`).
-3. **Supabase required**: A Supabase PostgreSQL project is required; SQLite is no longer used.
-4. **Avatar storage**: Avatars are stored in Supabase Storage and returned as public URLs.
-5. **Admin access**: Supabase Dashboard is the only administration interface. No admin routes or UI exist.
-6. **Legacy routes**: `POST /api/ai/rate` and `GET /api/ai/status` are preserved for compatibility.
-7. **Data migration**: `database/migrate-data.js` migrates SQLite data to PostgreSQL. Run it before deleting `data/app.db`.
-8. **GROQ key security**: The GROQ API key is never exposed to the frontend.
-9. **Server listens on `0.0.0.0`** for LAN access.
+1. **No Firebase anymore**: This version uses Express + PostgreSQL (Neon). Firebase files were removed.
+2. **No Supabase**: There is no Supabase dependency; the database is PostgreSQL via Neon.
+3. **Server required**: The app requires the Express server running (`node backend/index.js`).
+4. **Admin access**: Neon Dashboard or your DB Pro tool is the only administration interface. No admin routes or UI exist.
+5. **Legacy routes**: `POST /api/ai/rate` and `GET /api/ai/status` are preserved for compatibility.
+6. **Data migration**: `database/migrate-data.js` migrates SQLite data to PostgreSQL. Run it before deleting `data/app.db`.
+7. **GROQ key security**: The GROQ API key is never exposed to the frontend.
+8. **Server listens on `0.0.0.0`** for LAN access.

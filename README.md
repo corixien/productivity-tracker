@@ -1,11 +1,11 @@
 # Productivity Tracker
 
-A web app for competing in friend groups on productivity. Users sign in with a username, complete tasks to earn XP, level up through ranks, and compare on a leaderboard. The backend uses Express, PostgreSQL (Supabase), bcrypt, and JWT.
+A web app for competing in friend groups on productivity. Users sign in with a username, complete tasks to earn XP, level up through ranks, and compare on a leaderboard. The backend uses Express, PostgreSQL (Neon), bcrypt, and JWT.
 
 ## Setup
 
-1. Create a Supabase project and create a PostgreSQL database
-2. Copy your Supabase URL and service role key from Project Settings
+1. Create a Neon project and a PostgreSQL database (use the Neon console or DB Pro tool)
+2. Copy your Neon database connection string
 3. Set the environment variables in `.env`
 4. Run the database migration: `npm run migrate`
 5. Start the app: `npm start` or `npm run dev`
@@ -14,19 +14,18 @@ A web app for competing in friend groups on productivity. Users sign in with a u
 
 See `.env.example` for required variables:
 
-- `DATABASE_URL` - PostgreSQL connection string
-- `SUPABASE_URL` - Supabase project URL
-- `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key
-- `SUPABASE_STORAGE_BUCKET` - avatar storage bucket (default: `avatars`)
+- `DATABASE_URL` - Neon PostgreSQL connection string
 - `JWT_SECRET` - secure random JWT signing secret
 - `JWT_EXPIRES_IN` - token expiry (default: `7d`)
 - `GROQ_API_KEY` - optional AI rating API key
 - `GROQ_MODEL` - AI model (default: `groq/compound`)
+- `DATABASE_SSL_REJECT_UNAUTHORIZED` - set to `false` in production if your Neon database requires SSL acceptance
 - `PORT` - server port (default: `3000`)
+- `NODE_ENV` - environment (`development` or `production`)
 
 ## Database
 
-PostgreSQL through Supabase. The schema is created with `database/migrate.js`. Tables:
+PostgreSQL through Neon. The schema is created with `database/migrate.js`. Tables:
 
 - `users` - user accounts with bcrypt password hashes
 - `profiles` - extended profile data (5-year goals, preferences)
@@ -36,6 +35,8 @@ PostgreSQL through Supabase. The schema is created with `database/migrate.js`. T
 - `goals` - long-term goals
 - `groq_logs` - AI request/response logging
 - `system_logs` - application logs
+
+Manage the database with your DB Pro tool, the Neon SQL editor, or any PostgreSQL client.
 
 ## API Routes
 
@@ -67,7 +68,7 @@ PostgreSQL through Supabase. The schema is created with `database/migrate.js`. T
 - Rank progression: Newcomer -> Bronze -> Silver -> Gold -> Platinum -> Diamond -> Master
 - Leaderboard with friends (add by username)
 - Language toggle: English / Deutsch
-- Profile picture upload via Supabase Storage
+- Profile picture upload stored locally in `avatars/`
 - Goal management
 - Mobile-first responsive design with sidebar swipe gestures
 
@@ -100,6 +101,7 @@ productivity-tracker/
 │   ├── migrations/       # SQL migrations
 │   ├── migrate.js        # Schema migration runner
 │   └── migrate-data.js   # SQLite to PostgreSQL data migration
+├── avatars/                # Locally stored avatar images (gitignored)
 ├── Badges/                 # Rank badge images
 ├── assets/                 # Static assets
 ├── .env.example            # Example environment variables
@@ -108,9 +110,10 @@ productivity-tracker/
 
 ## Known Limitations
 
-- Avatars are stored in Supabase Storage and served from the Supabase URL; make the `avatars` bucket public or use signed URLs for production.
+- Avatars are stored locally in `avatars/`; use a CDN or object storage for production.
 - Changing a password invalidates existing sessions only if the user logs in again with the new password; existing JWT tokens remain valid until expiry.
-- SQLite data migration script (`database/migrate-data.js`) requires the old SQLite database and Supabase credentials.
+- SQLite data migration script (`database/migrate-data.js`) requires the old SQLite database.
+- The app does not include an admin panel; database administration is done externally through Neon.
 
 ## Credits
 
