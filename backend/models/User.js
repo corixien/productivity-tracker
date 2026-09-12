@@ -93,6 +93,14 @@ async function update(id, updates) {
     return normalizeUser(result.rows[0]);
 }
 
+async function updateAvatar(userId, avatarUrl) {
+    const result = await query(
+        'UPDATE users SET avatar_url = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+        [avatarUrl, userId]
+    );
+    return result.rows[0];
+}
+
 async function changeUsername(id, newUsername) {
     return transaction(async (client) => {
         const result = await client.query(
@@ -221,6 +229,7 @@ module.exports = {
     findByUsernameOrId,
     create,
     update,
+    updateAvatar,
     changeUsername,
     updateGoals,
     updateSettings,

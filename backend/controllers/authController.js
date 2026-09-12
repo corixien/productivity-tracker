@@ -139,7 +139,6 @@ async function changePassword(req, res) {
 async function uploadUserAvatar(req, res) {
     try {
         const avatarUrl = await uploadAvatar(req.user.id, req.body.avatar);
-        await User.update(req.user.id, { avatar_url: avatarUrl });
         return res.json({ success: true, avatar: avatarUrl, avatarUrl });
     } catch (error) {
         await logError(error, { context: 'uploadAvatar', userId: req.user.id });

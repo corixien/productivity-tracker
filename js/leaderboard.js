@@ -31,7 +31,7 @@ function renderLeaderboard(entries) {
 
     entries.forEach((entry, index) => {
         const tr = document.createElement('tr');
-        const avatarSrc = entry.avatar ? entry.avatar + '?t=' + Date.now() : null;
+        const avatarSrc = entry.avatar || null;
         const avatarId = 'avatar-' + index;
         const avatarHtml = avatarSrc
             ? `<img src="${avatarSrc}" class="leaderboard-avatar" alt="avatar" id="${avatarId}" onerror="this.style.display='none';document.getElementById('placeholder-${avatarId}').style.display='flex';">`

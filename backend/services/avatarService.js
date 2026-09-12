@@ -1,9 +1,7 @@
-const fs = require('fs');
-const path = require('path');
 const crypto = require('crypto');
 const { logger } = require('../utils/logger');
+const User = require('../models/User');
 
-const AVATARS_DIR = path.join(__dirname, '..', 'avatars');
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
 
 function parseAvatar(avatar) {
@@ -71,20 +69,17 @@ async function uploadAvatar(userId, avatarBase64) {
         throw error;
     }
 
-    const userDir = path.join(AVATARS_DIR, String(userId));
-    const fileName = `${Date.now()}-${crypto.randomUUID()}.${parsed.ext}`;
-    const filePath = path.join(userDir, fileName);
-    const relativePath = `/avatars/${userId}/${fileName}`;
+    const b64 = parsed.buffer.toString('base64');
+    const dataUrl = `data:${parsed.mime};base64,${b64}`;
 
     try {
-        await fs.promises.mkdir(userDir, { recursive: true });
-        await fs.promises.writeFile(filePath, parsed.buffer);
+        await User.updateAvatar(userId, dataUrl);
     } catch (error) {
-        logger.error('Avatar file write failed', { error: error.message, userId });
+        logger.error('Avatar database save failed', { error: error.message, userId });
         throw error;
     }
 
-    return relativePath;
+    return dataUrl;
 }
 
 module.exports = { uploadAvatar };

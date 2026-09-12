@@ -45,7 +45,7 @@ function initSettings() {
     if (username && currentAvatar) {
         api.getUser(username).then(user => {
             if (user.avatar) {
-                currentAvatar.src = user.avatar + '?t=' + Date.now();
+                currentAvatar.src = user.avatar;
                 currentAvatar.style.display = 'block';
                 if (avatarPlaceholder) avatarPlaceholder.style.display = 'none';
             }
@@ -70,7 +70,7 @@ function initSettings() {
             reader.onload = (event) => {
                 selectedAvatarBase64 = event.target.result.split(',')[1];
                 if (currentAvatar && avatarPlaceholder) {
-                    currentAvatar.src = event.target.result;
+                    currentAvatar.src = result.avatar;
                     currentAvatar.style.display = 'block';
                     avatarPlaceholder.style.display = 'none';
                 }
@@ -89,12 +89,18 @@ function initSettings() {
                 return;
             }
 
-            const result = await uploadAvatar(username, selectedAvatarBase64);
+            const currentUser = getCurrentUser();
+            if (!currentUser) {
+                alert('Session expired. Please log in again to save your avatar.');
+                return;
+            }
+
+            const result = await uploadAvatar(currentUser, selectedAvatarBase64);
             if (result.success) {
                 if (currentAvatar && avatarPlaceholder) {
-                    currentAvatar.src = result.avatar + '?t=' + Date.now();
+                    currentAvatar.src = result.avatar;
                     currentAvatar.style.display = 'block';
-                    avatarPlaceholder.style.display = 'none';
+                    if (avatarPlaceholder) avatarPlaceholder.style.display = 'none';
                 }
                 if (saveAvatarBtn) {
                     saveAvatarBtn.style.display = 'none';
