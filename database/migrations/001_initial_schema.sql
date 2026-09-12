@@ -38,6 +38,7 @@ CREATE TABLE tasks (
     bonus INTEGER DEFAULT 0 CHECK (bonus >= 0),
     completed BOOLEAN DEFAULT FALSE NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
     completed_at TIMESTAMPTZ
 );
 

@@ -83,10 +83,10 @@ async function update(id, updates) {
 
     if (setClause.length === 0) return findById(id);
     values.push(id);
-    const result = await query(
-        `UPDATE tasks SET ${setClause.join(', ')}, updated_at = NOW() WHERE id = $${paramIndex} RETURNING *`,
-        values
-    );
+        const result = await query(
+            `UPDATE tasks SET ${setClause.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+            values
+        );
     return normalizeTask(result.rows[0]);
 }
 
@@ -108,7 +108,7 @@ async function setCompleted(userId, taskId, completed) {
         if (completed) {
             xpChange = Number(task.xp_awarded || 0);
             await client.query(
-                `UPDATE tasks SET completed = true, completed_at = COALESCE(completed_at, NOW()), updated_at = NOW() WHERE id = $1 RETURNING *`,
+                `UPDATE tasks SET completed = true, completed_at = COALESCE(completed_at, NOW()) WHERE id = $1 RETURNING *`,
                 [taskId]
             );
             if (xpChange > 0) {
@@ -121,7 +121,7 @@ async function setCompleted(userId, taskId, completed) {
         } else {
             xpChange = -Number(task.xp_awarded || 0);
             await client.query(
-                `UPDATE tasks SET completed = false, completed_at = NULL, updated_at = NOW() WHERE id = $1 RETURNING *`,
+                `UPDATE tasks SET completed = false, completed_at = NULL WHERE id = $1 RETURNING *`,
                 [taskId]
             );
             if (xpChange < 0) {
