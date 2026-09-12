@@ -33,7 +33,7 @@ function removeAuthToken() {
     }
 }
 
-async function apiRequest(endpoint, options = {}) {
+async function apiRequest(endpoint, options = {}, retryCount = 0) {
     const url = `${API_BASE}${endpoint}`;
     const config = {
         headers: { 'Content-Type': 'application/json' },
@@ -47,12 +47,40 @@ async function apiRequest(endpoint, options = {}) {
 
     try {
         const response = await fetch(url, config);
-        const data = await response.json();
+        const text = await response.text();
+
+        if (!text) {
+            if (response.status >= 500 && retryCount < 1) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                return apiRequest(endpoint, options, retryCount + 1);
+            }
+            throw new Error('Server returned an empty response. Please try again.');
+        }
+
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (parseError) {
+            if (response.status >= 500 && retryCount < 1) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                return apiRequest(endpoint, options, retryCount + 1);
+            }
+            throw new Error('Server returned an invalid response. Please try again.');
+        }
+
         if (!response.ok) {
+            if (response.status >= 500 && retryCount < 1) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                return apiRequest(endpoint, options, retryCount + 1);
+            }
             throw new Error(data.error || data.message || 'API error');
         }
+
         return data;
     } catch (error) {
+        if (error.name === 'AbortError') {
+            throw new Error('Request timed out. Please try again.');
+        }
         console.error('API request failed:', error);
         throw error;
     }
