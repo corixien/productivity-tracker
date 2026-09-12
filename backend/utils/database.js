@@ -7,7 +7,7 @@ let pool = null;
 function getPool() {
     if (!pool) {
         const config = getDatabaseConfig();
-        const poolConfig = {
+        pool = new Pool({
             ...config,
             max: Number(process.env.DATABASE_POOL_MAX || 10),
             idleTimeoutMillis: 10000,
@@ -15,14 +15,7 @@ function getPool() {
             application_name: 'productivity-tracker',
             keepAlive: true,
             keepAliveInitialDelayMillis: 10000
-        };
-        // Prevent queries from hanging forever if the database is unresponsive.
-        if (!poolConfig.options) {
-            poolConfig.options = '-c statement_timeout=10000';
-        } else if (!poolConfig.options.includes('statement_timeout')) {
-            poolConfig.options += ' -c statement_timeout=10000';
-        }
-        pool = new Pool(poolConfig);
+        });
         pool.on('error', (error) => {
             logger.error('Unexpected database pool error', { error: error.message });
         });
