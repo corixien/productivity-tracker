@@ -155,4 +155,4 @@ const api = {
     }
 };
 
-export { api, getAuthToken, setAuthToken, removeAuthToken };
+export { api, apiRequest, getAuthToken, setAuthToken, removeAuthToken };
