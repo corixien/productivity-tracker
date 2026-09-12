@@ -73,7 +73,7 @@ async function completeTask(req, res) {
         });
     } catch (error) {
         await logError(error, { context: 'completeTask', taskId: req.params.id });
-        return res.status(500).json({ success: false, error: 'Failed to complete task', detail: error.message });
+        return res.status(500).json({ success: false, error: 'Failed to complete task' });
     }
 }
 

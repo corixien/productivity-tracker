@@ -3,7 +3,7 @@
   "version": "2.0.0",
   "private": true,
   "scripts": {
-    "start": "node backend/index.js",
+    "start": "node database/migrate.js && node backend/index.js",
     "dev": "node --watch backend/index.js",
     "backend": "node backend/index.js",
     "migrate": "node database/migrate.js",
