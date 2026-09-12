@@ -1,7 +1,7 @@
 import { apiRequest } from './api.js';
 
 const AI_TIMEOUT = 15000;
-const GROQ_ROUTE = '/api/groq';
+const GROQ_ROUTE = '/groq';
 
 async function rateTaskWithAI(description, goals) {
     const controller = new AbortController();
