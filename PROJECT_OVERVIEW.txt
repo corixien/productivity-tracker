@@ -164,7 +164,8 @@ Avatars are stored as local files under `avatars/{userId}/` and served by Expres
 2. **No Supabase**: There is no Supabase dependency; the database is PostgreSQL via Neon.
 3. **Server required**: The app requires the Express server running (`node backend/index.js`).
 4. **Admin access**: Neon Dashboard or your DB Pro tool is the only administration interface. No admin routes or UI exist.
-5. **Legacy routes**: `POST /api/ai/rate` and `GET /api/ai/status` are preserved for compatibility.
+5. **SSL**: set `DATABASE_SSL_REJECT_UNAUTHORIZED=false` for Neon/self-signed certs in production/Render.
+6. **Legacy routes**: `POST /api/ai/rate` and `GET /api/ai/status` are preserved for compatibility.
 6. **Data migration**: `database/migrate-data.js` migrates SQLite data to PostgreSQL. Run it before deleting `data/app.db`.
 7. **GROQ key security**: The GROQ API key is never exposed to the frontend.
 8. **Server listens on `0.0.0.0`** for LAN access.

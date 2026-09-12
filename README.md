@@ -15,6 +15,7 @@ A web app for competing in friend groups on productivity. Users sign in with a u
 See `.env.example` for required variables:
 
 - `DATABASE_URL` - Neon PostgreSQL connection string
+- `DATABASE_SSL_REJECT_UNAUTHORIZED` - set to `false` for Neon/self-signed certs (important for production/Render)
 - `JWT_SECRET` - secure random JWT signing secret
 - `JWT_EXPIRES_IN` - token expiry (default: `7d`)
 - `GROQ_API_KEY` - optional AI rating API key
