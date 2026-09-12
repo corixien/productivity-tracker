@@ -29,12 +29,12 @@ async function init() {
             showAuth();
         }
 
-        attachEventListeners();
-
         console.log('App init complete');
     } catch (error) {
         console.error('App init failed:', error);
         showAuth();
+    } finally {
+        attachEventListeners();
     }
 }
 

@@ -23,6 +23,18 @@ See `.env.example` for required variables:
 - `PORT` - server port (default: `3000`)
 - `NODE_ENV` - environment (`development` or `production`)
 
+## Deploying to Render
+
+1. Push this repo to GitHub and connect it to Render as a **Web Service** (free tier).
+2. Render auto-detects `render.yaml`. Confirm the build command is `npm install` and start command is `npm start`.
+3. In Render's service settings, add these **Environment Variables**:
+   - `DATABASE_URL` — your Neon connection string (copy from Neon dashboard).
+   - `DATABASE_SSL_REJECT_UNAUTHORIZED` — `false`.
+   - `JWT_SECRET` — the same secure string you used locally.
+   - `NODE_ENV` — `production`.
+4. **Do not** commit real secrets to the repo — `.env` is gitignored. Use Render's dashboard for secrets.
+5. Hit **Manual Deploy** after changing env vars.
+
 ## Database
 
 PostgreSQL through Neon. The schema is created with `database/migrate.js`. Tables:
