@@ -17,12 +17,15 @@ const settingsRoutes = require('./routes/settings');
 const groqController = require('./controllers/groqController');
 const { authenticate } = require('./middleware/auth');
 const { validateAiRate } = require('./middleware/validation');
+const { securityHeaders } = require('./middleware/security');
+const { authRateLimiter } = require('./middleware/rateLimiter');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const FRONTEND_DIR = path.join(__dirname, '..');
 
 app.disable('x-powered-by');
+app.use(securityHeaders);
 app.use(cors({
     origin: process.env.CLIENT_ORIGIN || true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -52,7 +55,7 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authRateLimiter, authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/goals', goalRoutes);

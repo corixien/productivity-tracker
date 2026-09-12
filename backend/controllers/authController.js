@@ -6,6 +6,7 @@ const {
     logSystemEvent
 } = require('../services/loggingService');
 const { uploadAvatar } = require('../services/avatarService');
+const { resetAuthRateLimiter } = require('../middleware/rateLimiter');
 
 function safeUser(user) {
     if (!user) return null;
@@ -25,6 +26,7 @@ async function register(req, res) {
         const user = await User.create(username, password);
         const token = generateToken({ userId: user.id, username: user.username });
         await logAuthAttempt(username, true, req.ip);
+        resetAuthRateLimiter(req.ip);
 
         return res.status(201).json({
             success: true,
@@ -50,6 +52,7 @@ async function login(req, res) {
 
         const token = generateToken({ userId: user.id, username: user.username });
         await logAuthAttempt(username, true, req.ip);
+        resetAuthRateLimiter(req.ip);
 
         return res.json({
             success: true,
