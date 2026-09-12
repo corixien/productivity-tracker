@@ -10,9 +10,11 @@ function getPool() {
         pool = new Pool({
             ...config,
             max: Number(process.env.DATABASE_POOL_MAX || 10),
-            idleTimeoutMillis: 30000,
-            connectionTimeoutMillis: 5000,
-            application_name: 'productivity-tracker'
+            idleTimeoutMillis: 10000,
+            connectionTimeoutMillis: 3000,
+            application_name: 'productivity-tracker',
+            keepAlive: true,
+            keepAliveInitialDelayMillis: 10000
         });
         pool.on('error', (error) => {
             logger.error('Unexpected database pool error', { error: error.message });
