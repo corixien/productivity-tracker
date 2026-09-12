@@ -19,6 +19,7 @@ const { authenticate } = require('./middleware/auth');
 const { validateAiRate } = require('./middleware/validation');
 const { securityHeaders } = require('./middleware/security');
 const { authRateLimiter } = require('./middleware/rateLimiter');
+const { getPool } = require('./utils/database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -55,8 +56,18 @@ app.use((req, res, next) => {
     next();
 });
 
-app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get('/api/health', async (req, res) => {
+    const health = { status: 'ok', timestamp: new Date().toISOString(), db: 'checking' };
+    try {
+        const pool = getPool();
+        await pool.query('SELECT 1');
+        health.db = 'ok';
+    } catch (error) {
+        health.db = 'error';
+        health.dbError = error.message;
+        health.status = 'degraded';
+    }
+    res.json(health);
 });
 
 app.use('/api/auth', authRoutes);
