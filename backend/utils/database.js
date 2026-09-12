@@ -9,7 +9,7 @@ function getPool() {
         const config = getDatabaseConfig();
         pool = new Pool({
             ...config,
-            max: Number(process.env.DATABASE_POOL_MAX || 20),
+            max: Number(process.env.DATABASE_POOL_MAX || 10),
             idleTimeoutMillis: 30000,
             connectionTimeoutMillis: 5000,
             application_name: 'productivity-tracker'

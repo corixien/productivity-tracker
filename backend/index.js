@@ -24,6 +24,10 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const FRONTEND_DIR = path.join(__dirname, '..');
 
+process.on('unhandledRejection', (error) => {
+    logger.error('Unhandled promise rejection', { error: error && error.message ? error.message : String(error) });
+});
+
 app.disable('x-powered-by');
 app.use(securityHeaders);
 app.use(cors({
