@@ -121,17 +121,18 @@ productivity-tracker/
 
 ## Keeping the Service Awake
 
-Render's free tier spins the service down after inactivity. The first request after idle time can fail. The client automatically retries with backoff, but the most reliable fix is to keep the service warm:
+Render's free tier spins the service down after ~15 minutes of inactivity. The first request after a spin-down can return **502/503** for 30–60 seconds while the instance wakes up. The client automatically retries API requests with backoff, but the page itself may briefly show a 503 until the instance is warm.
 
-1. Sign up at https://uptimerobot.com (free tier).
-2. Add a new monitor.
-3. Set **Friendly Name** to `Productivity Tracker`.
-4. Set **Monitor Type** to `HTTP(s)`.
-5. Set **URL** to `https://productivity-tracker-uguq.onrender.com/api/health`.
-6. Set **Monitoring Interval** to `5 minutes`.
-7. Save.
+To keep the instance warm, ping the health endpoint every few minutes with a free monitor like UptimeRobot:
 
-This keeps the service warm and prevents most cold-start failures.
+1. Sign up at https://uptimerobot.com
+2. Add a new monitor, **HTTP(s)**, URL `https://productivity-tracker-uguq.onrender.com/api/health`, interval **5 minutes**.
+3. Confirm the monitor shows **Up**.
+
+If you still see intermittent 502/503 after the monitor is Up, it is most often:
+- **Render/Neon maintenance** — free-tier databases and services can restart without notice; wait 1–2 minutes and refresh.
+- **Cold start** — hard refresh (`Ctrl + Shift + R`) to load the warm instance.
+- **A misconfigured monitor** — double-check that the monitor's last response was `200` and not a timeout/error.
 
 ## Known Limitations
 
