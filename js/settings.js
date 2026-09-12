@@ -137,6 +137,9 @@ function initSettings() {
     }
 }
 
+let cancelHandler = null;
+let submitHandler = null;
+
 function initChangeCredentials(showAppFn) {
     const changeForm = document.getElementById('change-credentials-form');
     const usernameInput = document.getElementById('change-username-input');
@@ -152,14 +155,17 @@ function initChangeCredentials(showAppFn) {
     }
 
     if (cancelBtn) {
-        cancelBtn.addEventListener('click', () => {
+        if (cancelHandler) cancelBtn.removeEventListener('click', cancelHandler);
+        cancelHandler = () => {
             if (errorEl) errorEl.textContent = '';
             showAppFn(currentUser);
-        });
+        };
+        cancelBtn.addEventListener('click', cancelHandler);
     }
 
     if (changeForm) {
-        changeForm.addEventListener('submit', async (e) => {
+        if (submitHandler) changeForm.removeEventListener('submit', submitHandler);
+        submitHandler = async (e) => {
             e.preventDefault();
             if (errorEl) errorEl.textContent = '';
 
@@ -206,7 +212,8 @@ function initChangeCredentials(showAppFn) {
                 alert(message);
                 if (errorEl) errorEl.textContent = message;
             }
-        });
+        };
+        changeForm.addEventListener('submit', submitHandler);
     }
 }
 

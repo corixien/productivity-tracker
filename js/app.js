@@ -18,7 +18,6 @@ async function init() {
     try {
     initUI();
     initSettings();
-    initChangeCredentials(showApp);
 
     subscribeToAuthEvents();
 
@@ -187,6 +186,7 @@ function showApp(username) {
     document.getElementById('auth-screen').classList.remove('active');
     document.getElementById('app-screen').classList.add('active');
 
+    initChangeCredentials(showApp);
     loadUserData(username);
 }
 
