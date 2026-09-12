@@ -28,6 +28,24 @@
         </div>
     </div>
 
+    <div id="change-credentials-screen" class="screen">
+        <div class="auth-container">
+            <div class="auth-card">
+                <h1 data-i18n="changeCredentialsTitle">Change Username & Password</h1>
+                <p class="auth-mode" data-i18n="changeCredentialsSubtitle">Update your credentials</p>
+                <form id="change-credentials-form">
+                    <input type="text" id="change-username-input" required placeholder="Username" data-i18n-placeholder="usernamePlaceholder">
+                    <input type="password" id="change-password-input" required placeholder="New Password" data-i18n-placeholder="newPasswordPlaceholder">
+                    <div class="change-credentials-buttons">
+                        <button type="button" id="cancel-change-credentials" class="secondary-btn" data-i18n="cancel">Cancel</button>
+                        <button type="submit" id="save-changes-btn" class="primary-btn" data-i18n="saveChanges">Save changes</button>
+                    </div>
+                </form>
+                <p id="change-credentials-error" class="error-msg"></p>
+            </div>
+        </div>
+    </div>
+
     <div id="app-screen" class="screen">
         <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Toggle menu">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -152,18 +170,7 @@
                 <div class="settings-username-display" id="settings-username-display"></div>
                 <h2 data-i18n="settingsTitle">Settings</h2>
                 <div class="settings-group">
-                    <label data-i18n="changeUsername">Change Username</label>
-                    <div class="settings-input-group">
-                        <input type="text" id="settings-new-username" placeholder="New username" data-i18n-placeholder="newUsernamePlaceholder">
-                        <button id="change-username-btn" class="primary-btn" data-i18n="save">Save</button>
-                    </div>
-                </div>
-                <div class="settings-group">
-                    <label data-i18n="changePassword">Change Password</label>
-                    <div class="settings-input-group">
-                        <input type="password" id="settings-new-password" placeholder="New password" data-i18n-placeholder="newPasswordPlaceholder">
-                        <button id="change-password-btn" class="primary-btn" data-i18n="save">Save</button>
-                    </div>
+                    <button id="change-credentials-btn" class="primary-btn" data-i18n="changeCredentials">Change Username/Password</button>
                 </div>
                 <div class="settings-group">
                     <label data-i18n="profilePicture">Profile Picture</label>

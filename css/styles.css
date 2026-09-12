@@ -432,6 +432,25 @@ body {
     background-color: #c0392b;
 }
 
+#change-credentials-form input[type="text"],
+#change-credentials-form input[type="password"] {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 16px;
+    border: 1px solid var(--bg-tertiary);
+    border-radius: var(--radius);
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 1rem;
+}
+
+.change-credentials-buttons {
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+    margin-top: 24px;
+}
+
 /* Task Lists */
 .task-lists {
     display: grid;

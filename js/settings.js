@@ -1,6 +1,6 @@
 import { api } from './api.js';
-import { setLanguage, getCurrentLang } from './i18n.js';
-import { getCurrentUser } from './auth.js';
+import { setLanguage, getCurrentLang, t } from './i18n.js';
+import { getCurrentUser, updateSession } from './auth.js';
 
 async function changePassword(username, newPassword) {
     if (!newPassword || newPassword.length < 4) {
@@ -14,6 +14,20 @@ async function changePassword(username, newPassword) {
 
     await api.updateUser(username, { newPassword });
     return { success: true };
+}
+
+async function changeUsername(oldUsername, newUsername) {
+    if (!newUsername || newUsername.length < 3) {
+        return { success: false, error: 'Username must be at least 3 characters' };
+    }
+
+    const existingUser = await api.getUser(newUsername);
+    if (existingUser && existingUser.username && existingUser.username.toLowerCase() !== oldUsername.toLowerCase()) {
+        return { success: false, error: 'Username already taken' };
+    }
+
+    const result = await api.changeUsername(oldUsername, newUsername);
+    return result;
 }
 
 async function uploadAvatar(username, base64Data) {
@@ -123,18 +137,77 @@ function initSettings() {
     }
 }
 
-async function changeUsername(oldUsername, newUsername) {
-    if (!newUsername || newUsername.length < 3) {
-        return { success: false, error: 'Username must be at least 3 characters' };
+function initChangeCredentials(showAppFn) {
+    const changeForm = document.getElementById('change-credentials-form');
+    const usernameInput = document.getElementById('change-username-input');
+    const passwordInput = document.getElementById('change-password-input');
+    const cancelBtn = document.getElementById('cancel-change-credentials');
+    const errorEl = document.getElementById('change-credentials-error');
+    const currentUser = getCurrentUser();
+
+    if (!currentUser) return;
+
+    if (usernameInput) {
+        usernameInput.value = currentUser;
     }
 
-    const existingUser = await api.getUser(newUsername);
-    if (existingUser && existingUser.username && existingUser.username.toLowerCase() !== oldUsername.toLowerCase()) {
-        return { success: false, error: 'Username already taken' };
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', () => {
+            if (errorEl) errorEl.textContent = '';
+            showAppFn(currentUser);
+        });
     }
 
-    const result = await api.changeUsername(oldUsername, newUsername);
-    return result;
+    if (changeForm) {
+        changeForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (errorEl) errorEl.textContent = '';
+
+            const newUsername = (usernameInput?.value || '').trim();
+            const newPassword = passwordInput?.value || '';
+
+            if (!newUsername && !newPassword) {
+                alert('Please enter a new username or a new password.');
+                return;
+            }
+
+            let success = true;
+            let message = '';
+
+            if (newUsername && newUsername.toLowerCase() !== currentUser.toLowerCase()) {
+                const result = await changeUsername(currentUser, newUsername);
+                if (result.success) {
+                    const remember = localStorage.getItem('productivity_tracker_token') || sessionStorage.getItem('productivity_tracker_session_token');
+                    updateSession(newUsername, result.token, !!remember);
+                    const display = document.getElementById('settings-username-display');
+                    if (display) display.textContent = newUsername;
+                    message = t('usernameChanged');
+                } else {
+                    success = false;
+                    message = result.error || 'Failed to change username';
+                }
+            }
+
+            if (success && newPassword) {
+                const result = await changePassword(currentUser, newPassword);
+                if (result.success) {
+                    message = message ? message + ' ' + t('passwordChanged') : t('passwordChanged');
+                } else {
+                    success = false;
+                    message = result.error || 'Failed to change password';
+                }
+            }
+
+            if (success) {
+                alert(message);
+                if (passwordInput) passwordInput.value = '';
+                showAppFn(getCurrentUser() || currentUser);
+            } else {
+                alert(message);
+                if (errorEl) errorEl.textContent = message;
+            }
+        });
+    }
 }
 
 async function saveGoals(username) {
@@ -143,4 +216,4 @@ async function saveGoals(username) {
     return result;
 }
 
-export { changePassword, changeUsername, uploadAvatar, saveGoals, initSettings };
+export { uploadAvatar, saveGoals, initSettings, initChangeCredentials };

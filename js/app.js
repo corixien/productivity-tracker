@@ -1,8 +1,8 @@
-import { register, signIn, signOut, restoreSession, subscribe, getCurrentUser, getAuthMode, setAuthMode, toggleAuthMode, updateSession } from './auth.js';
+import { register, signIn, signOut, restoreSession, subscribe, getCurrentUser, getAuthMode, setAuthMode, toggleAuthMode } from './auth.js';
 import { api } from './api.js';
 import { getRankName, getProgressPercent, addTask, completeTask as completeTaskOp, deleteTask as deleteTaskOp, renderTasks, updateXPDisplay } from './tasks.js';
 import { addFriend, loadLeaderboard, renderLeaderboard } from './leaderboard.js';
-import { changePassword, changeUsername, uploadAvatar, saveGoals, initSettings } from './settings.js';
+import { initSettings, initChangeCredentials, uploadAvatar, saveGoals } from './settings.js';
 import { initUI, showSection, closeModals } from './ui.js';
 import { setLanguage, getCurrentLang, t } from './i18n.js';
 import { rateTaskWithAI } from './ai-service.js';
@@ -16,10 +16,11 @@ async function init() {
     console.log('App init starting...');
 
     try {
-        initUI();
-        initSettings();
+    initUI();
+    initSettings();
+    initChangeCredentials(showApp);
 
-        subscribeToAuthEvents();
+    subscribeToAuthEvents();
 
         const username = await restoreSession();
         console.log('Restored session:', username);
@@ -74,14 +75,8 @@ function attachEventListeners() {
     const cancelFriendBtn = document.getElementById('cancel-friend-btn');
     if (cancelFriendBtn) cancelFriendBtn.addEventListener('click', closeModals);
 
-    const changeUsernameBtn = document.getElementById('change-username-btn');
-    if (changeUsernameBtn) changeUsernameBtn.addEventListener('click', handleChangeUsername);
-
     const saveGoalsBtn = document.getElementById('save-goals-btn');
     if (saveGoalsBtn) saveGoalsBtn.addEventListener('click', handleSaveGoals);
-
-    const changePasswordBtn = document.getElementById('change-password-btn');
-    if (changePasswordBtn) changePasswordBtn.addEventListener('click', handleChangePassword);
 
     const signOutBtn = document.getElementById('sign-out-btn');
     if (signOutBtn) signOutBtn.addEventListener('click', handleSignOut);
@@ -322,29 +317,6 @@ async function loadAndRenderLeaderboard(username) {
     renderLeaderboard(entries);
 }
 
-async function handleChangePassword() {
-    const username = getCurrentUser();
-    if (!username) return;
-
-    const newPassword = document.getElementById('settings-new-password').value.trim();
-    if (!newPassword || newPassword.length < 4) {
-        alert(t('invalidPassword'));
-        return;
-    }
-
-    try {
-        const result = await changePassword(username, newPassword);
-        if (result.success) {
-            alert(t('passwordChanged'));
-            document.getElementById('settings-new-password').value = '';
-        } else {
-            alert(result.error || 'Failed to change password');
-        }
-    } catch (error) {
-        alert(error.message || 'Failed to change password');
-    }
-}
-
 async function handleSaveGoals() {
     const username = getCurrentUser();
     if (!username) return;
@@ -352,32 +324,6 @@ async function handleSaveGoals() {
     const result = await saveGoals(username);
     if (result) {
         alert(t('goalsSaved'));
-    }
-}
-
-async function handleChangeUsername() {
-    const username = getCurrentUser();
-    if (!username) return;
-
-    const newUsername = document.getElementById('settings-new-username').value.trim();
-    if (!newUsername || newUsername.length < 3) {
-        alert(t('invalidUsername'));
-        return;
-    }
-
-    try {
-        const result = await changeUsername(username, newUsername);
-        if (result.success) {
-            const display = document.getElementById('settings-username-display');
-            if (display) display.textContent = newUsername;
-            const remember = localStorage.getItem('productivity_tracker_token') || sessionStorage.getItem('productivity_tracker_session_token');
-            updateSession(newUsername, result.token, !!remember);
-            alert(t('usernameChanged'));
-        } else {
-            alert(result.error);
-        }
-    } catch (error) {
-        alert(error.message || 'Failed to change username');
     }
 }
 
