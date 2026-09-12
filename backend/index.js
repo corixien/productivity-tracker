@@ -20,7 +20,6 @@ const { validateAiRate } = require('./middleware/validation');
 const { securityHeaders } = require('./middleware/security');
 const { authRateLimiter } = require('./middleware/rateLimiter');
 const { getPool } = require('./utils/database');
-const testRoutes = require('./routes/test');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -82,8 +81,6 @@ app.use('/api/groq', groqRoutes);
 
 app.post('/api/ai/rate', authenticate, validateAiRate, groqController.rateTask);
 app.get('/api/ai/status', groqController.getAiStatus);
-
-app.use('/api/test', authenticate, testRoutes);
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(FRONTEND_DIR, 'index.html'));
