@@ -102,15 +102,11 @@ function attachEventListeners() {
     const reviewConfirmBtn = document.getElementById('review-confirm-btn');
     if (reviewConfirmBtn) reviewConfirmBtn.addEventListener('click', handleReviewNext);
 
+    const reviewBackBtn = document.getElementById('review-back-btn');
+    if (reviewBackBtn) reviewBackBtn.addEventListener('click', handleReviewBack);
+
     const reviewCancelBtn = document.getElementById('review-cancel-btn');
-    if (reviewCancelBtn) {
-        reviewCancelBtn.addEventListener('click', () => {
-            currentAIRating = null;
-            document.getElementById('ai-review-section').style.display = 'none';
-            document.getElementById('ai-task-section').style.display = 'block';
-            document.getElementById('ai-loading').style.display = 'none';
-        });
-    }
+    if (reviewCancelBtn) reviewCancelBtn.addEventListener('click', cancelTaskCreation);
 
     const editConfirmBtn = document.getElementById('edit-confirm-btn');
     if (editConfirmBtn) editConfirmBtn.addEventListener('click', handleEditConfirm);
@@ -467,6 +463,12 @@ function showEditSection() {
 
     document.getElementById('ai-review-section').style.display = 'none';
     document.getElementById('ai-edit-section').style.display = 'block';
+}
+
+function handleReviewBack() {
+    document.getElementById('ai-review-section').style.display = 'none';
+    document.getElementById('ai-task-section').style.display = 'block';
+    document.getElementById('ai-loading').style.display = 'none';
 }
 
 function handleReviewNext() {
