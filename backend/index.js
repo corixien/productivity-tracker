@@ -88,6 +88,10 @@ app.get('/', (req, res) => {
 app.get('/LOGO.png', (req, res) => {
     res.sendFile(path.join(FRONTEND_DIR, 'LOGO.png'));
 });
+app.get('/manifest.json', (req, res) => {
+    res.sendFile(path.join(FRONTEND_DIR, 'manifest.json'));
+});
+app.use('/icons', express.static(path.join(FRONTEND_DIR, 'icons'), { maxAge: '1h' }));
 app.use('/js', express.static(path.join(FRONTEND_DIR, 'js'), { maxAge: '1h' }));
 app.use('/css', express.static(path.join(FRONTEND_DIR, 'css'), { maxAge: '1h' }));
 app.use('/avatars', express.static(path.join(FRONTEND_DIR, 'avatars'), { maxAge: '1h' }));
