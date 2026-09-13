@@ -198,6 +198,7 @@ function showChangeCredentialsScreen() {
 
 function showApp(username) {
     document.getElementById('auth-screen').classList.remove('active');
+    document.getElementById('change-credentials-screen').classList.remove('active');
     document.getElementById('app-screen').classList.add('active');
 
     initChangeCredentials(showApp);
