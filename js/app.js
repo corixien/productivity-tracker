@@ -84,8 +84,16 @@ function attachEventListeners() {
     if (signOutBtn) signOutBtn.addEventListener('click', handleSignOut);
 
     const languageSelect = document.getElementById('language-select');
-    if (languageSelect) languageSelect.addEventListener('change', (e) => {
+    if (languageSelect) languageSelect.addEventListener('change', async (e) => {
         setLanguage(e.target.value);
+        const username = getCurrentUser();
+        if (username) {
+            try {
+                await api.updateUser(username, { language: e.target.value });
+            } catch (error) {
+                console.error('Failed to save language', error);
+            }
+        }
     });
 
     const aiSubmitBtn = document.getElementById('ai-submit-btn');
