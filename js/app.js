@@ -96,11 +96,14 @@ function attachEventListeners() {
         }
     });
 
+    const aiCancelBtn = document.getElementById('ai-cancel-btn');
+    if (aiCancelBtn) aiCancelBtn.addEventListener('click', cancelTaskCreation);
+
     const aiSubmitBtn = document.getElementById('ai-submit-btn');
     if (aiSubmitBtn) aiSubmitBtn.addEventListener('click', handleAITaskSubmit);
 
-    const reviewConfirmBtn = document.getElementById('review-confirm-btn');
-    if (reviewConfirmBtn) reviewConfirmBtn.addEventListener('click', handleReviewNext);
+    const reviewNextBtn = document.getElementById('review-next-btn');
+    if (reviewNextBtn) reviewNextBtn.addEventListener('click', handleReviewNext);
 
     const reviewBackBtn = document.getElementById('review-back-btn');
     if (reviewBackBtn) reviewBackBtn.addEventListener('click', handleReviewBack);
