@@ -21,7 +21,18 @@ async function changeUsername(oldUsername, newUsername) {
         return { success: false, error: 'Username must be at least 3 characters' };
     }
 
-    const existingUser = await api.getUser(newUsername);
+    if (newUsername.toLowerCase() === oldUsername.toLowerCase()) {
+        return { success: false, error: 'Username unchanged' };
+    }
+
+    let existingUser = null;
+    try {
+        existingUser = await api.getUser(newUsername);
+    } catch (e) {
+        // 404 means the username is available — that's what we want
+        existingUser = null;
+    }
+
     if (existingUser && existingUser.username && existingUser.username.toLowerCase() !== oldUsername.toLowerCase()) {
         return { success: false, error: 'Username already taken' };
     }
