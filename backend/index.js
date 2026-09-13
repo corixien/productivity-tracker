@@ -85,6 +85,9 @@ app.get('/api/ai/status', groqController.getAiStatus);
 app.get('/', (req, res) => {
     res.sendFile(path.join(FRONTEND_DIR, 'index.html'));
 });
+app.get('/LOGO.png', (req, res) => {
+    res.sendFile(path.join(FRONTEND_DIR, 'LOGO.png'));
+});
 app.use('/js', express.static(path.join(FRONTEND_DIR, 'js'), { maxAge: '1h' }));
 app.use('/css', express.static(path.join(FRONTEND_DIR, 'css'), { maxAge: '1h' }));
 app.use('/avatars', express.static(path.join(FRONTEND_DIR, 'avatars'), { maxAge: '1h' }));
