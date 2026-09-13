@@ -14,6 +14,7 @@ router.delete('/friends/:friendId', userController.removeFriend);
 router.get('/leaderboard', userController.getLeaderboard);
 router.get('/profile', userController.getProfile);
 router.put('/profile', userController.updateProfile);
+router.put('/reload-all', authController.reloadAll);
 router.get('/:username', optionalAuth, authController.getUser);
 router.put('/:username', authController.updateUser);
 router.post('/:username/password', authController.changePassword);
@@ -22,6 +23,5 @@ router.post('/:username/change-username', authController.changeUsername);
 router.get('/:username/reload', authController.getReload);
 router.put('/:username/reload', authController.setReload);
 router.post('/:username/reload-confirm', authController.confirmReload);
-router.put('/reload-all', authController.reloadAll);
 
 module.exports = router;
