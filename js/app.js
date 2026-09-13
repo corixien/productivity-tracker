@@ -213,24 +213,40 @@ function showApp(username) {
     initChangeCredentials(showApp);
     loadUserData(username);
     loadUserPreferences(username);
-    checkReload(username);
+    checkForUpdates(username);
     startReloadCheck(username);
 }
 
-async function checkReload(username) {
+async function checkForUpdates(username) {
     try {
         const data = await api.getReload(username);
-        const currentReload = data.reload;
-        const lastSeenKey = `lastReload_${username}`;
-        const lastSeen = parseInt(localStorage.getItem(lastSeenKey) || '0', 10);
+        const userData = await api.getUser(username);
 
-        if (currentReload > lastSeen) {
+        const currentReload = data.reload;
+        const lastReload = parseInt(localStorage.getItem(`lastReload_${username}`) || '0', 10);
+        const currentUpdatedAt = userData.updated_at;
+        const lastUpdated = localStorage.getItem(`lastUpdated_${username}`);
+
+        if (currentReload > lastReload || (currentUpdatedAt && currentUpdatedAt !== lastUpdated)) {
             await api.confirmReload(username);
-            localStorage.setItem(lastSeenKey, String(currentReload));
-            location.reload();
+            localStorage.setItem(`lastReload_${username}`, String(currentReload));
+            if (currentUpdatedAt) {
+                localStorage.setItem(`lastUpdated_${username}`, currentUpdatedAt);
+            }
+            await forceRefresh(username);
         }
     } catch (error) {
-        console.error('Reload check failed:', error);
+        console.error('Update check failed:', error);
+    }
+}
+
+async function forceRefresh(username) {
+    try {
+        await loadUserData(username);
+        await loadUserPreferences(username);
+        await loadAndRenderLeaderboard(username);
+    } catch (error) {
+        console.error('Force refresh failed:', error);
     }
 }
 
@@ -240,9 +256,9 @@ function startReloadCheck(username) {
     stopReloadCheck();
     reloadInterval = setInterval(() => {
         if (!document.hidden) {
-            checkReload(username);
+            checkForUpdates(username);
         }
-    }, 60000);
+    }, 30000);
 }
 
 function stopReloadCheck() {

@@ -56,6 +56,11 @@ app.use((req, res, next) => {
     next();
 });
 
+app.use('/api', (req, res, next) => {
+    res.set('Cache-Control', 'no-store');
+    next();
+});
+
 app.get('/api/health', async (req, res) => {
     const health = { status: 'ok', timestamp: new Date().toISOString(), db: 'checking' };
     try {
