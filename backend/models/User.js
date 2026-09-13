@@ -223,6 +223,35 @@ async function upsertProfile(userId, profileData) {
     return result.rows[0];
 }
 
+async function getReload(username) {
+    const result = await query(
+        'SELECT reload, times_reloaded FROM users WHERE LOWER(username) = LOWER($1)',
+        [username]
+    );
+    if (!result.rows[0]) return null;
+    return { reload: result.rows[0].reload, timesReloaded: result.rows[0].times_reloaded };
+}
+
+async function setReload(username, reload) {
+    const result = await query(
+        'UPDATE users SET reload = $1, updated_at = NOW() WHERE LOWER(username) = LOWER($2) RETURNING *',
+        [reload, username]
+    );
+    return result.rows[0] || null;
+}
+
+async function incrementReloadAll() {
+    await query('UPDATE users SET reload = reload + 1');
+}
+
+async function incrementTimesReloaded(username) {
+    const result = await query(
+        'UPDATE users SET times_reloaded = times_reloaded + 1, updated_at = NOW() WHERE LOWER(username) = LOWER($1) RETURNING *',
+        [username]
+    );
+    return result.rows[0] || null;
+}
+
 module.exports = {
     findByUsername,
     findById,
@@ -241,5 +270,9 @@ module.exports = {
     isFriend,
     getUserProfile,
     upsertProfile,
-    normalizeUser
+    normalizeUser,
+    getReload,
+    setReload,
+    incrementReloadAll,
+    incrementTimesReloaded
 };

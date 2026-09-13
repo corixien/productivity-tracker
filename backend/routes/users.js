@@ -19,5 +19,9 @@ router.put('/:username', authController.updateUser);
 router.post('/:username/password', authController.changePassword);
 router.post('/:username/avatar', authController.uploadAvatar);
 router.post('/:username/change-username', authController.changeUsername);
+router.get('/:username/reload', authController.getReload);
+router.put('/:username/reload', authController.setReload);
+router.post('/:username/reload-confirm', authController.confirmReload);
+router.put('/reload-all', authController.reloadAll);
 
 module.exports = router;

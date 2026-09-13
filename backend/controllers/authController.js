@@ -169,6 +169,59 @@ async function changeUsername(req, res) {
     }
 }
 
+async function getReload(req, res) {
+    try {
+        const reload = await User.getReload(req.params.username);
+        if (!reload) {
+            return res.status(404).json({ success: false, error: 'User not found' });
+        }
+        return res.json({ reload: reload.reload, timesReloaded: reload.timesReloaded });
+    } catch (error) {
+        await logError(error, { context: 'getReload', username: req.params.username });
+        return res.status(500).json({ success: false, error: 'Failed to get reload status' });
+    }
+}
+
+async function setReload(req, res) {
+    try {
+        const { reload } = req.body;
+        if (typeof reload !== 'number' || reload < 0) {
+            return res.status(400).json({ success: false, error: 'Valid reload number is required' });
+        }
+        const user = await User.setReload(req.params.username, reload);
+        if (!user) {
+            return res.status(404).json({ success: false, error: 'User not found' });
+        }
+        return res.json({ success: true, reload });
+    } catch (error) {
+        await logError(error, { context: 'setReload', username: req.params.username });
+        return res.status(500).json({ success: false, error: 'Failed to set reload' });
+    }
+}
+
+async function reloadAll(req, res) {
+    try {
+        await User.incrementReloadAll();
+        return res.json({ success: true });
+    } catch (error) {
+        await logError(error, { context: 'reloadAll' });
+        return res.status(500).json({ success: false, error: 'Failed to reload all users' });
+    }
+}
+
+async function confirmReload(req, res) {
+    try {
+        const result = await User.incrementTimesReloaded(req.params.username);
+        if (!result) {
+            return res.status(404).json({ success: false, error: 'User not found' });
+        }
+        return res.json({ success: true });
+    } catch (error) {
+        await logError(error, { context: 'confirmReload', username: req.params.username });
+        return res.status(500).json({ success: false, error: 'Failed to confirm reload' });
+    }
+}
+
 module.exports = {
     register,
     login,
@@ -177,5 +230,9 @@ module.exports = {
     updateUser,
     changePassword,
     uploadAvatar: uploadUserAvatar,
-    changeUsername
+    changeUsername,
+    getReload,
+    setReload,
+    reloadAll,
+    confirmReload
 };

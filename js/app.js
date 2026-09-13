@@ -178,6 +178,7 @@ function updateAuthUI(mode) {
 }
 
 function showAuth() {
+    stopReloadCheck();
     document.getElementById('auth-screen').classList.add('active');
     document.getElementById('app-screen').classList.remove('active');
     updateAuthUI(getAuthMode());
@@ -212,6 +213,43 @@ function showApp(username) {
     initChangeCredentials(showApp);
     loadUserData(username);
     loadUserPreferences(username);
+    checkReload(username);
+    startReloadCheck(username);
+}
+
+async function checkReload(username) {
+    try {
+        const data = await api.getReload(username);
+        const currentReload = data.reload;
+        const lastSeenKey = `lastReload_${username}`;
+        const lastSeen = parseInt(localStorage.getItem(lastSeenKey) || '0', 10);
+
+        if (currentReload > lastSeen) {
+            await api.confirmReload(username);
+            localStorage.setItem(lastSeenKey, String(currentReload));
+            location.reload();
+        }
+    } catch (error) {
+        console.error('Reload check failed:', error);
+    }
+}
+
+let reloadInterval = null;
+
+function startReloadCheck(username) {
+    stopReloadCheck();
+    reloadInterval = setInterval(() => {
+        if (!document.hidden) {
+            checkReload(username);
+        }
+    }, 60000);
+}
+
+function stopReloadCheck() {
+    if (reloadInterval) {
+        clearInterval(reloadInterval);
+        reloadInterval = null;
+    }
 }
 
 function openTaskModal() {
