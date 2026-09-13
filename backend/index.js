@@ -29,6 +29,7 @@ process.on('unhandledRejection', (error) => {
     logger.error('Unhandled promise rejection', { error: error && error.message ? error.message : String(error) });
 });
 
+app.set('trust proxy', 1);
 app.disable('x-powered-by');
 app.use(securityHeaders);
 app.use(cors({
