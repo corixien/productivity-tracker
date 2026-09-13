@@ -189,5 +189,6 @@ export {
     setAuthMode,
     getAuthMode,
     toggleAuthMode,
-    updateSession
+    updateSession,
+    loadUserPreferences
 };

@@ -1,4 +1,4 @@
-import { register, signIn, signOut, restoreSession, subscribe, getCurrentUser, getAuthMode, setAuthMode, toggleAuthMode } from './auth.js';
+import { register, signIn, signOut, restoreSession, subscribe, getCurrentUser, getAuthMode, setAuthMode, toggleAuthMode, loadUserPreferences } from './auth.js';
 import { api } from './api.js';
 import { getRankName, getProgressPercent, addTask, completeTask as completeTaskOp, deleteTask as deleteTaskOp, renderTasks, updateXPDisplay } from './tasks.js';
 import { addFriend, loadLeaderboard, renderLeaderboard } from './leaderboard.js';
@@ -211,6 +211,7 @@ function showApp(username) {
 
     initChangeCredentials(showApp);
     loadUserData(username);
+    loadUserPreferences(username);
 }
 
 function openTaskModal() {
