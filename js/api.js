@@ -192,30 +192,6 @@ const api = {
             method: 'PUT',
             body: JSON.stringify(data)
         });
-    },
-
-    async getReload(username) {
-        return apiRequest(`/users/${encodeURIComponent(username)}/reload`);
-    },
-
-    async setReload(username, reload) {
-        return apiRequest(`/users/${encodeURIComponent(username)}/reload`, {
-            method: 'PUT',
-            body: JSON.stringify({ reload })
-        });
-    },
-
-    async reloadAll() {
-        return apiRequest('/users/reload-all', {
-            method: 'PUT'
-        });
-    },
-
-    async confirmReload(username) {
-        return apiRequest(`/users/${encodeURIComponent(username)}/reload-confirm`, {
-            method: 'POST'
-        });
     }
-};
 
 export { api, apiRequest, getAuthToken, setAuthToken, removeAuthToken };

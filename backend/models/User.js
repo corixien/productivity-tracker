@@ -224,35 +224,6 @@ async function upsertProfile(userId, profileData) {
     return result.rows[0];
 }
 
-async function getReload(username) {
-    const result = await query(
-        'SELECT reload, times_reloaded FROM users WHERE LOWER(username) = LOWER($1)',
-        [username]
-    );
-    if (!result.rows[0]) return null;
-    return { reload: result.rows[0].reload, timesReloaded: result.rows[0].times_reloaded };
-}
-
-async function setReload(username, reload) {
-    const result = await query(
-        'UPDATE users SET reload = $1, updated_at = NOW() WHERE LOWER(username) = LOWER($2) RETURNING *',
-        [reload, username]
-    );
-    return result.rows[0] || null;
-}
-
-async function incrementReloadAll() {
-    await query('UPDATE users SET reload = reload + 1');
-}
-
-async function incrementTimesReloaded(username) {
-    const result = await query(
-        'UPDATE users SET times_reloaded = times_reloaded + 1, updated_at = NOW() WHERE LOWER(username) = LOWER($1) RETURNING *',
-        [username]
-    );
-    return result.rows[0] || null;
-}
-
 async function getPositionMultiplier(userId, xp) {
     const friends = await getFriends(userId);
     const friendIds = friends.map(f => f.friend_id);
@@ -289,8 +260,8 @@ async function recalculateMultiplier(userId) {
     const combined = Math.round(((rankMultiplier + positionMultiplier) / 2) * 100) / 100;
 
     await query(
-        'UPDATE users SET multiplier = $1, updated_at = NOW() WHERE id = $2',
-        [combined, userId]
+        'UPDATE users SET multiplier = $1, position_based_multiplier = $2, rank_based_multiplier = $3, updated_at = NOW() WHERE id = $4',
+        [combined, positionMultiplier, rankMultiplier, userId]
     );
 }
 
@@ -313,10 +284,6 @@ module.exports = {
     getUserProfile,
     upsertProfile,
     normalizeUser,
-    getReload,
-    setReload,
-    incrementReloadAll,
-    incrementTimesReloaded,
     getPositionMultiplier,
     recalculateMultiplier
 };

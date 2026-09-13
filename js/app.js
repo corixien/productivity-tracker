@@ -178,7 +178,6 @@ function updateAuthUI(mode) {
 }
 
 function showAuth() {
-    stopReloadCheck();
     document.getElementById('auth-screen').classList.add('active');
     document.getElementById('app-screen').classList.remove('active');
     updateAuthUI(getAuthMode());
@@ -213,59 +212,6 @@ function showApp(username) {
     initChangeCredentials(showApp);
     loadUserData(username);
     loadUserPreferences(username);
-    checkForUpdates(username);
-    startReloadCheck(username);
-}
-
-async function checkForUpdates(username) {
-    try {
-        const data = await api.getReload(username);
-        const userData = await api.getUser(username);
-
-        const currentReload = data.reload;
-        const lastReload = parseInt(localStorage.getItem(`lastReload_${username}`) || '0', 10);
-        const currentUpdatedAt = userData.updated_at;
-        const lastUpdated = localStorage.getItem(`lastUpdated_${username}`);
-
-        if (currentReload > lastReload || (currentUpdatedAt && currentUpdatedAt !== lastUpdated)) {
-            await api.confirmReload(username);
-            localStorage.setItem(`lastReload_${username}`, String(currentReload));
-            if (currentUpdatedAt) {
-                localStorage.setItem(`lastUpdated_${username}`, currentUpdatedAt);
-            }
-            await forceRefresh(username);
-        }
-    } catch (error) {
-        console.error('Update check failed:', error);
-    }
-}
-
-async function forceRefresh(username) {
-    try {
-        await loadUserData(username);
-        await loadUserPreferences(username);
-        await loadAndRenderLeaderboard(username);
-    } catch (error) {
-        console.error('Force refresh failed:', error);
-    }
-}
-
-let reloadInterval = null;
-
-function startReloadCheck(username) {
-    stopReloadCheck();
-    reloadInterval = setInterval(() => {
-        if (!document.hidden) {
-            checkForUpdates(username);
-        }
-    }, 30000);
-}
-
-function stopReloadCheck() {
-    if (reloadInterval) {
-        clearInterval(reloadInterval);
-        reloadInterval = null;
-    }
 }
 
 function openTaskModal() {
