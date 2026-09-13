@@ -116,7 +116,16 @@ function attachEventListeners() {
     if (editConfirmBtn) editConfirmBtn.addEventListener('click', handleEditConfirm);
 
     const editCancelBtn = document.getElementById('edit-cancel-btn');
-    if (editCancelBtn) editCancelBtn.addEventListener('click', handleEditCancel);
+    if (editCancelBtn) editCancelBtn.addEventListener('click', cancelTaskCreation);
+
+    const multiplierBackBtn = document.getElementById('multiplier-back-btn');
+    if (multiplierBackBtn) multiplierBackBtn.addEventListener('click', handleMultiplierBack);
+
+    const multiplierCancelBtn = document.getElementById('multiplier-cancel-btn');
+    if (multiplierCancelBtn) multiplierCancelBtn.addEventListener('click', handleMultiplierCancel);
+
+    const multiplierConfirmBtn = document.getElementById('multiplier-confirm-btn');
+    if (multiplierConfirmBtn) multiplierConfirmBtn.addEventListener('click', handleMultiplierConfirm);
 
     const addPendingTaskBtn = document.getElementById('add-pending-task-btn');
     if (addPendingTaskBtn) {
@@ -465,6 +474,29 @@ function handleReviewNext() {
 }
 
 async function handleEditConfirm() {
+    showMultiplierSection();
+}
+
+function showMultiplierSection() {
+    if (!currentAIRating) return;
+
+    const r = currentAIRating;
+    const bonus = document.getElementById('review-bonus-checkbox').checked ? 3 : 0;
+    const baseXP = r.productivity === 0 ? 0 : Math.round((r.productivity * r.difficulty) + (r.duration / 5) + bonus);
+    const multiplier = (userData && userData.multiplier) ? parseFloat(userData.multiplier) : 1.0;
+    const finalXP = Math.round(baseXP * multiplier);
+
+    const equation = document.getElementById('multiplier-equation');
+    if (equation) {
+        equation.textContent = baseXP + ' XP \u00d7 ' + multiplier.toFixed(2) + 'x = ' + finalXP + ' XP';
+    }
+
+    document.getElementById('ai-edit-section').style.display = 'none';
+    document.getElementById('ai-review-section').style.display = 'none';
+    document.getElementById('ai-multiplier-section').style.display = 'block';
+}
+
+async function handleMultiplierConfirm() {
     const username = getCurrentUser();
     if (!username || !currentAIRating) return;
 
@@ -497,6 +529,7 @@ async function handleEditConfirm() {
         document.getElementById('ai-task-input').value = '';
         document.getElementById('ai-review-section').style.display = 'none';
         document.getElementById('ai-edit-section').style.display = 'none';
+        document.getElementById('ai-multiplier-section').style.display = 'none';
         refreshTasks(username);
     } catch (error) {
         console.error('Task creation failed:', error);
@@ -504,9 +537,24 @@ async function handleEditConfirm() {
     }
 }
 
-function handleEditCancel() {
+function handleMultiplierBack() {
+    document.getElementById('ai-multiplier-section').style.display = 'none';
+    document.getElementById('ai-edit-section').style.display = 'block';
+}
+
+function handleMultiplierCancel() {
+    cancelTaskCreation();
+}
+
+function cancelTaskCreation() {
+    currentAIRating = null;
+    closeModals();
+    document.getElementById('ai-task-input').value = '';
+    document.getElementById('ai-task-section').style.display = 'block';
+    document.getElementById('ai-loading').style.display = 'none';
+    document.getElementById('ai-review-section').style.display = 'none';
     document.getElementById('ai-edit-section').style.display = 'none';
-    document.getElementById('ai-review-section').style.display = 'block';
+    document.getElementById('ai-multiplier-section').style.display = 'none';
 }
 
 export { init, getCurrentUser, completeTask, deleteTask };
