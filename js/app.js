@@ -77,6 +77,9 @@ function attachEventListeners() {
     const saveGoalsBtn = document.getElementById('save-goals-btn');
     if (saveGoalsBtn) saveGoalsBtn.addEventListener('click', handleSaveGoals);
 
+    const changeCredentialsBtn = document.getElementById('change-credentials-btn');
+    if (changeCredentialsBtn) changeCredentialsBtn.addEventListener('click', showChangeCredentialsScreen);
+
     const signOutBtn = document.getElementById('sign-out-btn');
     if (signOutBtn) signOutBtn.addEventListener('click', handleSignOut);
 
@@ -180,6 +183,17 @@ function showAuth() {
     if (usernameInput) usernameInput.value = '';
     if (passwordInput) passwordInput.value = '';
     if (rememberCheckbox) rememberCheckbox.checked = true;
+}
+
+function showChangeCredentialsScreen() {
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
+        alert('Session expired. Please log in again.');
+        return;
+    }
+    document.getElementById('app-screen').classList.remove('active');
+    document.getElementById('change-credentials-screen').classList.add('active');
+    initChangeCredentials(showApp);
 }
 
 function showApp(username) {

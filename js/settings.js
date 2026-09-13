@@ -180,7 +180,17 @@ function initChangeCredentials(showAppFn) {
             let success = true;
             let message = '';
 
-            if (newUsername && newUsername.toLowerCase() !== currentUser.toLowerCase()) {
+            if (success && newPassword) {
+                const result = await changePassword(currentUser, newPassword);
+                if (result.success) {
+                    message = message ? message + ' ' + t('passwordChanged') : t('passwordChanged');
+                } else {
+                    success = false;
+                    message = result.error || 'Failed to change password';
+                }
+            }
+
+            if (success && newUsername && newUsername.toLowerCase() !== currentUser.toLowerCase()) {
                 const result = await changeUsername(currentUser, newUsername);
                 if (result.success) {
                     const remember = localStorage.getItem('productivity_tracker_token') || sessionStorage.getItem('productivity_tracker_session_token');
@@ -191,16 +201,6 @@ function initChangeCredentials(showAppFn) {
                 } else {
                     success = false;
                     message = result.error || 'Failed to change username';
-                }
-            }
-
-            if (success && newPassword) {
-                const result = await changePassword(currentUser, newPassword);
-                if (result.success) {
-                    message = message ? message + ' ' + t('passwordChanged') : t('passwordChanged');
-                } else {
-                    success = false;
-                    message = result.error || 'Failed to change password';
                 }
             }
 
