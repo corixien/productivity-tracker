@@ -193,5 +193,6 @@ const api = {
             body: JSON.stringify(data)
         });
     }
+};
 
 export { api, apiRequest, getAuthToken, setAuthToken, removeAuthToken };
