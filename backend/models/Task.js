@@ -1,6 +1,7 @@
 const { query, transaction } = require('../utils/database');
 const { logTaskCreation, logXpGeneration } = require('../services/loggingService');
 const { getRankName, getLevel, calculateXpFromTask } = require('../services/rankService');
+const { recalculateMultiplier } = require('../models/User');
 
 function normalizeTask(task) {
     if (!task) return null;
@@ -107,6 +108,12 @@ async function setCompleted(userId, taskId, completed) {
         let xpChange = 0;
         if (completed) {
             xpChange = Number(task.xp_awarded || 0);
+            const multResult = await client.query(
+                'SELECT multiplier FROM users WHERE id = $1',
+                [userId]
+            );
+            const multiplier = multResult.rows[0]?.multiplier || 1.0;
+            xpChange = Math.round(xpChange * multiplier);
             await client.query(
                 `UPDATE tasks SET completed = true, completed_at = COALESCE(completed_at, NOW()) WHERE id = $1 RETURNING *`,
                 [taskId]
@@ -146,11 +153,15 @@ async function setCompleted(userId, taskId, completed) {
 }
 
 async function complete(userId, taskId) {
-    return setCompleted(userId, taskId, true);
+    const result = await setCompleted(userId, taskId, true);
+    if (result) {
+        await recalculateMultiplier(userId).catch(() => {});
+    }
+    return result;
 }
 
 async function deleteTask(userId, taskId) {
-    return transaction(async (client) => {
+    const result = await transaction(async (client) => {
         const taskResult = await client.query(
             'SELECT * FROM tasks WHERE id = $1 AND user_id = $2',
             [taskId, userId]
@@ -176,6 +187,10 @@ async function deleteTask(userId, taskId) {
         await logXpGeneration(userId, xpChange, 'task_delete');
         return { deleted: true, totalXp, xpChange };
     });
+    if (result) {
+        await recalculateMultiplier(userId).catch(() => {});
+    }
+    return result;
 }
 
 async function getCompletedCount(userId) {

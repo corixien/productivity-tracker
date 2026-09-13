@@ -1,0 +1,1 @@
+ALTER TABLE users ADD COLUMN multiplier DECIMAL(3,2) DEFAULT 1.0;

@@ -327,8 +327,21 @@ async function loadUserData(username) {
     if (data && data.username) {
         userData = data;
         updateXPDisplay(data.xp || 0);
+        updateMultiplierDisplay(data.multiplier);
     }
     refreshTasks(username);
+}
+
+function updateMultiplierDisplay(multiplier) {
+    const display = document.getElementById('multiplier-display');
+    const value = document.getElementById('multiplier-value');
+    if (!display || !value) return;
+    if (multiplier !== undefined && multiplier !== null) {
+        value.textContent = parseFloat(multiplier).toFixed(2) + 'x';
+        display.style.display = 'block';
+    } else {
+        display.style.display = 'none';
+    }
 }
 
 async function refreshTasks(username) {

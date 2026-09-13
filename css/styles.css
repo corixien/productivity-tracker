@@ -386,6 +386,21 @@ body {
     transition: width 0.4s ease;
 }
 
+.multiplier-display {
+    margin-bottom: 24px;
+    padding: 8px 16px;
+    background-color: var(--bg-tertiary);
+    border-radius: 8px;
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+.multiplier-display strong {
+    color: var(--accent);
+    font-size: 1.1rem;
+}
+
 /* Buttons */
 .primary-btn {
     padding: 10px 20px;

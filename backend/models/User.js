@@ -1,6 +1,7 @@
 const { query, transaction } = require('../utils/database');
 const { hashPassword, verifyPassword } = require('../utils/password');
 const { logSystemEvent } = require('../services/loggingService');
+const { getRankMultiplier } = require('../services/rankService');
 
 const USER_WITH_PROFILE = `
     SELECT
@@ -252,6 +253,47 @@ async function incrementTimesReloaded(username) {
     return result.rows[0] || null;
 }
 
+async function getPositionMultiplier(userId, xp) {
+    const friends = await getFriends(userId);
+    const friendIds = friends.map(f => f.friend_id);
+
+    let friendXps = [];
+    if (friendIds.length > 0) {
+        const placeholders = friendIds.map((_, i) => `$${i + 1}`).join(',');
+        const result = await query(
+            `SELECT xp FROM users WHERE id IN (${placeholders})`,
+            friendIds
+        );
+        friendXps = result.rows.map(r => r.xp || 0);
+    }
+
+    const entries = [...friendXps, xp || 0];
+    const total = entries.length;
+
+    if (total <= 1) return 1.0;
+
+    const userXp = xp || 0;
+    const lowerXpCount = entries.filter(x => x < userXp).length;
+    const position = lowerXpCount;
+
+    return 1.5 - (position / (total - 1)) * 0.8;
+}
+
+async function recalculateMultiplier(userId) {
+    const userResult = await query('SELECT username, rank, xp FROM users WHERE id = $1', [userId]);
+    if (!userResult.rows[0]) return;
+
+    const { rank, xp } = userResult.rows[0];
+    const rankMultiplier = getRankMultiplier(rank);
+    const positionMultiplier = await getPositionMultiplier(userId, xp);
+    const combined = Math.round((rankMultiplier + positionMultiplier) * 100) / 100;
+
+    await query(
+        'UPDATE users SET multiplier = $1, updated_at = NOW() WHERE id = $2',
+        [combined, userId]
+    );
+}
+
 module.exports = {
     findByUsername,
     findById,
@@ -274,5 +316,7 @@ module.exports = {
     getReload,
     setReload,
     incrementReloadAll,
-    incrementTimesReloaded
+    incrementTimesReloaded,
+    getPositionMultiplier,
+    recalculateMultiplier
 };

@@ -52,13 +52,29 @@ async function recalculateUserRank(userId, userModel) {
     return { totalXp, rank, level };
 }
 
+const RANK_MULTIPLIERS = {
+    Newcomer: 1.5,
+    Bronze: 1.3,
+    Silver: 1.1,
+    Gold: 1.0,
+    Platinum: 0.8,
+    Diamond: 0.7,
+    Master: 0.6
+};
+
+function getRankMultiplier(rank) {
+    return RANK_MULTIPLIERS[rank] || 1.0;
+}
+
 module.exports = {
     RANK_THRESHOLDS,
+    RANK_MULTIPLIERS,
     getRankInfo,
     getRankName,
     getProgressPercent,
     getLevel,
     getXpForNextRank,
     calculateXpFromTask,
-    recalculateUserRank
+    recalculateUserRank,
+    getRankMultiplier
 };

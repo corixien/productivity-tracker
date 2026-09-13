@@ -1,4 +1,5 @@
 const Task = require('../models/Task');
+const { recalculateMultiplier } = require('../models/User');
 const { logError } = require('../services/loggingService');
 
 function formatTask(task) {
@@ -44,6 +45,7 @@ async function updateTask(req, res) {
             if (!result) {
                 return res.status(404).json({ success: false, error: 'Task not found' });
             }
+            await recalculateMultiplier(req.user.id).catch(() => {});
             return res.json({
                 ...formatTask(result.task),
                 success: true,

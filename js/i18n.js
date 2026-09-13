@@ -82,7 +82,8 @@ const translations = {
         addCompletedTask: "Add Completed Task",
         aiFailed: "AI rating failed. Please try again.",
         aiTimeout: "AI rating timed out. Please try again.",
-        aiNotConfigured: "AI is not configured on the server. Please fill in manually."
+        aiNotConfigured: "AI is not configured on the server. Please fill in manually.",
+        multiplier: "Multiplier"
     },
     de: {
         appTitle: "Produktivitäts-Tracker",
@@ -167,7 +168,8 @@ const translations = {
         addCompletedTask: "Erledigte Aufgabe hinzufügen",
         aiFailed: "KI-Bewertung fehlgeschlagen. Bitte versuche es erneut.",
         aiTimeout: "KI-Bewertung dauerte zu lange. Bitte versuche es erneut.",
-        aiNotConfigured: "KI ist auf dem Server nicht konfiguriert. Bitte fülle manuell aus."
+        aiNotConfigured: "KI ist auf dem Server nicht konfiguriert. Bitte fülle manuell aus.",
+        multiplier: "Multiplikator"
     }
 };
 
