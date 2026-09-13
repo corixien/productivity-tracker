@@ -114,6 +114,9 @@ function attachEventListeners() {
     const editCancelBtn = document.getElementById('edit-cancel-btn');
     if (editCancelBtn) editCancelBtn.addEventListener('click', cancelTaskCreation);
 
+    const editBackBtn = document.getElementById('edit-back-btn');
+    if (editBackBtn) editBackBtn.addEventListener('click', handleEditBack);
+
     const multiplierBackBtn = document.getElementById('multiplier-back-btn');
     if (multiplierBackBtn) multiplierBackBtn.addEventListener('click', handleMultiplierBack);
 
@@ -473,6 +476,11 @@ function handleReviewBack() {
 
 function handleReviewNext() {
     showEditSection();
+}
+
+function handleEditBack() {
+    document.getElementById('ai-edit-section').style.display = 'none';
+    document.getElementById('ai-review-section').style.display = 'block';
 }
 
 async function handleEditConfirm() {
