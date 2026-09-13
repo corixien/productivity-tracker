@@ -1,4 +1,4 @@
-import { api } from './api.js';
+import { api, getAuthToken } from './api.js';
 import { setLanguage, getCurrentLang, t } from './i18n.js';
 import { getCurrentUser, updateSession } from './auth.js';
 
@@ -27,9 +27,14 @@ async function changeUsername(oldUsername, newUsername) {
 
     let existingUser = null;
     try {
-        existingUser = await api.getUser(newUsername);
+        const token = getAuthToken();
+        const res = await fetch(`/api/users/${encodeURIComponent(newUsername)}`, {
+            headers: { 'Authorization': token ? `Bearer ${token}` : '' }
+        });
+        if (res.ok) {
+            existingUser = await res.json();
+        }
     } catch (e) {
-        // 404 means the username is available — that's what we want
         existingUser = null;
     }
 
