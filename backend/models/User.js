@@ -1,6 +1,6 @@
 const { query, transaction } = require('../utils/database');
 const { hashPassword, verifyPassword } = require('../utils/password');
-const { logSystemEvent } = require('../services/loggingService');
+const { logSystemEvent, logError } = require('../services/loggingService');
 const { getRankMultiplier } = require('../services/rankService');
 
 const USER_WITH_PROFILE = `
@@ -250,9 +250,16 @@ async function getPositionMultiplier(userId, xp) {
     return 1.5 - (position / (total - 1)) * 0.8;
 }
 
-async function recalculateMultiplier(userId) {
-    const userResult = await query('SELECT username, rank, xp FROM users WHERE id = $1', [userId]);
+async function recalculateMultiplier(userId, force = false) {
+    const userResult = await query('SELECT username, rank, xp, last_multiplier_check FROM users WHERE id = $1', [userId]);
     if (!userResult.rows[0]) return;
+
+    if (!force) {
+        const lastCheck = userResult.rows[0].last_multiplier_check;
+        if (lastCheck && (Date.now() - new Date(lastCheck).getTime() < 60000)) {
+            return;
+        }
+    }
 
     const { rank, xp } = userResult.rows[0];
     const rankMultiplier = getRankMultiplier(rank);
@@ -260,9 +267,50 @@ async function recalculateMultiplier(userId) {
     const combined = Math.round((positionMultiplier - (1 - rankMultiplier)) * 100) / 100;
 
     await query(
-        'UPDATE users SET multiplier = $1, position_based_multiplier = $2, rank_based_multiplier = $3, updated_at = NOW() WHERE id = $4',
+        'UPDATE users SET multiplier = $1, position_based_multiplier = $2, rank_based_multiplier = $3, last_multiplier_check = NOW(), updated_at = NOW() WHERE id = $4',
         [combined, positionMultiplier, rankMultiplier, userId]
     );
+}
+
+async function monitorMultipliers(maxAgeMinutes = 5) {
+    const staleUsers = await query(
+        'SELECT id, username, multiplier, position_based_multiplier, rank_based_multiplier, xp, rank, last_multiplier_check FROM users WHERE last_multiplier_check < NOW() - INTERVAL $1 MINUTES',
+        [maxAgeMinutes]
+    );
+
+    const discrepancies = [];
+    for (const user of staleUsers.rows) {
+        const currentRankMultiplier = getRankMultiplier(user.rank);
+        const currentPositionMultiplier = await getPositionMultiplier(user.id, user.xp);
+        const expectedCombined = Math.round((currentPositionMultiplier - (1 - currentRankMultiplier)) * 100) / 100;
+
+        if (Math.abs((user.multiplier || 0) - expectedCombined) > 0.01) {
+            discrepancies.push({
+                userId: user.id,
+                username: user.username,
+                storedMultiplier: user.multiplier,
+                expectedMultiplier: expectedCombined,
+                storedPosition: user.position_based_multiplier,
+                expectedPosition: currentPositionMultiplier,
+                storedRank: user.rank_based_multiplier,
+                expectedRank: currentRankMultiplier,
+                lastCheck: user.last_multiplier_check,
+                severity: Math.abs((user.multiplier || 0) - expectedCombined) > 0.5 ? 'high' : 'medium'
+            });
+        }
+
+        await recalculateMultiplier(user.id, true).catch(() => {});
+    }
+
+    if (discrepancies.length > 0) {
+        await logError(new Error('Multiplier discrepancies detected'), {
+            context: 'monitorMultipliers',
+            count: discrepancies.length,
+            discrepancies
+        });
+    }
+
+    return discrepancies;
 }
 
 module.exports = {
@@ -285,5 +333,6 @@ module.exports = {
     upsertProfile,
     normalizeUser,
     getPositionMultiplier,
-    recalculateMultiplier
+    recalculateMultiplier,
+    monitorMultipliers
 };

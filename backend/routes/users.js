@@ -12,6 +12,7 @@ router.get('/friends', userController.getFriends);
 router.post('/friends', validateFriendAdd, userController.addFriend);
 router.delete('/friends/:friendId', userController.removeFriend);
 router.get('/leaderboard', userController.getLeaderboard);
+router.post('/monitor-multipliers', userController.monitorMultipliers);
 router.get('/profile', userController.getProfile);
 router.put('/profile', userController.updateProfile);
 router.get('/:username', optionalAuth, authController.getUser);

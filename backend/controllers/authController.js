@@ -69,6 +69,7 @@ async function login(req, res) {
 
 async function getMe(req, res) {
     try {
+        await User.recalculateMultiplier(req.user.id);
         const user = await User.findById(req.user.id);
         if (!user) {
             return res.status(404).json({ success: false, error: 'User not found' });
@@ -86,6 +87,7 @@ async function getUser(req, res) {
         if (!user) {
             return res.status(404).json({ success: false, error: 'User not found' });
         }
+        await User.recalculateMultiplier(user.id).catch(() => {});
         return res.json(safeUser(user));
     } catch (error) {
         await logError(error, { context: 'getUser', username: req.params.username });

@@ -1,0 +1,1 @@
+ALTER TABLE users ADD COLUMN last_multiplier_check TIMESTAMPTZ DEFAULT NOW();

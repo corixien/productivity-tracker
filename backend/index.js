@@ -20,6 +20,7 @@ const { validateAiRate } = require('./middleware/validation');
 const { securityHeaders } = require('./middleware/security');
 const { authRateLimiter } = require('./middleware/rateLimiter');
 const { getPool } = require('./utils/database');
+const User = require('./models/User');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -109,6 +110,13 @@ app.use(errorHandler);
 
 const server = app.listen(PORT, '0.0.0.0', () => {
     logger.info('Productivity Tracker API running', { port: PORT, environment: process.env.NODE_ENV || 'development' });
+    setInterval(async () => {
+        try {
+            await User.monitorMultipliers(5).catch(() => {});
+        } catch (e) {
+            logger.error('Periodic multiplier check failed', { error: e.message });
+        }
+    }, 300000);
 });
 
 async function shutdown(signal) {

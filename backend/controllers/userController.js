@@ -59,6 +59,8 @@ async function getLeaderboard(req, res) {
             return res.status(404).json({ success: false, error: 'User not found' });
         }
 
+        await User.recalculateMultiplier(requestedUser.id).catch(() => {});
+
         const friends = await User.getFriends(requestedUser.id);
         const entries = [];
         for (const friend of friends) {
@@ -99,6 +101,16 @@ async function getProfile(req, res) {
     }
 }
 
+async function monitorMultipliers(req, res) {
+    try {
+        const discrepancies = await User.monitorMultipliers(5).catch(() => []);
+        return res.json({ success: true, discrepancies });
+    } catch (error) {
+        await logError(error, { context: 'monitorMultipliers', userId: req.user.id });
+        return res.status(500).json({ success: false, error: 'Failed to monitor multipliers' });
+    }
+}
+
 async function updateProfile(req, res) {
     try {
         const profile = await User.upsertProfile(req.user.id, req.body);
@@ -115,5 +127,6 @@ module.exports = {
     removeFriend,
     getLeaderboard,
     getProfile,
-    updateProfile
+    updateProfile,
+    monitorMultipliers
 };
