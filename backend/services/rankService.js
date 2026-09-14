@@ -53,13 +53,13 @@ async function recalculateUserRank(userId, userModel) {
 }
 
 const RANK_MULTIPLIERS = {
-    Newcomer: 1.5,
-    Bronze: 1.3,
-    Silver: 1.1,
-    Gold: 1.0,
+    Newcomer: 1.0,
+    Bronze: 0.95,
+    Silver: 0.9,
+    Gold: 0.85,
     Platinum: 0.8,
-    Diamond: 0.7,
-    Master: 0.6
+    Diamond: 0.75,
+    Master: 0.7
 };
 
 function getRankMultiplier(rank) {
