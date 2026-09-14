@@ -257,7 +257,7 @@ async function recalculateMultiplier(userId) {
     const { rank, xp } = userResult.rows[0];
     const rankMultiplier = getRankMultiplier(rank);
     const positionMultiplier = await getPositionMultiplier(userId, xp);
-    const combined = Math.round((positionMultiplier + (1 - rankMultiplier)) * 100) / 100;
+    const combined = Math.round((positionMultiplier - (1 - rankMultiplier)) * 100) / 100;
 
     await query(
         'UPDATE users SET multiplier = $1, position_based_multiplier = $2, rank_based_multiplier = $3, updated_at = NOW() WHERE id = $4',
