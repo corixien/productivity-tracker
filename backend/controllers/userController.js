@@ -70,7 +70,8 @@ async function getLeaderboard(req, res) {
                 username: friendUser.username,
                 avatar: friendUser.avatar || friendUser.avatar_url || null,
                 xp: friendUser.xp || 0,
-                tasks: await Task.getCompletedCount(friendUser.id)
+                tasks: await Task.getCompletedCount(friendUser.id),
+                friendId: friend.friend_id
             });
         }
 
@@ -78,7 +79,8 @@ async function getLeaderboard(req, res) {
             username: `${requestedUser.username}${requestedUser.id === req.user.id ? ' (You)' : ''}`,
             avatar: requestedUser.avatar || requestedUser.avatar_url || null,
             xp: requestedUser.xp || 0,
-            tasks: await Task.getCompletedCount(requestedUser.id)
+            tasks: await Task.getCompletedCount(requestedUser.id),
+            friendId: null
         });
         entries.sort((a, b) => b.xp - a.xp || a.username.localeCompare(b.username));
         return res.json(entries);

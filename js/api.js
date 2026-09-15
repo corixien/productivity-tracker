@@ -183,6 +183,12 @@ const api = {
         });
     },
 
+    async removeFriend(friendId) {
+        return apiRequest(`/users/friends/${friendId}`, {
+            method: 'DELETE'
+        });
+    },
+
     async getSettings() {
         return apiRequest('/settings');
     },

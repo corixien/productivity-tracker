@@ -265,10 +265,12 @@ async function recalculateMultiplier(userId, force = false) {
     const rankMultiplier = getRankMultiplier(rank);
     const positionMultiplier = await getPositionMultiplier(userId, xp);
     const combined = Math.round((positionMultiplier - (1 - rankMultiplier)) * 100) / 100;
+    const tasksResult = await query('SELECT COUNT(*) AS count FROM tasks WHERE user_id = $1 AND completed = true', [userId]);
+    const tasksCompleted = parseInt(tasksResult.rows[0].count, 10);
 
     await query(
-        'UPDATE users SET multiplier = $1, position_based_multiplier = $2, rank_based_multiplier = $3, last_multiplier_check = NOW(), updated_at = NOW() WHERE id = $4',
-        [combined, positionMultiplier, rankMultiplier, userId]
+        'UPDATE users SET multiplier = $1, position_based_multiplier = $2, rank_based_multiplier = $3, tasks_completed = $4, last_multiplier_check = NOW(), updated_at = NOW() WHERE id = $5',
+        [combined, positionMultiplier, rankMultiplier, tasksCompleted, userId]
     );
 }
 

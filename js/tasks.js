@@ -142,8 +142,16 @@ function updateXPDisplay(xp) {
     document.getElementById('xp-fill').style.width = `${percent}%`;
 }
 
+function updateRankDisplay(rank) {
+    const badge = document.getElementById('rank-badge');
+    if (!badge) return;
+    badge.setAttribute('data-rank', rank);
+    badge.querySelector('.rank-icon').textContent = RANK_ICONS[rank] || '⭐';
+    badge.querySelector('.rank-label').textContent = t('rank' + capitalize(rank));
+}
+
 function capitalize(str) {
     return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
-export { getRankName, getProgressPercent, getRankInfo, addTask, completeTask, deleteTask, renderTasks, updateXPDisplay };
+export { getRankName, getProgressPercent, getRankInfo, addTask, completeTask, deleteTask, renderTasks, updateXPDisplay, updateRankDisplay, RANK_ICONS };

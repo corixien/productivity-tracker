@@ -25,7 +25,7 @@ function renderLeaderboard(entries) {
     tbody.innerHTML = '';
 
     if (entries.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4" class="empty-state">${t('noFriends')}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" class="empty-state">${t('noFriends')}</td></tr>`;
         return;
     }
 
@@ -37,13 +37,36 @@ function renderLeaderboard(entries) {
             ? `<img src="${avatarSrc}" class="leaderboard-avatar" alt="avatar" id="${avatarId}" onerror="this.style.display='none';document.getElementById('placeholder-${avatarId}').style.display='flex';">`
             : `<span class="leaderboard-avatar-placeholder" id="placeholder-${avatarId}">👤</span>`;
 
+        const deleteBtn = entry.friendId
+            ? `<button class="friend-delete-btn" data-friend-id="${entry.friendId}" title="${t('removeFriend')}">&times;</button>`
+            : '';
+
         tr.innerHTML = `
             <td>#${index + 1}</td>
-            <td><div class="leaderboard-user-cell">${avatarHtml}<span>${escapeHtml(entry.username)}</span></div></td>
+            <td><div class="leaderboard-user-cell">${avatarHtml}<span>${escapeHtml(entry.username)}</span>${deleteBtn}</div></td>
             <td>${entry.xp.toLocaleString()}</td>
             <td>${entry.tasks}</td>
         `;
         tbody.appendChild(tr);
+    });
+
+    tbody.querySelectorAll('.friend-delete-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const friendId = btn.getAttribute('data-friend-id');
+            const row = btn.closest('tr');
+            if (confirm(t('confirmRemoveFriend'))) {
+                try {
+                    await api.removeFriend(friendId);
+                    row.remove();
+                    const remaining = tbody.querySelectorAll('tr');
+                    if (remaining.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="5" class="empty-state">${t('noFriends')}</td></tr>`;
+                    }
+                } catch (error) {
+                    alert(t('failedRemoveFriend'));
+                }
+            }
+        });
     });
 }
 

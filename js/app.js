@@ -1,6 +1,6 @@
 import { register, signIn, signOut, restoreSession, subscribe, getCurrentUser, getAuthMode, setAuthMode, toggleAuthMode, loadUserPreferences } from './auth.js';
 import { api } from './api.js';
-import { getRankName, getProgressPercent, addTask, completeTask as completeTaskOp, deleteTask as deleteTaskOp, renderTasks, updateXPDisplay } from './tasks.js';
+import { getRankName, getProgressPercent, addTask, completeTask as completeTaskOp, deleteTask as deleteTaskOp, renderTasks, updateXPDisplay, updateRankDisplay } from './tasks.js';
 import { addFriend, loadLeaderboard, renderLeaderboard } from './leaderboard.js';
 import { initSettings, initChangeCredentials, uploadAvatar, saveGoals } from './settings.js';
 import { initUI, showSection, closeModals } from './ui.js';
@@ -234,6 +234,9 @@ function openTaskModal() {
         document.getElementById('ai-task-input').value = '';
         document.getElementById('ai-task-section').style.display = 'block';
         document.getElementById('ai-loading').style.display = 'none';
+        document.getElementById('ai-review-section').style.display = 'none';
+        document.getElementById('ai-edit-section').style.display = 'none';
+        document.getElementById('ai-multiplier-section').style.display = 'none';
     }
 }
 
@@ -284,6 +287,7 @@ async function loadUserData(username) {
     if (data && data.username) {
         userData = data;
         updateXPDisplay(data.xp || 0);
+        updateRankDisplay(data.rank || getRankName(data.xp || 0));
         updateMultiplierDisplay(data.multiplier);
     }
     refreshTasks(username);
@@ -493,9 +497,12 @@ async function handleEditConfirm() {
 function showMultiplierSection() {
     if (!currentAIRating) return;
 
-    const r = currentAIRating;
+    const name = document.getElementById('edit-task-name').value.trim() || 'Task';
+    const duration = parseInt(document.getElementById('edit-task-duration').value) || 30;
+    const productivity = parseInt(document.getElementById('edit-task-productivity').value) || 3;
+    const difficulty = parseInt(document.getElementById('edit-task-difficulty').value) || 3;
     const bonus = document.getElementById('review-bonus-checkbox').checked ? 3 : 0;
-    const baseXP = r.productivity === 0 ? 0 : Math.round((r.productivity * r.difficulty) + (r.duration / 5) + bonus);
+    const baseXP = productivity === 0 ? 0 : Math.round((productivity * difficulty) + (duration / 5) + bonus);
     const multiplier = (userData && userData.multiplier) ? parseFloat(userData.multiplier) : 1.0;
     const finalXP = Math.round(baseXP * multiplier);
 
