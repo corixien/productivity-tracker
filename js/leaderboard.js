@@ -25,7 +25,7 @@ function renderLeaderboard(entries) {
     tbody.innerHTML = '';
 
     if (entries.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="empty-state">${t('noFriends')}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="4" class="empty-state">${t('noFriends')}</td></tr>`;
         return;
     }
 
@@ -60,7 +60,7 @@ function renderLeaderboard(entries) {
                     row.remove();
                     const remaining = tbody.querySelectorAll('tr');
                     if (remaining.length === 0) {
-                        tbody.innerHTML = `<tr><td colspan="5" class="empty-state">${t('noFriends')}</td></tr>`;
+                        tbody.innerHTML = `<tr><td colspan="4" class="empty-state">${t('noFriends')}</td></tr>`;
                     }
                 } catch (error) {
                     alert(t('failedRemoveFriend'));
