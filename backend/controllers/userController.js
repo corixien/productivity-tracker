@@ -1,5 +1,4 @@
 const User = require('../models/User');
-const Task = require('../models/Task');
 const { logError } = require('../services/loggingService');
 
 async function getFriends(req, res) {
@@ -70,7 +69,7 @@ async function getLeaderboard(req, res) {
                 username: friendUser.username,
                 avatar: friendUser.avatar || friendUser.avatar_url || null,
                 xp: friendUser.xp || 0,
-                tasks: await Task.getCompletedCount(friendUser.id),
+                tasks: friendUser.tasks_completed || 0,
                 friendId: friend.friend_id
             });
         }
@@ -79,7 +78,7 @@ async function getLeaderboard(req, res) {
             username: `${requestedUser.username}${requestedUser.id === req.user.id ? ' (You)' : ''}`,
             avatar: requestedUser.avatar || requestedUser.avatar_url || null,
             xp: requestedUser.xp || 0,
-            tasks: await Task.getCompletedCount(requestedUser.id),
+            tasks: requestedUser.tasks_completed || 0,
             friendId: null
         });
         entries.sort((a, b) => b.xp - a.xp || a.username.localeCompare(b.username));
