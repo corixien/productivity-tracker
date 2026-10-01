@@ -7,6 +7,7 @@ import { restoreSession, signOut } from './core/auth.js';
 import { loadMeta, loadTasks, loadStats, loadTemplates, refreshCore } from './core/data.js';
 import { initDialogs, toast, closeDialog, showError } from './core/ui.js';
 import { initPwa, syncQueue } from './core/pwa.js';
+import { initGlass } from './core/glass.js';
 import { initNav, registerView, startNav } from './features/nav.js';
 import { initAuthView, resetAuthView } from './features/auth-view.js';
 import { initDashboard } from './features/dashboard.js';
@@ -69,6 +70,7 @@ async function init() {
     setLanguage(getCurrentLang());
     initDialogs();
     initPwa();
+    initGlass();
     initNav();
     initAuthView();
     initDashboard();

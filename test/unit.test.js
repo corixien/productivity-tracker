@@ -51,13 +51,42 @@ test('meta exposes ranks with multipliers', () => {
     assert.equal(meta.ranks[6].multiplier, 0.7);
 });
 
+function days(start, count) {
+    return Array.from({ length: count }, (_, i) => new Date(Date.parse(`${start}T00:00:00Z`) + i * 86400000).toISOString().slice(0, 10));
+}
+
 test('streaks', () => {
-    assert.deepEqual(computeStreaks([], '2026-10-01'), { current: 0, longest: 0 });
+    assert.deepEqual(computeStreaks([], '2026-10-01'), { current: 0, longest: 0, freezes: 0, frozenDates: [] });
     assert.equal(computeStreaks(['2026-10-01', '2026-09-30', '2026-09-29'], '2026-10-01').current, 3);
     assert.equal(computeStreaks(['2026-09-30', '2026-09-29'], '2026-10-01').current, 2, 'alive until end of today');
     assert.equal(computeStreaks(['2026-09-29'], '2026-10-01').current, 0, 'broken after a missed day');
     assert.equal(computeStreaks(['2026-09-01', '2026-09-02', '2026-09-03', '2026-09-10'], '2026-10-01').longest, 3);
     assert.equal(computeStreaks(['2026-02-28', '2026-03-01'], '2026-03-01').current, 2, 'month boundary');
+});
+
+test('ice streaks: earned every 7 days, max 3, spent on missed days', () => {
+    const week = days('2026-09-01', 7);
+    assert.equal(computeStreaks(week, '2026-09-07').freezes, 1, 'earned on day 7');
+    assert.equal(computeStreaks(days('2026-09-01', 6), '2026-09-06').freezes, 0);
+    assert.equal(computeStreaks(days('2026-09-01', 28), '2026-09-28').freezes, 3, 'capped at 3');
+
+    // 7 days, miss day 8 (ice spent), back on day 9: streak survives
+    const saved = computeStreaks([...week, '2026-09-09'], '2026-09-09');
+    assert.equal(saved.current, 8);
+    assert.equal(saved.freezes, 0);
+    assert.deepEqual(saved.frozenDates, ['2026-09-08']);
+
+    // today still open: yesterday missed spends ice, streak alive
+    const open = computeStreaks(week, '2026-09-09');
+    assert.equal(open.current, 7);
+    assert.deepEqual(open.frozenDates, ['2026-09-08']);
+
+    // 14 days earn 2 ice streaks; 3 missed days: two saved, the third breaks it
+    const fortnight = days('2026-09-01', 14);
+    const broken = computeStreaks(fortnight, '2026-09-18');
+    assert.equal(broken.current, 0);
+    assert.equal(broken.freezes, 0);
+    assert.equal(computeStreaks(fortnight, '2026-09-17').current, 14, 'two missed days are covered');
 });
 
 test('rate limiter blocks after max and resets', async () => {

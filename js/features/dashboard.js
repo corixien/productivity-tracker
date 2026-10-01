@@ -152,6 +152,7 @@ function renderTasks() {
 async function completeTask(task, button) {
     setBusy(button, true);
     const before = state.user;
+    const freezesBefore = state.stats ? state.stats.streak.freezes : null;
     try {
         const result = await api.completeTask(task.id);
         if (result.queued) {
@@ -162,6 +163,7 @@ async function completeTask(task, button) {
         }
         const after = await refreshCore();
         announceProgress(before, after, result.xpEarned);
+        if (freezesBefore !== null && state.stats.streak.freezes > freezesBefore) toast(t('iceEarned'), { type: 'xp' });
     } catch (error) {
         showError(error);
         setBusy(button, false);
@@ -224,9 +226,7 @@ function setFilter(next) {
 function initDashboard() {
     $('#tab-pending').addEventListener('click', () => setFilter('pending'));
     $('#tab-completed').addEventListener('click', () => setFilter('completed'));
-    const open = () => openTaskDialog({ mode: 'create' });
-    $('#add-task-btn').addEventListener('click', open);
-    $('#fab-add-task').addEventListener('click', open);
+    $('#fab-add-task').addEventListener('click', () => openTaskDialog({ mode: 'create' }));
     $('#fab-add-task').replaceChildren(icon('plus'));
 
     on('user', renderHero);

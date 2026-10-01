@@ -5,6 +5,7 @@ import { t, onLanguageChange } from '../core/i18n.js';
 import { loadStats } from '../core/data.js';
 import { emptyState, skeletonList, showError } from '../core/ui.js';
 import { statTiles } from './stats.js';
+import { renderStreakPanel } from './streak.js';
 import { warnNonCritical } from './shared.js';
 
 const PAGE_SIZE = 30;
@@ -63,6 +64,7 @@ function renderHistory() {
 }
 
 function renderStats() {
+    renderStreakPanel($('#streak-panel'));
     $('#activity-stats').replaceChildren(...statTiles(state.stats));
 }
 

@@ -16,11 +16,12 @@ function statTiles(stats) {
     if (!stats) return [h('div', { class: 'skeleton', 'aria-hidden': 'true' }), h('div', { class: 'skeleton', 'aria-hidden': 'true' }), h('div', { class: 'skeleton', 'aria-hidden': 'true' })];
     const { streak, today, week } = stats;
     const streakValue = streak.current === 1 ? t('streakDay', { n: 1 }) : t('streakDays', { n: streak.current });
+    const ice = streak.freezes > 0 ? ` · ${t('iceCount', { n: streak.freezes, max: streak.maxFreezes })}` : '';
     const streakSub = streak.current === 0
         ? t('streakStart')
         : streak.activeToday
-            ? t('longestStreak', { n: streak.longest })
-            : t('streakKeep');
+            ? t('longestStreak', { n: streak.longest }) + ice
+            : t('streakKeep') + ice;
     return [
         tile('flame', t('streak'), streakValue, streakSub, streak.current > 0 ? 'is-hot' : ''),
         tile('target', t('today'), `${formatNumber(today.xp)} ${t('xpUnit')}`, tasksText(today.tasks)),

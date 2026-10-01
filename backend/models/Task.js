@@ -264,34 +264,47 @@ async function getTotalXp(userId) {
 const DAY_MS = 86400000;
 const shiftDay = (day, deltaDays) => new Date(Date.parse(`${day}T00:00:00Z`) + deltaDays * DAY_MS).toISOString().slice(0, 10);
 
-// dates: distinct 'YYYY-MM-DD' strings with completed tasks. today: 'YYYY-MM-DD'.
-// The streak stays alive through today if nothing is completed yet, but breaks after a missed day.
-function computeStreaks(dates, today) {
-    const set = new Set(dates);
-    let current = 0;
-    let cursor = set.has(today) ? today : shiftDay(today, -1);
-    while (set.has(cursor)) {
-        current += 1;
-        cursor = shiftDay(cursor, -1);
-    }
+const FREEZE_EVERY_DAYS = 7;
+const MAX_FREEZES = 3;
+const CALENDAR_DAYS = 35;
 
+// dates: 'YYYY-MM-DD' strings with at least one completed task. today: 'YYYY-MM-DD'.
+// Walks the calendar day by day:
+//  - a day with a completed task extends the streak; every 7th streak day earns an ice streak (max 3 stored)
+//  - a missed day spends one ice streak (the streak survives) or, with none left, resets the streak
+//  - today never counts as missed: the day is not over yet
+function computeStreaks(dates, today, maxFreezes = MAX_FREEZES) {
+    const done = new Set(dates);
+    if (done.size === 0) return { current: 0, longest: 0, freezes: 0, frozenDates: [] };
+
+    let streak = 0;
     let longest = 0;
-    let run = 0;
-    let previous = null;
-    for (const date of [...set].sort()) {
-        run = previous && shiftDay(previous, 1) === date ? run + 1 : 1;
-        longest = Math.max(longest, run);
-        previous = date;
+    let freezes = 0;
+    const frozenDates = [];
+    for (let day = [...done].sort()[0]; day <= today; day = shiftDay(day, 1)) {
+        if (done.has(day)) {
+            streak += 1;
+            longest = Math.max(longest, streak);
+            if (streak % FREEZE_EVERY_DAYS === 0 && freezes < maxFreezes) freezes += 1;
+        } else if (day === today) {
+            // still open
+        } else if (streak > 0 && freezes > 0) {
+            freezes -= 1;
+            frozenDates.push(day);
+        } else {
+            streak = 0;
+        }
     }
-    return { current, longest };
+    return { current: streak, longest, freezes, frozenDates };
 }
 
 async function getStats(userId, tz) {
-    const [datesResult, windowResult, goalResult] = await Promise.all([
+    const [datesResult, windowResult, goalResult, daysResult] = await Promise.all([
         query(
             `SELECT DISTINCT ((completed_at AT TIME ZONE $2)::date)::text AS d
              FROM tasks WHERE user_id = $1 AND completed = true AND completed_at IS NOT NULL
-             ORDER BY d DESC LIMIT 400`,
+               AND completed_at > NOW() - INTERVAL '1500 days'
+             ORDER BY d ASC`,
             [userId, tz]
         ),
         query(
@@ -306,14 +319,45 @@ async function getStats(userId, tz) {
                      WHERE user_id = $1 AND completed = true AND completed_at >= date_trunc('week', NOW() AT TIME ZONE $2) AT TIME ZONE $2) AS week_tasks`,
             [userId, tz]
         ),
-        query('SELECT daily_goal_xp FROM users WHERE id = $1', [userId])
+        query('SELECT daily_goal_xp FROM users WHERE id = $1', [userId]),
+        query(
+            `WITH days AS (
+                 SELECT (date_trunc('day', NOW() AT TIME ZONE $2)::date - g) AS d FROM generate_series(0, $3::int - 1) g
+             )
+             SELECT d::text AS date,
+                    COALESCE((SELECT SUM(h.xp_amount) FROM xp_history h
+                              WHERE h.user_id = $1 AND h.created_at > NOW() - INTERVAL '60 days'
+                                AND (h.created_at AT TIME ZONE $2)::date = days.d), 0)::int AS xp,
+                    (SELECT COUNT(*) FROM tasks t
+                     WHERE t.user_id = $1 AND t.completed = true AND t.completed_at > NOW() - INTERVAL '60 days'
+                       AND (t.completed_at AT TIME ZONE $2)::date = days.d)::int AS tasks
+             FROM days ORDER BY d ASC`,
+            [userId, tz, CALENDAR_DAYS]
+        )
     ]);
     const window = windowResult.rows[0];
     const dates = datesResult.rows.map((row) => row.d);
+    const streak = computeStreaks(dates, window.today);
+    const frozen = new Set(streak.frozenDates);
+
     return {
-        streak: { ...computeStreaks(dates, window.today), activeToday: dates.includes(window.today) },
+        streak: {
+            current: streak.current,
+            longest: streak.longest,
+            activeToday: dates.includes(window.today),
+            freezes: streak.freezes,
+            maxFreezes: MAX_FREEZES,
+            nextFreezeIn: streak.freezes >= MAX_FREEZES ? null : FREEZE_EVERY_DAYS - (streak.current % FREEZE_EVERY_DAYS)
+        },
         today: { xp: Math.max(0, window.today_xp), tasks: window.today_tasks, goal: goalResult.rows[0]?.daily_goal_xp ?? 50 },
-        week: { xp: Math.max(0, window.week_xp), tasks: window.week_tasks }
+        week: { xp: Math.max(0, window.week_xp), tasks: window.week_tasks },
+        days: daysResult.rows.map((row) => ({
+            date: row.date,
+            xp: Math.max(0, row.xp),
+            tasks: row.tasks,
+            status: row.tasks > 0 ? 'done' : frozen.has(row.date) ? 'frozen' : 'none',
+            today: row.date === window.today
+        }))
     };
 }
 

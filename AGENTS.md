@@ -8,7 +8,7 @@ Web app for friend groups competing on productivity. Users register/login (usern
 
 ## Stack
 
-- Frontend: vanilla JS ES modules, single `index.html`, plain CSS split by concern. Visual style: blue "liquid glass" (translucent gradients, heavy backdrop blur, bright top edge) driven by `--glass-*` and `--blur` tokens in `css/tokens.css`. No framework, no bundler, no build step.
+- Frontend: vanilla JS ES modules, single `index.html`, plain CSS split by concern. Visual style: calm blue "liquid glass" with bright blue only as accent (translucent gradients, heavy backdrop blur, bright top edge, spring hover/press animations, a gliding glass lens behind the active nav item) driven by `--glass-*` and `--blur` tokens in `css/tokens.css`. No framework, no bundler, no build step.
 - Backend: Node >=18 (CI uses 22), Express 4, `pg` pool, bcrypt, JWT, Winston, Helmet.
 - DB: PostgreSQL on Neon. Deploy: Render free tier (`render.yaml`). The service is allowed to spin down; do not add keep-alive pings.
 - AI: Groq API proxied via backend (key never reaches the browser).
@@ -24,9 +24,9 @@ js/
   app.js                    bootstrap and wiring
   theme-boot.js             classic script in <head>: applies saved theme before first paint
   core/                     api (fetch, retry, offline queue), auth, state (store + event bus), data (loaders),
-                            i18n (EN/DE), dom (h(), icons, formatters), ui (toasts, banners, dialogs), ranks, theme, pwa
+                            i18n (EN/DE), dom (h(), icons, formatters), ui (toasts, banners, dialogs), ranks, theme, pwa, glass (pointer highlight + ripple for the liquid-glass buttons)
   features/                 nav (hash routing), auth-view, dashboard (hero + task list), task-dialog (add/edit),
-                            templates, activity, leaderboard, settings, stats, shared
+                            templates, activity, streak (streak card, charts, calendar), leaderboard, settings, stats, shared
 backend/
   index.js                  Express entry (exports app; listens only when run directly)
   config.js                 env readers
@@ -71,7 +71,7 @@ Tables: `users`, `profiles`, `tasks`, `xp_history` (immutable audit log), `frien
 - Completing: awards `round(xp_awarded * multiplier)` as an `xp_history` row (`task`). Uncomplete (`task_uncomplete`) and deleting a completed task (`task_delete`) subtract what was actually awarded (`SUM(xp_history)` for that task). Editing a completed task books the difference as `task_edit`, keeping the multiplier used at completion.
 - `users.xp = SUM(xp_history.xp_amount)`; `level = floor(xp/100)`; rank from thresholds 0/100/300/600/1200/2400/5000.
 - Multiplier (catch-up mechanic) = position multiplier minus rank penalty. Position: least XP among you and your friends gets 1.5, the leader 0.7. Rank penalty: Newcomer 1.0 down to Master 0.7. Recomputed inside every XP transaction; `User.monitorMultipliersThrottled` audits stale users opportunistically (leaderboard requests, at most every 5 min) because the server sleeps.
-- Streak: consecutive local days (client timezone) with at least one completed task; it survives until the end of the current day.
+- Streak: consecutive local days (client timezone) with at least one completed task; today never counts as missed. Ice streaks (`Task.computeStreaks`): +1 on every 7th streak day (max 3), one is spent per missed day, no ice left resets the streak. Derived from completion history on every `/api/xp/stats` call (no stored state); the response also carries `days` (last 35 days) for the charts.
 
 ## Invariants and gotchas
 

@@ -15,10 +15,8 @@
     min-height: 44px; padding: 10px 18px;
     border: 1px solid transparent; border-radius: 999px;
     font-weight: 650; font-size: 0.95rem; line-height: 1.25; text-align: center;
-    transition: transform 0.15s var(--ease), box-shadow 0.2s var(--ease), background 0.2s, border-color 0.2s, opacity 0.2s;
 }
 .btn svg { width: 18px; height: 18px; flex: none; }
-.btn:active { transform: scale(0.97); }
 .btn[disabled], .btn[aria-busy="true"] { opacity: 0.6; pointer-events: none; }
 .btn-block { width: 100%; }
 
@@ -26,7 +24,7 @@
     background: linear-gradient(to bottom, rgba(255, 255, 255, 0.3), transparent 55%), var(--grad);
     color: var(--on-accent); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), var(--glow);
 }
-.btn-primary:hover { transform: translateY(-1px); filter: brightness(1.06); }
+.btn-primary:hover { filter: brightness(1.06); }
 
 .btn-secondary { background: var(--glass-bg-soft); border-color: var(--glass-border); box-shadow: inset 0 1px 0 var(--glass-edge); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); }
 .btn-secondary:hover { border-color: var(--accent); }
@@ -42,11 +40,9 @@
     width: 40px; height: 40px; padding: 0;
     border: 1px solid transparent; border-radius: 12px;
     background: transparent; color: var(--text-muted);
-    transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.15s var(--ease);
 }
 .icon-btn svg { width: 20px; height: 20px; }
 .icon-btn:hover { background: var(--surface-hover); color: var(--text); }
-.icon-btn:active { transform: scale(0.92); }
 .icon-btn.is-danger:hover { color: var(--danger); background: var(--danger-bg); }
 
 /* Chips */
@@ -61,6 +57,32 @@
 .chip-cat { color: var(--text); }
 .chip-cat::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--cat, var(--text-faint)); box-shadow: 0 0 8px var(--cat, transparent); }
 .chip-warn { color: var(--warning); border-color: color-mix(in srgb, var(--warning) 45%, transparent); }
+
+/* Liquid-glass interaction: spring hover/press, pointer-following specular highlight, press ripple */
+.btn, .icon-btn, .segment, .nav-link, .fab, .check-btn, button.chip {
+    position: relative; overflow: hidden; isolation: isolate; -webkit-tap-highlight-color: transparent;
+    transition: transform 0.5s var(--spring), box-shadow 0.3s var(--ease), background 0.25s, border-color 0.25s, color 0.25s, filter 0.25s, opacity 0.2s;
+}
+.btn::after, .icon-btn::after, .segment::after, .nav-link::after, .fab::after, .check-btn::after, button.chip::after {
+    content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; opacity: 0;
+    background: radial-gradient(130px circle at var(--mx, 50%) var(--my, 0%), rgba(255, 255, 255, 0.4), transparent 70%);
+    transition: opacity 0.35s var(--ease);
+}
+@media (hover: hover) {
+    .btn:hover::after, .icon-btn:hover::after, .segment:hover::after, .nav-link:hover::after, .fab:hover::after, .check-btn:hover::after, button.chip:hover::after { opacity: 1; }
+    .btn:hover, .icon-btn:hover, .nav-link:hover, button.chip:hover { transform: translateY(-1px) scale(1.04); }
+    .segment:hover { transform: scale(1.04); }
+    .fab:hover { transform: scale(1.1); }
+}
+.btn:active, .icon-btn:active, .segment:active, .nav-link:active, .fab:active, .check-btn:active, button.chip:active {
+    transform: scale(0.92); transition-duration: 0.12s;
+}
+.ripple {
+    position: absolute; z-index: -1; border-radius: 50%; pointer-events: none; transform: scale(0);
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 65%);
+    animation: ripple 0.75s var(--ease) forwards;
+}
+@keyframes ripple { to { transform: scale(1); opacity: 0; } }
 
 /* Forms */
 .stack { display: grid; gap: 16px; }
@@ -185,7 +207,7 @@ input[aria-invalid="true"] { border-color: var(--danger); }
     box-shadow: var(--glass-shadow), 0 40px 90px -20px rgba(0, 10, 40, 0.65);
     overflow: hidden; margin: auto;
 }
-.dialog[open] { display: flex; flex-direction: column; animation: dialog-in 0.28s var(--ease); }
+.dialog[open] { display: flex; flex-direction: column; animation: dialog-in 0.5s var(--spring); }
 .dialog-sm { width: min(420px, calc(100vw - 24px)); }
 .dialog::backdrop { background: rgba(2, 10, 30, 0.45); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); animation: fade-in 0.25s ease; }
 .dialog-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 20px 6px; }
@@ -194,7 +216,7 @@ input[aria-invalid="true"] { border-color: var(--danger); }
 .dialog-actions .btn-ghost:first-child { margin-right: auto; }
 .loading-block { display: grid; justify-items: center; gap: 16px; padding: 48px 20px; color: var(--text-muted); }
 
-@keyframes dialog-in { from { opacity: 0; transform: translateY(16px) scale(0.98); } }
+@keyframes dialog-in { from { opacity: 0; transform: translateY(24px) scale(0.94); } }
 @keyframes fade-in { from { opacity: 0; } }
 
 @media (max-width: 640px) {
@@ -206,7 +228,7 @@ input[aria-invalid="true"] { border-color: var(--danger); }
 
 /* Toasts and banners */
 .toast-region {
-    position: fixed; z-index: 900; right: 16px; bottom: 16px;
+    position: fixed; z-index: 900; right: 20px; top: 64px;
     display: grid; gap: 10px; width: min(380px, calc(100vw - 32px)); pointer-events: none;
 }
 .toast {
@@ -236,7 +258,7 @@ input[aria-invalid="true"] { border-color: var(--danger); }
 .banner .spinner { width: 16px; height: 16px; border-width: 2px; }
 
 @media (max-width: 960px) {
-    .toast-region { bottom: calc(var(--tabbar-h) + 88px + env(safe-area-inset-bottom)); right: 12px; left: 12px; width: auto; }
+    .toast-region { top: auto; bottom: calc(var(--tabbar-h) + 88px + env(safe-area-inset-bottom)); right: 12px; left: 12px; width: auto; }
 }
 
 /* XP preview */
