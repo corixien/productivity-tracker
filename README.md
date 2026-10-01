@@ -111,4 +111,4 @@ Badges/     rank badge images
 
 ## Credits
 
-Built with Kilo Code. Main contributor: Mateo Rettenberger.
+Built with Kilo Code and Claude. Deployed on Render. Database: Neon. Main contributor: Mateo Rettenberger.

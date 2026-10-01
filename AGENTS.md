@@ -8,7 +8,7 @@ Web app for friend groups competing on productivity. Users register/login (usern
 
 ## Stack
 
-- Frontend: vanilla JS ES modules, single `index.html`, plain CSS split by concern. No framework, no bundler, no build step.
+- Frontend: vanilla JS ES modules, single `index.html`, plain CSS split by concern. Visual style: blue "liquid glass" (translucent gradients, heavy backdrop blur, bright top edge) driven by `--glass-*` and `--blur` tokens in `css/tokens.css`. No framework, no bundler, no build step.
 - Backend: Node >=18 (CI uses 22), Express 4, `pg` pool, bcrypt, JWT, Winston, Helmet.
 - DB: PostgreSQL on Neon. Deploy: Render free tier (`render.yaml`). The service is allowed to spin down; do not add keep-alive pings.
 - AI: Groq API proxied via backend (key never reaches the browser).
@@ -40,7 +40,7 @@ backend/
 database/                   migrate.js, migrations/NNN_*.sql (next = 011), migrate-data.js (one-time SQLite import)
 scripts/check.js            syntax-checks every first-party JS file
 test/                       node:test suites (unit, frontend static checks, integration)
-Badges/ icons/ LOGO.png     static assets (Badges: one PNG per rank, Platinum reuses silver with a tint)
+Badges/ icons/ LOGO.png     static assets (Badges: one PNG per rank, Platinum reuses silver with a tint; icons/logo.svg is the logo source, PNG icons and LOGO.png are rendered from it)
 ```
 
 ## Commands (run from this directory)

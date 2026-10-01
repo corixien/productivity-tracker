@@ -10,7 +10,9 @@ body {
     font-size: 16px;
     line-height: 1.5;
     color: var(--text);
-    background: var(--bg);
+    background-color: var(--bg);
+    background-image: var(--bg-image);
+    background-attachment: fixed;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     overflow-x: hidden;
@@ -63,7 +65,7 @@ strong, output, .num { font-variant-numeric: tabular-nums; }
 .bg-orbs { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
 .bg-orbs span {
     position: absolute; width: 46vmax; height: 46vmax; border-radius: 50%;
-    filter: blur(80px); opacity: 0.9;
+    filter: blur(110px); opacity: 0.95;
     animation: drift 26s ease-in-out infinite alternate;
 }
 .bg-orbs span:nth-child(1) { top: -18vmax; left: -12vmax; background: radial-gradient(circle, var(--orb-1), transparent 65%); }

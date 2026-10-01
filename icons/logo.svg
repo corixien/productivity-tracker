@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#86deff"/>
+      <stop offset="0.42" stop-color="#2f9dff"/>
+      <stop offset="0.8" stop-color="#0b5fe3"/>
+      <stop offset="1" stop-color="#2b3fc8"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="1.05" r="0.75">
+      <stop offset="0" stop-color="#a5ebff" stop-opacity="0.75"/>
+      <stop offset="1" stop-color="#a5ebff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.62"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.85"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0.08"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.45"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#d9efff"/>
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#012a7a" flood-opacity="0.5"/>
+    </filter>
+    <clipPath id="shape"><rect width="1024" height="1024" rx="232"/></clipPath>
+  </defs>
+  <g clip-path="url(#shape)">
+    <rect width="1024" height="1024" fill="url(#bg)"/>
+    <rect width="1024" height="1024" fill="url(#glow)"/>
+    <path d="M0 0H1024V400C800 500 224 500 0 400Z" fill="url(#shine)"/>
+    <g transform="translate(512 512) scale(1.0) translate(-512 -512)">
+      <circle cx="512" cy="512" r="270" fill="#ffffff" fill-opacity="0.10" stroke="#ffffff" stroke-opacity="0.28" stroke-width="64"/>
+      <circle cx="512" cy="512" r="270" fill="none" stroke="url(#mark)" stroke-width="64" stroke-linecap="round"
+              stroke-dasharray="1222 1700" transform="rotate(-90 512 512)" filter="url(#soft)"/>
+      <path d="M388 524 L484 620 L650 420" fill="none" stroke="url(#mark)" stroke-width="76" stroke-linecap="round" stroke-linejoin="round" filter="url(#soft)"/>
+    </g>
+    <rect x="5" y="5" width="1014" height="1014" rx="228" fill="none" stroke="url(#rim)" stroke-width="10"/>
+  </g>
+</svg>

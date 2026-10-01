@@ -4,10 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="color-scheme" content="dark light">
-    <meta name="theme-color" content="#070b14" media="(prefers-color-scheme: dark)">
-    <meta name="theme-color" content="#f3f6fc" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#030a1c" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#e9f2ff" media="(prefers-color-scheme: light)">
     <meta name="description" content="Compete with friends on productivity: complete tasks, earn XP, climb the ranks.">
     <title>Productivity Tracker</title>
+    <link rel="icon" type="image/svg+xml" href="icons/logo.svg">
     <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="192x192" href="icons/favicon-192x192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="icons/favicon-192x192.png">
@@ -26,12 +27,12 @@
     <div id="banner-region" class="banner-region" role="status" aria-live="polite"></div>
     <div id="toast-region" class="toast-region" role="status" aria-live="polite"></div>
 
-    <div id="splash" class="splash" aria-hidden="true"><img src="LOGO.png" alt="" width="72" height="72"><div class="spinner"></div></div>
+    <div id="splash" class="splash" aria-hidden="true"><img src="LOGO.png" alt="" width="76" height="76"><div class="spinner"></div></div>
 
     <!-- Auth -->
     <div id="auth-screen" class="auth-screen" hidden>
         <main class="auth-card card">
-            <img class="auth-logo" src="LOGO.png" alt="" width="72" height="72">
+            <img class="auth-logo" src="LOGO.png" alt="" width="76" height="76">
             <h1 data-i18n="appTitle">Productivity Tracker</h1>
             <p class="subtitle" data-i18n="authSubtitle">Complete tasks, earn XP, outrank your friends.</p>
 
@@ -98,7 +99,6 @@
                         <h1 id="h-tasks" data-i18n="navTasks">Tasks</h1>
                         <p class="subtitle" id="greeting"></p>
                     </div>
-                    <button type="button" class="btn btn-primary" id="add-task-btn"><span data-icon="plus"></span><span data-i18n="addTask">Add task</span></button>
                 </header>
 
                 <div class="hero card" id="hero">
@@ -129,6 +129,8 @@
                 </div>
 
                 <div class="stat-row" id="stat-row"></div>
+
+                <button type="button" class="btn btn-primary add-task-big" id="add-task-btn"><span data-icon="plus"></span><span data-i18n="addTask">Add task</span></button>
 
                 <div class="list-toolbar">
                     <div class="segmented" role="group" data-i18n-aria="taskFilter" aria-label="Task filter" id="task-tabs">
@@ -193,7 +195,7 @@
                     </div>
                 </header>
 
-                <div class="settings-grid">
+                <div class="settings-list">
                     <section class="card settings-card" aria-labelledby="s-profile">
                         <h2 id="s-profile" data-i18n="profile">Profile</h2>
                         <div class="avatar-row">
@@ -245,7 +247,7 @@
 
                     <section class="card settings-card" aria-labelledby="s-about">
                         <h2 id="s-about" data-i18n="credits">Credits</h2>
-                        <p class="muted" data-i18n="creditsText">Built with Kilo Code. Main contributor: Mateo Rettenberger.</p>
+                        <p class="muted" data-i18n="creditsText">Built with Kilo Code and Claude. Deployed on Render. Database: Neon. Main contributor: Mateo Rettenberger.</p>
                         <button type="button" class="btn btn-danger" id="sign-out-btn"><span data-icon="logout"></span><span data-i18n="signOut">Sign out</span></button>
                     </section>
                 </div>
@@ -314,16 +316,10 @@
                     <span data-i18n="bonus">Bonus: offline or with friends (+3 XP)</span>
                 </label>
 
-                <div class="xp-preview" id="xp-preview" aria-live="polite">
-                    <span class="xp-preview-label" data-i18n="xpPreview">XP preview</span>
-                    <strong id="xp-preview-value"></strong>
-                    <span class="xp-preview-eq" id="xp-preview-eq"></span>
-                </div>
-
                 <div id="task-create-options" class="stack-sm">
                     <label class="check">
                         <input type="checkbox" id="task-done">
-                        <span data-i18n="markDone">Already done: complete it right away</span>
+                        <span data-i18n="markDone">Already done</span>
                     </label>
                     <div class="field-row field-row-center">
                         <label class="check">
@@ -336,6 +332,12 @@
                             <option value="weekly" data-i18n="recurWeekly">Every week</option>
                         </select>
                     </div>
+                </div>
+
+                <div class="xp-preview" id="xp-preview" aria-live="polite">
+                    <span class="xp-preview-label" data-i18n="xpPreview">XP preview</span>
+                    <strong id="xp-preview-value"></strong>
+                    <span class="xp-preview-eq" id="xp-preview-eq"></span>
                 </div>
 
                 <p id="task-error" class="form-error" role="alert"></p>

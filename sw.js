@@ -43,7 +43,8 @@ const SHELL = [
     '/Badges/diamond.png',
     '/Badges/master.png',
     '/icons/favicon-32x32.png',
-    '/icons/favicon-192x192.png'
+    '/icons/favicon-192x192.png',
+    '/icons/logo.svg'
 ];
 
 self.addEventListener('install', (event) => {

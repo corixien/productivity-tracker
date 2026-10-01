@@ -7,8 +7,8 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "theme_color": "#070b14",
-  "background_color": "#070b14",
+  "theme_color": "#030a1c",
+  "background_color": "#030a1c",
   "categories": [
     "productivity",
     "lifestyle"
@@ -50,7 +50,7 @@
       "type": "image/png"
     },
     {
-      "src": "icons/favicon-512x512.png",
+      "src": "icons/maskable-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
