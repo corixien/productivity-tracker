@@ -1,59 +1,28 @@
 const Goal = require('../models/Goal');
-const { logError } = require('../services/loggingService');
+const { asyncHandler, notFound } = require('../utils/errors');
 
-async function getGoals(req, res) {
-    try {
-        return res.json(await Goal.findByUserId(req.user.id));
-    } catch (error) {
-        await logError(error, { context: 'getGoals', userId: req.user.id });
-        return res.status(500).json({ success: false, error: 'Failed to get goals' });
-    }
-}
+const getGoals = asyncHandler(async (req, res) => {
+    res.json(await Goal.findByUserId(req.user.id));
+});
 
-async function createGoal(req, res) {
-    try {
-        return res.status(201).json(await Goal.create(req.user.id, req.body));
-    } catch (error) {
-        await logError(error, { context: 'createGoal', userId: req.user.id });
-        return res.status(500).json({ success: false, error: 'Failed to create goal' });
-    }
-}
+const createGoal = asyncHandler(async (req, res) => {
+    res.status(201).json(await Goal.create(req.user.id, req.body));
+});
 
-async function updateGoal(req, res) {
-    try {
-        const goal = await Goal.update(req.params.id, req.user.id, req.body);
-        if (!goal) return res.status(404).json({ success: false, error: 'Goal not found' });
-        return res.json(goal);
-    } catch (error) {
-        await logError(error, { context: 'updateGoal', goalId: req.params.id });
-        return res.status(500).json({ success: false, error: 'Failed to update goal' });
-    }
-}
+const updateGoal = asyncHandler(async (req, res) => {
+    const goal = await Goal.update(req.params.id, req.user.id, req.body);
+    if (!goal) throw notFound('Goal not found');
+    res.json(goal);
+});
 
-async function deleteGoal(req, res) {
-    try {
-        const goal = await Goal.delete(req.params.id, req.user.id);
-        if (!goal) return res.status(404).json({ success: false, error: 'Goal not found' });
-        return res.json({ success: true });
-    } catch (error) {
-        await logError(error, { context: 'deleteGoal', goalId: req.params.id });
-        return res.status(500).json({ success: false, error: 'Failed to delete goal' });
-    }
-}
+const deleteGoal = asyncHandler(async (req, res) => {
+    const goal = await Goal.delete(req.params.id, req.user.id);
+    if (!goal) throw notFound('Goal not found');
+    res.json({ success: true });
+});
 
-async function getGoalsCount(req, res) {
-    try {
-        return res.json({ count: await Goal.getActiveCount(req.user.id) });
-    } catch (error) {
-        await logError(error, { context: 'getGoalsCount', userId: req.user.id });
-        return res.status(500).json({ success: false, error: 'Failed to get goals count' });
-    }
-}
+const getGoalsCount = asyncHandler(async (req, res) => {
+    res.json({ count: await Goal.getActiveCount(req.user.id) });
+});
 
-module.exports = {
-    getGoals,
-    createGoal,
-    updateGoal,
-    deleteGoal,
-    getGoalsCount
-};
+module.exports = { getGoals, createGoal, updateGoal, deleteGoal, getGoalsCount };

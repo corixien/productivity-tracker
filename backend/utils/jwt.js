@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const { logger } = require('./logger');
 const { getAuthConfig } = require('../config');
 
+// payload: { userId, username, tv } where tv is users.token_version at issue time
 function generateToken(payload) {
     const config = getAuthConfig();
     return jwt.sign(
@@ -30,4 +31,9 @@ function extractTokenFromHeader(authHeader) {
     return token || null;
 }
 
-module.exports = { generateToken, verifyToken, extractTokenFromHeader };
+// Tokens issued before token versioning have no tv claim and count as version 0.
+function tokenMatchesVersion(decoded, tokenVersion) {
+    return (decoded.tv ?? 0) === (tokenVersion ?? 0);
+}
+
+module.exports = { generateToken, verifyToken, extractTokenFromHeader, tokenMatchesVersion };

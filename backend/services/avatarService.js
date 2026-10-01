@@ -1,8 +1,9 @@
-const crypto = require('crypto');
 const { logger } = require('../utils/logger');
+const { badRequest } = require('../utils/errors');
 const User = require('../models/User');
 
-const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
+// The client downscales avatars to ~256px before upload; this is only a safety cap.
+const MAX_AVATAR_SIZE = 512 * 1024;
 
 function parseAvatar(avatar) {
     if (!avatar || typeof avatar !== 'string') {
@@ -34,7 +35,7 @@ function parseAvatar(avatar) {
     }
 
     if (buffer.length > MAX_AVATAR_SIZE) {
-        return { buffer: null, mime: null, ext: null, error: 'Avatar must be under 5MB' };
+        return { buffer: null, mime: null, ext: null, error: 'Avatar must be under 512KB' };
     }
 
     const mimeToExt = {
@@ -64,9 +65,7 @@ function parseAvatar(avatar) {
 async function uploadAvatar(userId, avatarBase64) {
     const parsed = parseAvatar(avatarBase64);
     if (parsed.error) {
-        const error = new Error(parsed.error);
-        error.statusCode = 400;
-        throw error;
+        throw badRequest(parsed.error, 'invalid_avatar');
     }
 
     const b64 = parsed.buffer.toString('base64');

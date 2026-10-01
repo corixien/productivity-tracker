@@ -1,0 +1,95 @@
+# AGENTS.md
+
+Project guide for agents. Complements `/home/mateo/AGENTS.md` (workspace-level rules: subagent model, secrets, Neon IDs) — read both.
+
+## What it is
+
+Web app for friend groups competing on productivity. Users register/login (username + password), log tasks (natural language, optionally AI-rated), complete them to earn XP, climb ranks (Newcomer, Bronze, Silver, Gold, Platinum, Diamond, Master), keep streaks and a daily XP goal, compare on an all-time/weekly leaderboard, reuse tasks as templates (optionally recurring). UI languages: English and German. Installable PWA.
+
+## Stack
+
+- Frontend: vanilla JS ES modules, single `index.html`, plain CSS split by concern. No framework, no bundler, no build step.
+- Backend: Node >=18 (CI uses 22), Express 4, `pg` pool, bcrypt, JWT, Winston, Helmet.
+- DB: PostgreSQL on Neon. Deploy: Render free tier (`render.yaml`). The service is allowed to spin down; do not add keep-alive pings.
+- AI: Groq API proxied via backend (key never reaches the browser).
+
+## Layout
+
+```
+index.html                  SPA shell: static markup + <dialog>s (no inline script/style: strict CSP)
+sw.js, offline.html         service worker (app-shell cache, API never cached) + offline page
+manifest.json               PWA manifest
+css/                        tokens (themes) -> base -> components -> layout -> views
+js/
+  app.js                    bootstrap and wiring
+  theme-boot.js             classic script in <head>: applies saved theme before first paint
+  core/                     api (fetch, retry, offline queue), auth, state (store + event bus), data (loaders),
+                            i18n (EN/DE), dom (h(), icons, formatters), ui (toasts, banners, dialogs), ranks, theme, pwa
+  features/                 nav (hash routing), auth-view, dashboard (hero + task list), task-dialog (add/edit),
+                            templates, activity, leaderboard, settings, stats, shared
+backend/
+  index.js                  Express entry (exports app; listens only when run directly)
+  config.js                 env readers
+  routes/                   thin route tables
+  controllers/              handlers wrapped in asyncHandler, throw AppError
+  models/                   SQL: User, Task, Goal, QuickTask (templates)
+  services/                 rankService (thresholds, XP formula, multipliers, meta), groqService, avatarService,
+                            loggingService, retentionService (log purge)
+  middleware/               auth, validation, rateLimiter (factory + presets), security (Helmet CSP), timezone, errorHandler
+  utils/                    database, jwt, password, logger, validation, errors (AppError, asyncHandler, warnOnError)
+database/                   migrate.js, migrations/NNN_*.sql (next = 011), migrate-data.js (one-time SQLite import)
+scripts/check.js            syntax-checks every first-party JS file
+test/                       node:test suites (unit, frontend static checks, integration)
+Badges/ icons/ LOGO.png     static assets (Badges: one PNG per rank, Platinum reuses silver with a tint)
+```
+
+## Commands (run from this directory)
+
+- `npm run check` — syntax check of backend, database, scripts, tests, frontend, `sw.js`.
+- `npm test` — unit + frontend static checks; the integration suite is skipped unless `TEST_DATABASE_URL` is set.
+- Integration tests: start a throwaway Postgres (`podman run -d -e POSTGRES_PASSWORD=test -e POSTGRES_DB=pt -p 54329:5432 docker.io/library/postgres:16-alpine`), then `DATABASE_URL=<url> npm run migrate` and `TEST_DATABASE_URL=<url> npm run test:integration`. The suite refuses non-localhost URLs. Never point tests or migrations at the Neon production DB (`.env` holds it; shell-provided `DATABASE_URL` takes precedence over `.env`).
+- `npm run dev` / `npm start` (migrate + server, what Render runs) / `npm run migrate` / `npm run migrate:data`.
+- CI: `.github/workflows/ci.yml` (Postgres service, check, migrate, test).
+
+## Request flow
+
+`routes/X.js` -> middleware (authenticate, rate limiters, validation) -> `controllers/X.js` -> `models/X.js` -> `utils/database.query|transaction`. `/api/*` is `no-store`, rate-limited per IP (300/min), and gets `req.tz` from the `X-Timezone` header (the client always sends it). Errors: `{ success: false, error, code }`; throw `AppError` (or helpers `notFound`, `conflict`, ...) inside `asyncHandler`; only 5xx are persisted to `system_logs`.
+
+Public: `GET /api/health`, `GET /api/meta` (rank thresholds/multipliers), `GET /api/ai/status`, register/login. Everything else requires a Bearer token.
+
+## API surface
+
+`/api/auth` (register, login, me) · `/api/users` (me, friends, leaderboard, profile, quick-tasks incl. `:id/use` and `spawn-recurring`, then `:username` get/put/password/avatar/change-username) · `/api/tasks` (CRUD, `PUT` edits fields and/or toggles `completed`, `:id/complete`) · `/api/goals` · `/api/xp` (history, paginated) and `/api/xp/stats` (streak, today, week, daily goal) · `/api/leaderboard?period=all|week` · `/api/settings` · `/api/groq` (`/`, `/rate`, `/status`) · legacy `/api/ai/rate`, `/api/ai/status` (kept on purpose) · `/api/meta` · `/api/health`. Full list: README.md.
+
+## Database
+
+Tables: `users`, `profiles`, `tasks`, `xp_history` (immutable audit log), `friends` (directional), `goals`, `groq_logs`, `system_logs`, `quick_tasks` (templates; `recurrence`, `last_spawned_on`). `users` carries `xp, level, rank, multiplier, position_based_multiplier, rank_based_multiplier, last_multiplier_check, tasks_completed, token_version, daily_goal_xp`. Avatars are stored as small JPEG data URLs in `users.avatar_url` (client resizes to 256 px, server caps at 512 KB). Migrations are the schema source of truth.
+
+## Game mechanics
+
+- Task XP: `round(productivity * difficulty + duration/5 + bonus)`, 0 if productivity is 0 (`rankService.calculateXpFromTask`; the frontend mirrors it for previews in `core/ranks.js`, server wins).
+- Completing: awards `round(xp_awarded * multiplier)` as an `xp_history` row (`task`). Uncomplete (`task_uncomplete`) and deleting a completed task (`task_delete`) subtract what was actually awarded (`SUM(xp_history)` for that task). Editing a completed task books the difference as `task_edit`, keeping the multiplier used at completion.
+- `users.xp = SUM(xp_history.xp_amount)`; `level = floor(xp/100)`; rank from thresholds 0/100/300/600/1200/2400/5000.
+- Multiplier (catch-up mechanic) = position multiplier minus rank penalty. Position: least XP among you and your friends gets 1.5, the leader 0.7. Rank penalty: Newcomer 1.0 down to Master 0.7. Recomputed inside every XP transaction; `User.monitorMultipliersThrottled` audits stale users opportunistically (leaderboard requests, at most every 5 min) because the server sleeps.
+- Streak: consecutive local days (client timezone) with at least one completed task; it survives until the end of the current day.
+
+## Invariants and gotchas
+
+- Never write `users.xp` directly: do it inside a transaction via `Task.syncUserTotals` (insert `xp_history`, re-sum, update users, recalc multiplier).
+- Auth: JWT carries `tv` (= `users.token_version`). Changing the password bumps it, revoking all older tokens; the response returns the new token. `authenticate` only loads `id, username, token_version`.
+- Password change requires the current password. `PUT /api/users/:username` only accepts `language` and `goals`; other users get public fields only from `GET /api/users/:username`.
+- In `routes/users.js`, fixed paths must stay above `/:username`.
+- CSP is strict (`script-src 'self'`, `style-src 'self'`): no inline scripts, `style=` attributes, `on*=` handlers. Set styles through CSSOM (`el.style.x`, `--var`). `test/frontend.test.js` enforces this.
+- Every new CSS/JS file must be added to the `SHELL` list in `sw.js` (the test fails otherwise); bump `VERSION` there when shell files change in a way that must invalidate caches.
+- New UI text needs both `en` and `de` in `js/core/i18n.js` (test enforces key parity and usage).
+- Rate limiters are in-memory (per process, reset on restart).
+- Render free tier cold start: first request may 502/503; `core/api.js` retries and shows a "server waking up" banner. Only completing an existing task is queued offline.
+- `logs/` and `.env` are gitignored; the test server logs to `LOG_DIR`.
+
+## Conventions
+
+- CommonJS in backend, ES modules in `js/`. 4-space indent, single quotes, semicolons.
+- Parameterized SQL only. Build DOM with `h()` (text nodes only); never `innerHTML` with data.
+- Log through `utils/logger`/`loggingService`; swallowed errors use `warnOnError(context)` so they stay visible.
+- New DB change = new migration (next number 011); never edit applied migrations (003 was made idempotent for fresh DBs, 010 dropped its trigger).
+- Config via env only: `DATABASE_URL`, `JWT_SECRET` required; optional `DATABASE_SSL_REJECT_UNAUTHORIZED`, `JWT_EXPIRES_IN`, `GROQ_API_KEY`, `GROQ_MODEL`, `GROQ_BASE_URL`, `LOG_LEVEL`, `LOG_DIR`, `LOG_RETENTION_DAYS` (default 30), `PORT`, `NODE_ENV`, `CLIENT_ORIGIN`, `DATABASE_POOL_MAX`.

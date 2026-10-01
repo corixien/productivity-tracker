@@ -1,62 +1,24 @@
 const groqService = require('../services/groqService');
 const User = require('../models/User');
-const { logError } = require('../services/loggingService');
+const { asyncHandler, AppError } = require('../utils/errors');
 
-async function rateTask(req, res) {
+const rateTask = asyncHandler(async (req, res) => {
+    const { description, goals } = req.body;
+    const user = await User.findById(req.user.id);
+
     try {
-        const { description, goals } = req.body;
-        const user = await User.findById(req.user.id);
-
-        const result = await groqService.rateTask(
-            description,
-            goals || (user?.goals || ''),
-            req.user.id,
-            req.user.username
-        );
-
-        return res.json(result);
+        res.json(await groqService.rateTask(description, goals || (user?.goals || ''), req.user.id, req.user.username));
     } catch (error) {
-        await logError(error, { context: 'rateTask', userId: req.user.id });
-
-        if (error.message.includes('GROQ_API_KEY')) {
-            return res.status(503).json({
-                success: false,
-                error: 'AI service is not configured'
-            });
-        }
-
-        if (error.message.includes('rate limit') || error.message.includes('Rate limit')) {
-            return res.status(429).json({
-                success: false,
-                error: 'AI rate limit exceeded. Please try again in a minute.'
-            });
-        }
-
-        if (error.message.includes('authentication') || error.message.includes('invalid API key')) {
-            return res.status(503).json({
-                success: false,
-                error: 'AI service authentication failed'
-            });
-        }
-
-        return res.status(500).json({
-            success: false,
-            error: 'AI service unavailable'
-        });
+        const message = error.message || '';
+        if (message.includes('GROQ_API_KEY')) throw new AppError(503, 'AI service is not configured', 'ai_not_configured');
+        if (/rate limit/i.test(message)) throw new AppError(429, 'AI rate limit exceeded. Please try again in a minute.', 'ai_rate_limited');
+        if (/authentication|invalid API key/i.test(message)) throw new AppError(503, 'AI service authentication failed', 'ai_auth_failed');
+        throw new AppError(502, 'AI service unavailable', 'ai_unavailable');
     }
-}
+});
 
-async function getAiStatus(req, res) {
-    try {
-        const status = await groqService.checkGroqStatus();
-        return res.json(status);
-    } catch (error) {
-        await logError(error, { context: 'getAiStatus' });
-        return res.status(500).json({ success: false, error: 'Failed to get AI status' });
-    }
-}
+const getAiStatus = asyncHandler(async (req, res) => {
+    res.json(await groqService.checkGroqStatus());
+});
 
-module.exports = {
-    rateTask,
-    getAiStatus
-};
+module.exports = { rateTask, getAiStatus };

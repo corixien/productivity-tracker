@@ -1,7 +1,9 @@
 const { getGroqConfig } = require('../config');
 const { query } = require('../utils/database');
 const { logGroqRequest, logGroqResponse, logError } = require('../services/loggingService');
-const logger = require('../utils/logger');
+const { logger } = require('../utils/logger');
+const { calculateXpFromTask } = require('./rankService');
+const { warnOnError } = require('../utils/errors');
 
 const DEFAULT_GROQ_MODEL = 'groq/compound';
 const MAX_RETRIES = 3;
@@ -22,8 +24,7 @@ function extractJsonFromResponse(content) {
 }
 
 function calculateXp(productivity, difficulty, duration, bonus = 0) {
-    if (productivity === 0) return 0;
-    return Math.round((productivity * difficulty) + (duration / 5) + bonus);
+    return calculateXpFromTask(duration, productivity, difficulty, bonus);
 }
 
 async function rateTask(description, goals, userId, username) {
@@ -123,8 +124,8 @@ Return ONLY the JSON.` },
             errorMessage = 'GROQ rate limit exceeded';
         }
 
-        await logGroqRequest(userId, username, requestPayload, model).catch(() => null);
-        await logGroqResponse(null, { error: errorText }, responseTimeMs, false, errorMessage).catch(() => null);
+        await logGroqRequest(userId, username, requestPayload, model).catch(warnOnError('groqService.log'));
+        await logGroqResponse(null, { error: errorText }, responseTimeMs, false, errorMessage).catch(warnOnError('groqService.log'));
         throw new Error(errorMessage);
     }
 
@@ -133,8 +134,8 @@ Return ONLY the JSON.` },
         groqData = await groqResponse.json();
     } catch (error) {
         const errorMessage = 'Invalid JSON response from GROQ';
-        await logGroqRequest(userId, username, requestPayload, model).catch(() => null);
-        await logGroqResponse(null, { error: error.message }, responseTimeMs, false, errorMessage).catch(() => null);
+        await logGroqRequest(userId, username, requestPayload, model).catch(warnOnError('groqService.log'));
+        await logGroqResponse(null, { error: error.message }, responseTimeMs, false, errorMessage).catch(warnOnError('groqService.log'));
         throw new Error(errorMessage);
     }
 
@@ -142,8 +143,8 @@ Return ONLY the JSON.` },
 
     if (!content) {
         const errorMessage = 'Empty response from GROQ';
-        await logGroqRequest(userId, username, requestPayload, model).catch(() => null);
-        await logGroqResponse(null, groqData, responseTimeMs, false, errorMessage).catch(() => null);
+        await logGroqRequest(userId, username, requestPayload, model).catch(warnOnError('groqService.log'));
+        await logGroqResponse(null, groqData, responseTimeMs, false, errorMessage).catch(warnOnError('groqService.log'));
         throw new Error(errorMessage);
     }
 
@@ -152,8 +153,8 @@ Return ONLY the JSON.` },
         taskData = extractJsonFromResponse(content);
     } catch (parseError) {
         const errorMessage = 'Failed to parse GROQ response';
-        await logGroqRequest(userId, username, requestPayload, model).catch(() => null);
-        await logGroqResponse(null, { raw: content }, responseTimeMs, false, errorMessage).catch(() => null);
+        await logGroqRequest(userId, username, requestPayload, model).catch(warnOnError('groqService.log'));
+        await logGroqResponse(null, { raw: content }, responseTimeMs, false, errorMessage).catch(warnOnError('groqService.log'));
         throw new Error(errorMessage);
     }
 
@@ -172,12 +173,11 @@ Return ONLY the JSON.` },
         bonus,
         category: taskData.category || 'other',
         xp,
-        reasoning: taskData.reasoning || '',
-        rawResponse: groqData
+        reasoning: taskData.reasoning || ''
     };
 
-    const logId = await logGroqRequest(userId, username, requestPayload, model).catch(() => null);
-    await logGroqResponse(logId, responseData, responseTimeMs, true).catch(() => null);
+    const logId = await logGroqRequest(userId, username, requestPayload, model).catch(warnOnError('groqService.log'));
+    await logGroqResponse(logId, responseData, responseTimeMs, true).catch(warnOnError('groqService.log'));
 
     return responseData;
 }

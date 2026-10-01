@@ -1,584 +1,109 @@
-import { register, signIn, signOut, restoreSession, subscribe, getCurrentUser, getAuthMode, setAuthMode, toggleAuthMode, loadUserPreferences } from './auth.js';
-import { api } from './api.js';
-import { getRankName, getProgressPercent, addTask, completeTask as completeTaskOp, deleteTask as deleteTaskOp, renderTasks, updateXPDisplay, updateRankDisplay } from './tasks.js';
-import { addFriend, loadLeaderboard, renderLeaderboard } from './leaderboard.js';
-import { initSettings, initChangeCredentials, uploadAvatar, saveGoals } from './settings.js';
-import { initUI, showSection, closeModals } from './ui.js';
-import { setLanguage, getCurrentLang, t } from './i18n.js';
-import { rateTaskWithAI } from './ai-service.js';
+import { api, events } from './core/api.js';
+import { state, on } from './core/state.js';
+import { $, hydrateIcons } from './core/dom.js';
+import { t, setLanguage, getCurrentLang, onLanguageChange } from './core/i18n.js';
+import { initTheme } from './core/theme.js';
+import { restoreSession, signOut } from './core/auth.js';
+import { loadMeta, loadTasks, loadStats, loadTemplates, refreshCore } from './core/data.js';
+import { initDialogs, toast, closeDialog, showError } from './core/ui.js';
+import { initPwa, syncQueue } from './core/pwa.js';
+import { initNav, registerView, startNav } from './features/nav.js';
+import { initAuthView, resetAuthView } from './features/auth-view.js';
+import { initDashboard } from './features/dashboard.js';
+import { initTaskDialog } from './features/task-dialog.js';
+import { initTemplates, showTemplates } from './features/templates.js';
+import { initActivity, showActivity } from './features/activity.js';
+import { initLeaderboard, showLeaderboard } from './features/leaderboard.js';
+import { initSettings, renderSettings } from './features/settings.js';
+import { warnNonCritical } from './features/shared.js';
 
-let currentTasks = { pending: [], completed: [] };
-let userData = null;
-let taskMode = 'pending';
-let authUnsubscribe = null;
+const STALE_AFTER_MS = 60 * 1000;
+let lastRefresh = 0;
 
-async function init() {
-    console.log('App init starting...');
-
-    try {
-    initUI();
-    initSettings();
-
-    subscribeToAuthEvents();
-
-        const username = await restoreSession();
-        console.log('Restored session:', username);
-        if (username) {
-            showApp(username);
-        } else {
-            showAuth();
-        }
-
-        console.log('App init complete');
-    } catch (error) {
-        console.error('App init failed:', error);
-        showAuth();
-    } finally {
-        attachEventListeners();
-    }
+function showScreen(name) {
+    $('#splash').hidden = true;
+    $('#auth-screen').hidden = name !== 'auth';
+    $('#app-screen').hidden = name !== 'app';
 }
 
-function subscribeToAuthEvents() {
-    authUnsubscribe = subscribe((event, data) => {
-        if (event === 'auth:login') {
-            showApp(data.username);
-        } else if (event === 'auth:logout') {
-            showAuth();
-        } else if (event === 'auth:modeChange') {
-            updateAuthUI(data.mode);
-        } else if (event === 'auth:restore') {
-            updateAuthUI(getAuthMode());
-        }
-    });
+async function loadAll() {
+    // Recurring templates first, so the task list below already contains what they spawned.
+    const spawned = await api.spawnRecurring().catch(warnNonCritical('spawnRecurring'));
+    const results = await Promise.allSettled([loadTasks(), loadStats(), loadTemplates()]);
+    const failed = results.find((result) => result.status === 'rejected');
+    if (failed) showError(failed.reason, 'loadFailed');
+    if (spawned && spawned.tasks.length > 0) toast(t('recurringAdded', { n: spawned.tasks.length }), { type: 'success' });
+    lastRefresh = Date.now();
+    syncQueue();
 }
 
-function attachEventListeners() {
-    const authForm = document.getElementById('auth-form');
-    if (authForm) authForm.addEventListener('submit', handleAuth);
-
-    const friendForm = document.getElementById('friend-form');
-    if (friendForm) friendForm.addEventListener('submit', handleAddFriend);
-
-    const addFriendBtn = document.getElementById('add-friend-btn');
-    if (addFriendBtn) {
-        addFriendBtn.addEventListener('click', () => {
-            document.getElementById('add-friend-modal').classList.add('active');
-            document.getElementById('overlay').classList.add('active');
-            document.getElementById('friend-username').value = '';
-        });
-    }
-
-    const closeFriendModal = document.getElementById('close-friend-modal');
-    if (closeFriendModal) closeFriendModal.addEventListener('click', closeModals);
-
-    const cancelFriendBtn = document.getElementById('cancel-friend-btn');
-    if (cancelFriendBtn) cancelFriendBtn.addEventListener('click', closeModals);
-
-    const saveGoalsBtn = document.getElementById('save-goals-btn');
-    if (saveGoalsBtn) saveGoalsBtn.addEventListener('click', handleSaveGoals);
-
-    const changeCredentialsBtn = document.getElementById('change-credentials-btn');
-    if (changeCredentialsBtn) changeCredentialsBtn.addEventListener('click', showChangeCredentialsScreen);
-
-    const signOutBtn = document.getElementById('sign-out-btn');
-    if (signOutBtn) signOutBtn.addEventListener('click', handleSignOut);
-
-    const languageSelect = document.getElementById('language-select');
-    if (languageSelect) languageSelect.addEventListener('change', async (e) => {
-        setLanguage(e.target.value);
-        const username = getCurrentUser();
-        if (username) {
-            try {
-                await api.updateUser(username, { language: e.target.value });
-            } catch (error) {
-                console.error('Failed to save language', error);
-            }
-        }
-    });
-
-    const aiCancelBtn = document.getElementById('ai-cancel-btn');
-    if (aiCancelBtn) aiCancelBtn.addEventListener('click', cancelTaskCreation);
-
-    const aiSubmitBtn = document.getElementById('ai-submit-btn');
-    if (aiSubmitBtn) aiSubmitBtn.addEventListener('click', handleAITaskSubmit);
-
-    const reviewNextBtn = document.getElementById('review-next-btn');
-    if (reviewNextBtn) reviewNextBtn.addEventListener('click', handleReviewNext);
-
-    const reviewBackBtn = document.getElementById('review-back-btn');
-    if (reviewBackBtn) reviewBackBtn.addEventListener('click', handleReviewBack);
-
-    const reviewCancelBtn = document.getElementById('review-cancel-btn');
-    if (reviewCancelBtn) reviewCancelBtn.addEventListener('click', cancelTaskCreation);
-
-    const editConfirmBtn = document.getElementById('edit-confirm-btn');
-    if (editConfirmBtn) editConfirmBtn.addEventListener('click', handleEditConfirm);
-
-    const editCancelBtn = document.getElementById('edit-cancel-btn');
-    if (editCancelBtn) editCancelBtn.addEventListener('click', cancelTaskCreation);
-
-    const editBackBtn = document.getElementById('edit-back-btn');
-    if (editBackBtn) editBackBtn.addEventListener('click', handleEditBack);
-
-    const multiplierBackBtn = document.getElementById('multiplier-back-btn');
-    if (multiplierBackBtn) multiplierBackBtn.addEventListener('click', handleMultiplierBack);
-
-    const multiplierCancelBtn = document.getElementById('multiplier-cancel-btn');
-    if (multiplierCancelBtn) multiplierCancelBtn.addEventListener('click', handleMultiplierCancel);
-
-    const multiplierConfirmBtn = document.getElementById('multiplier-confirm-btn');
-    if (multiplierConfirmBtn) multiplierConfirmBtn.addEventListener('click', handleMultiplierConfirm);
-
-    const addPendingTaskBtn = document.getElementById('add-pending-task-btn');
-    if (addPendingTaskBtn) {
-        addPendingTaskBtn.addEventListener('click', () => {
-            taskMode = 'pending';
-            openTaskModal();
-        });
-    }
-
-    const addCompletedTaskBtn = document.getElementById('add-completed-task-btn');
-    if (addCompletedTaskBtn) {
-        addCompletedTaskBtn.addEventListener('click', () => {
-            taskMode = 'completed';
-            openTaskModal();
-        });
-    }
-
-    const closeTaskModal = document.getElementById('close-task-modal');
-    if (closeTaskModal) closeTaskModal.addEventListener('click', closeModals);
-
-    const authToggle = document.getElementById('auth-toggle');
-    if (authToggle) {
-        authToggle.addEventListener('click', () => {
-            toggleAuthMode();
-        });
-    }
-
-    document.querySelectorAll('.nav-item').forEach(item => {
-        item.addEventListener('click', () => {
-            const section = item.getAttribute('data-section');
-            if (section === 'leaderboard') {
-                const username = getCurrentUser();
-                if (username) loadAndRenderLeaderboard(username);
-            }
-        });
-    });
-}
-
-function updateAuthUI(mode) {
-    const submitBtn = document.querySelector('#auth-form button[type="submit"]');
-    const subtitle = document.querySelector('.auth-card p');
-    const modeIndicator = document.getElementById('auth-mode');
-
-    if (mode === 'signup') {
-        if (submitBtn) submitBtn.textContent = t('register');
-        if (subtitle) subtitle.textContent = t('registerSubtitle');
-        if (modeIndicator) {
-            modeIndicator.textContent = 'Register Mode';
-            modeIndicator.style.color = '#4caf50';
-        }
-    } else {
-        if (submitBtn) submitBtn.textContent = t('signIn');
-        if (subtitle) subtitle.textContent = t('authSubtitle');
-        if (modeIndicator) {
-            modeIndicator.textContent = 'Sign In Mode';
-            modeIndicator.style.color = '#4a90d9';
-        }
-    }
+function showApp() {
+    showScreen('app');
+    renderSettings();
+    startNav();
+    loadAll();
 }
 
 function showAuth() {
-    document.getElementById('auth-screen').classList.add('active');
-    document.getElementById('app-screen').classList.remove('active');
-    updateAuthUI(getAuthMode());
-
-    const errorEl = document.getElementById('auth-error');
-    const usernameInput = document.getElementById('auth-username');
-    const passwordInput = document.getElementById('auth-password');
-    const rememberCheckbox = document.getElementById('auth-remember');
-
-    if (errorEl) errorEl.textContent = '';
-    if (usernameInput) usernameInput.value = '';
-    if (passwordInput) passwordInput.value = '';
-    if (rememberCheckbox) rememberCheckbox.checked = true;
+    document.querySelectorAll('dialog[open]').forEach(closeDialog);
+    resetAuthView();
+    history.replaceState(null, '', location.pathname);
+    showScreen('auth');
+    document.title = t('appTitle');
+    $('#auth-username').focus();
 }
 
-function showChangeCredentialsScreen() {
-    const currentUser = getCurrentUser();
-    if (!currentUser) {
-        alert('Session expired. Please log in again.');
-        return;
-    }
-    document.getElementById('app-screen').classList.remove('active');
-    document.getElementById('change-credentials-screen').classList.add('active');
-    initChangeCredentials(showApp);
-}
-
-function showApp(username) {
-    document.getElementById('auth-screen').classList.remove('active');
-    document.getElementById('change-credentials-screen').classList.remove('active');
-    document.getElementById('app-screen').classList.add('active');
-
-    initChangeCredentials(showApp);
-    loadUserData(username);
-    loadUserPreferences(username);
-}
-
-function openTaskModal() {
-    const modal = document.getElementById('add-task-modal');
-    const overlay = document.getElementById('overlay');
-    if (modal) {
-        modal.classList.add('active');
-        overlay.classList.add('active');
-        document.getElementById('ai-task-input').value = '';
-        document.getElementById('ai-task-section').style.display = 'block';
-        document.getElementById('ai-loading').style.display = 'none';
-        document.getElementById('ai-review-section').style.display = 'none';
-        document.getElementById('ai-edit-section').style.display = 'none';
-        document.getElementById('ai-multiplier-section').style.display = 'none';
-    }
-}
-
-async function handleAuth(e) {
-    e.preventDefault();
-    const username = document.getElementById('auth-username').value.trim();
-    const password = document.getElementById('auth-password').value;
-    const remember = document.getElementById('auth-remember').checked;
-    const errorEl = document.getElementById('auth-error');
-    const submitBtn = document.querySelector('#auth-form button[type="submit"]');
-
-    if (!username || !password) {
-        errorEl.textContent = t('invalidUsername');
-        return;
-    }
-
-    errorEl.textContent = getAuthMode() === 'signup' ? 'Creating account...' : 'Signing in...';
-    if (submitBtn) submitBtn.disabled = true;
-
-    try {
-        let result;
-        if (getAuthMode() === 'signup') {
-            result = await register(username, password);
-        } else {
-            result = await signIn(username, password);
-        }
-
-        if (result.success) {
-            errorEl.textContent = '';
-        } else {
-            errorEl.textContent = result.error || 'Authentication failed';
-        }
-    } catch (error) {
-        console.error('Auth handler error:', error);
-        errorEl.textContent = 'An error occurred. Please try again.';
-    } finally {
-        if (submitBtn) submitBtn.disabled = false;
-    }
-}
-
-function handleSignOut() {
-    signOut();
-    showAuth();
-}
-
-async function loadUserData(username) {
-    const data = await api.getUser(username);
-    if (data && data.username) {
-        userData = data;
-        updateXPDisplay(data.xp || 0);
-        updateRankDisplay(data.rank || getRankName(data.xp || 0));
-        updateMultiplierDisplay(data.multiplier);
-    }
-    refreshTasks(username);
-}
-
-function updateMultiplierDisplay(multiplier) {
-    const display = document.getElementById('multiplier-display');
-    const value = document.getElementById('multiplier-value');
-    if (!display || !value) return;
-    if (multiplier !== undefined && multiplier !== null) {
-        value.textContent = parseFloat(multiplier).toFixed(2) + 'x';
-        display.style.display = 'block';
-    } else {
-        display.style.display = 'none';
-    }
-}
-
-async function refreshTasks(username) {
-    const tasks = await api.getTasks(username);
-    const pending = [];
-    const completed = [];
-
-    tasks.forEach(task => {
-        if (task.completed) {
-            completed.push(task);
-        } else {
-            pending.push(task);
-        }
+// Pull fresh data when the user comes back to a tab that has been idle (friends, multiplier, streak).
+function refreshWhenVisible() {
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState !== 'visible' || !state.user) return;
+        if (Date.now() - lastRefresh < STALE_AFTER_MS) return;
+        lastRefresh = Date.now();
+        refreshCore().catch(warnNonCritical('refreshWhenVisible'));
     });
-
-    currentTasks = { pending, completed };
-    renderTasks(pending, completed);
 }
 
-async function completeTask(taskId) {
-    const username = getCurrentUser();
-    if (!username) return;
+async function init() {
+    initTheme();
+    hydrateIcons();
+    setLanguage(getCurrentLang());
+    initDialogs();
+    initPwa();
+    initNav();
+    initAuthView();
+    initDashboard();
+    initTaskDialog();
+    initTemplates();
+    initActivity();
+    initLeaderboard();
+    initSettings();
 
-    const result = await completeTaskOp(username, taskId);
-    if (result.success) {
-        updateXPDisplay(result.newXP);
-        refreshTasks(username);
-    }
-}
+    registerView('templates', showTemplates);
+    registerView('activity', showActivity);
+    registerView('leaderboard', showLeaderboard);
+    registerView('settings', renderSettings);
 
-async function deleteTask(taskId) {
-    const username = getCurrentUser();
-    if (!username) return;
+    on('auth:login', showApp);
+    on('auth:logout', showAuth);
+    on('sync:done', () => refreshCore().catch(warnNonCritical('sync:done')));
+    events.addEventListener('unauthorized', () => {
+        if (!state.user) return;
+        signOut();
+        toast(t('sessionExpired'), { type: 'error' });
+    });
+    onLanguageChange(() => { if (!state.user) document.title = t('appTitle'); });
+    refreshWhenVisible();
 
-    const confirmed = confirm('Delete this task? ' + (currentTasks.completed.some(t => t.id === taskId) ? 'This will remove its XP from your total.' : ''));
-    if (!confirmed) return;
-
-    const result = await deleteTaskOp(username, taskId);
-    if (result.success) {
-        updateXPDisplay(result.newXP);
-        refreshTasks(username);
-    }
-}
-
-async function handleAddFriend(e) {
-    e.preventDefault();
-    const username = getCurrentUser();
-    if (!username) return;
-
-    const friendUsername = document.getElementById('friend-username').value.trim();
-    if (!friendUsername) return;
-
-    const result = await addFriend(friendUsername);
-    if (result.success) {
-        closeModals();
-        loadAndRenderLeaderboard(username);
-    } else {
-        alert(result.error);
-    }
-}
-
-async function loadAndRenderLeaderboard(username) {
-    const entries = await loadLeaderboard(username);
-    renderLeaderboard(entries);
-}
-
-async function handleSaveGoals() {
-    const username = getCurrentUser();
-    if (!username) return;
-
-    const result = await saveGoals(username);
-    if (result) {
-        alert(t('goalsSaved'));
-    }
-}
-
-let currentAIRating = null;
-
-async function handleAITaskSubmit() {
-    const username = getCurrentUser();
-    if (!username) return;
-
-    const description = document.getElementById('ai-task-input').value.trim();
-    if (!description) return;
-
-    document.getElementById('ai-loading').style.display = 'flex';
-    document.getElementById('ai-task-section').style.display = 'none';
-
+    loadMeta();
     try {
-        const goals = userData?.goals || '';
-        const taskData = await rateTaskWithAI(description, goals);
-
-        currentAIRating = {
-            name: taskData.name || description.substring(0, 50),
-            duration: taskData.duration || 30,
-            productivity: taskData.productivity !== undefined ? taskData.productivity : 3,
-            difficulty: taskData.difficulty !== undefined ? taskData.difficulty : 3,
-            category: taskData.category || 'other'
-        };
-
-        document.getElementById('ai-loading').style.display = 'none';
-        showReviewSection();
+        const user = await restoreSession();
+        if (user) showApp();
+        else showAuth();
     } catch (error) {
-        console.error('AI task submission failed:', error);
-        let errorKey = 'aiFailed';
-        if (error.name === 'AbortError' || error.message?.includes('timed out')) {
-            errorKey = 'aiTimeout';
-        } else if (error.message && error.message.includes('not configured')) {
-            errorKey = 'aiNotConfigured';
-        }
-        alert(t(errorKey));
-        document.getElementById('ai-loading').style.display = 'none';
-        document.getElementById('ai-task-section').style.display = 'block';
+        // Token exists but the server cannot be reached: stay signed in and let the user retry.
+        showScreen('auth');
+        $('#auth-error').textContent = t('networkError');
     }
 }
-
-function showReviewSection() {
-    if (!currentAIRating) return;
-
-    const checkbox = document.getElementById('review-bonus-checkbox');
-    checkbox.checked = false;
-
-    document.getElementById('ai-review-section').style.display = 'block';
-    document.getElementById('ai-loading').style.display = 'none';
-    document.getElementById('ai-task-section').style.display = 'none';
-    document.getElementById('ai-edit-section').style.display = 'none';
-}
-
-function showEditSection() {
-    if (!currentAIRating) return;
-
-    const r = currentAIRating;
-    const bonus = document.getElementById('review-bonus-checkbox').checked ? 3 : 0;
-
-    document.getElementById('edit-task-name').value = r.name;
-    document.getElementById('edit-task-duration').value = r.duration;
-    document.getElementById('edit-task-productivity').value = r.productivity;
-    document.getElementById('edit-productivity-value').textContent = r.productivity;
-    document.getElementById('edit-task-difficulty').value = r.difficulty;
-    document.getElementById('edit-difficulty-value').textContent = r.difficulty;
-
-    currentAIRating.bonus = bonus;
-
-    function updateFinalXP() {
-        const prod = parseInt(document.getElementById('edit-task-productivity').value) || 0;
-        const diff = parseInt(document.getElementById('edit-task-difficulty').value) || 1;
-        const dur = parseInt(document.getElementById('edit-task-duration').value) || 30;
-        const b = document.getElementById('review-bonus-checkbox').checked ? 3 : 0;
-        const xp = prod === 0 ? 0 : Math.round((prod * diff) + (dur / 5) + b);
-        document.getElementById('edit-final-xp').textContent = xp + ' XP';
-    }
-
-    updateFinalXP();
-
-    const prodSlider = document.getElementById('edit-task-productivity');
-    const diffSlider = document.getElementById('edit-task-difficulty');
-    const durInput = document.getElementById('edit-task-duration');
-
-    prodSlider.oninput = () => {
-        document.getElementById('edit-productivity-value').textContent = prodSlider.value;
-        updateFinalXP();
-    };
-    diffSlider.oninput = () => {
-        document.getElementById('edit-difficulty-value').textContent = diffSlider.value;
-        updateFinalXP();
-    };
-    durInput.oninput = updateFinalXP;
-
-    document.getElementById('ai-review-section').style.display = 'none';
-    document.getElementById('ai-edit-section').style.display = 'block';
-}
-
-function handleReviewBack() {
-    document.getElementById('ai-review-section').style.display = 'none';
-    document.getElementById('ai-task-section').style.display = 'block';
-    document.getElementById('ai-loading').style.display = 'none';
-}
-
-function handleReviewNext() {
-    showEditSection();
-}
-
-function handleEditBack() {
-    document.getElementById('ai-edit-section').style.display = 'none';
-    document.getElementById('ai-review-section').style.display = 'block';
-}
-
-async function handleEditConfirm() {
-    showMultiplierSection();
-}
-
-function showMultiplierSection() {
-    if (!currentAIRating) return;
-
-    const name = document.getElementById('edit-task-name').value.trim() || 'Task';
-    const duration = parseInt(document.getElementById('edit-task-duration').value) || 30;
-    const productivity = parseInt(document.getElementById('edit-task-productivity').value) || 3;
-    const difficulty = parseInt(document.getElementById('edit-task-difficulty').value) || 3;
-    const bonus = document.getElementById('review-bonus-checkbox').checked ? 3 : 0;
-    const baseXP = productivity === 0 ? 0 : Math.round((productivity * difficulty) + (duration / 5) + bonus);
-    const multiplier = (userData && userData.multiplier) ? parseFloat(userData.multiplier) : 1.0;
-    const finalXP = Math.round(baseXP * multiplier);
-
-    const equation = document.getElementById('multiplier-equation');
-    if (equation) {
-        equation.textContent = baseXP + ' XP \u00d7 ' + multiplier.toFixed(2) + 'x = ' + finalXP + ' XP';
-    }
-
-    document.getElementById('ai-edit-section').style.display = 'none';
-    document.getElementById('ai-review-section').style.display = 'none';
-    document.getElementById('ai-multiplier-section').style.display = 'block';
-}
-
-async function handleMultiplierConfirm() {
-    const username = getCurrentUser();
-    if (!username || !currentAIRating) return;
-
-    const name = document.getElementById('edit-task-name').value.trim() || 'Task';
-    const duration = parseInt(document.getElementById('edit-task-duration').value) || 30;
-    const productivity = parseInt(document.getElementById('edit-task-productivity').value) || 3;
-    const difficulty = parseInt(document.getElementById('edit-task-difficulty').value) || 3;
-    const bonus = document.getElementById('review-bonus-checkbox').checked ? 3 : 0;
-
-    try {
-        const task = await addTask(
-            username,
-            name,
-            duration,
-            productivity,
-            difficulty,
-            bonus,
-            currentAIRating.category || 'other'
-        );
-
-        if (taskMode === 'completed') {
-            const result = await completeTaskOp(username, task.id);
-            if (result.success) {
-                updateXPDisplay(result.newXP);
-            }
-        }
-
-        currentAIRating = null;
-        closeModals();
-        document.getElementById('ai-task-input').value = '';
-        document.getElementById('ai-review-section').style.display = 'none';
-        document.getElementById('ai-edit-section').style.display = 'none';
-        document.getElementById('ai-multiplier-section').style.display = 'none';
-        refreshTasks(username);
-    } catch (error) {
-        console.error('Task creation failed:', error);
-        alert('Failed to create task');
-    }
-}
-
-function handleMultiplierBack() {
-    document.getElementById('ai-multiplier-section').style.display = 'none';
-    document.getElementById('ai-edit-section').style.display = 'block';
-}
-
-function handleMultiplierCancel() {
-    cancelTaskCreation();
-}
-
-function cancelTaskCreation() {
-    currentAIRating = null;
-    closeModals();
-    document.getElementById('ai-task-input').value = '';
-    document.getElementById('ai-task-section').style.display = 'block';
-    document.getElementById('ai-loading').style.display = 'none';
-    document.getElementById('ai-review-section').style.display = 'none';
-    document.getElementById('ai-edit-section').style.display = 'none';
-    document.getElementById('ai-multiplier-section').style.display = 'none';
-}
-
-export { init, getCurrentUser, completeTask, deleteTask };
-
-window.app = { init, getCurrentUser, completeTask, deleteTask };
 
 init();

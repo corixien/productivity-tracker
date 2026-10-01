@@ -275,7 +275,99 @@ function validateAiRate(req, res, next) {
     next();
 }
 
+function validateQuickTask(req, res, next) {
+    const partial = req.method === 'PUT';
+    const body = req.body;
+    const out = {};
+    const fail = (error) => res.status(400).json({ success: false, error, code: 'validation_error' });
+
+    if (!partial || body.name !== undefined) {
+        const v = validateTaskName(body.name);
+        if (!v.valid) return fail(v.error);
+        out.name = v.value;
+    }
+    if (!partial || body.duration !== undefined) {
+        const v = validateDuration(body.duration);
+        if (!v.valid) return fail(v.error);
+        out.duration = v.value;
+    }
+    if (!partial || body.productivity !== undefined) {
+        const v = validateProductivity(body.productivity === undefined ? 0 : body.productivity);
+        if (!v.valid) return fail(v.error);
+        out.productivity = v.value;
+    }
+    if (!partial || body.difficulty !== undefined) {
+        const v = validateDifficulty(body.difficulty === undefined ? 3 : body.difficulty);
+        if (!v.valid) return fail(v.error);
+        out.difficulty = v.value;
+    }
+    if (!partial || body.category !== undefined) {
+        const v = validateCategory(body.category === undefined ? 'other' : body.category);
+        if (!v.valid) return fail(v.error);
+        out.category = v.value;
+    }
+    if (!partial || body.bonus !== undefined) {
+        const bonus = body.bonus === undefined ? 0 : parseInt(body.bonus, 10);
+        if (isNaN(bonus) || bonus < 0) return fail('Bonus must be a non-negative number');
+        out.bonus = bonus;
+    }
+    if (!partial || body.recurrence !== undefined) {
+        const recurrence = body.recurrence === undefined ? 'none' : body.recurrence;
+        if (!['none', 'daily', 'weekly'].includes(recurrence)) return fail('Invalid recurrence');
+        out.recurrence = recurrence;
+    }
+    req.body = out;
+    next();
+}
+
+function validateChangePassword(req, res, next) {
+    const current = typeof req.body.currentPassword === 'string' ? req.body.currentPassword : '';
+    if (!current) {
+        return res.status(400).json({ success: false, error: 'Current password is required', code: 'validation_error' });
+    }
+    const v = validatePassword(req.body.newPassword);
+    if (!v.valid) {
+        return res.status(400).json({ success: false, error: v.error, code: 'validation_error' });
+    }
+    req.body.currentPassword = current;
+    req.body.newPassword = v.value;
+    next();
+}
+
+function validateChangeUsername(req, res, next) {
+    const v = validateUsername(req.body.newUsername);
+    if (!v.valid) {
+        return res.status(400).json({ success: false, error: v.error, code: 'validation_error' });
+    }
+    req.body.newUsername = v.value;
+    next();
+}
+
+function validateSettings(req, res, next) {
+    if (req.body.language !== undefined) {
+        const v = validateLanguage(req.body.language);
+        if (!v.valid) return res.status(400).json({ success: false, error: v.error, code: 'validation_error' });
+    }
+    const goalsInput = req.body.fiveYearGoal ?? req.body.goals;
+    if (goalsInput !== undefined) {
+        req.body.goals = sanitizeString(String(goalsInput), 5000);
+        delete req.body.fiveYearGoal;
+    }
+    if (req.body.dailyGoalXp !== undefined) {
+        const goal = parseInt(req.body.dailyGoalXp, 10);
+        if (isNaN(goal) || goal < 10 || goal > 5000) {
+            return res.status(400).json({ success: false, error: 'Daily goal must be between 10 and 5000 XP', code: 'validation_error' });
+        }
+        req.body.dailyGoalXp = goal;
+    }
+    next();
+}
+
 module.exports = {
+    validateQuickTask,
+    validateChangePassword,
+    validateChangeUsername,
+    validateSettings,
     validateRegister,
     validateLogin,
     validateTaskCreate,

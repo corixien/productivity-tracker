@@ -5,5 +5,6 @@ const { authenticate } = require('../middleware/auth');
 
 router.use(authenticate);
 router.get('/', xpController.getXp);
+router.get('/stats', xpController.getStats);
 
 module.exports = router;

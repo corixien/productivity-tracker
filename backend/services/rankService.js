@@ -45,13 +45,6 @@ function calculateXpFromTask(duration, productivity, difficulty, bonus = 0) {
     return Math.round((productivity * difficulty) + (duration / 5) + bonus);
 }
 
-async function recalculateUserRank(userId, userModel) {
-    const totalXp = await userModel.getTotalXp ? await userModel.getTotalXp(userId) : 0;
-    const rank = getRankName(totalXp);
-    const level = getLevel(totalXp);
-    return { totalXp, rank, level };
-}
-
 const RANK_MULTIPLIERS = {
     Newcomer: 1.0,
     Bronze: 0.95,
@@ -66,6 +59,22 @@ function getRankMultiplier(rank) {
     return RANK_MULTIPLIERS[rank] || 1.0;
 }
 
+// Position multiplier (catch-up mechanic): the member with the least XP in the friend group gets 1.5,
+// the leader gets 0.7.
+// lowerCount = group members with less XP than the user, total = group size including the user.
+function computePositionMultiplier(lowerCount, total) {
+    if (total <= 1) return 1.0;
+    return 1.5 - (lowerCount / (total - 1)) * 0.8;
+}
+
+function getMeta() {
+    return {
+        ranks: RANK_THRESHOLDS.map((rank) => ({ ...rank, multiplier: RANK_MULTIPLIERS[rank.name] })),
+        xpPerLevel: 100,
+        xpFormula: { durationDivisor: 5 }
+    };
+}
+
 module.exports = {
     RANK_THRESHOLDS,
     RANK_MULTIPLIERS,
@@ -75,6 +84,7 @@ module.exports = {
     getLevel,
     getXpForNextRank,
     calculateXpFromTask,
-    recalculateUserRank,
+    computePositionMultiplier,
+    getMeta,
     getRankMultiplier
 };

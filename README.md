@@ -1,146 +1,113 @@
 # Productivity Tracker
 
-A web app for competing in friend groups on productivity. Users sign in with a username, complete tasks to earn XP, level up through ranks, and compare on a leaderboard. The backend uses Express, PostgreSQL (Neon), bcrypt, and JWT.
+A web app for competing with friends on productivity. Log tasks (describe them and an AI rates them, or enter them manually), complete them to earn XP, keep a daily streak, climb ranks and compare on an all-time or weekly leaderboard. English and German, dark and light theme, installable as a PWA.
+
+Backend: Express, PostgreSQL (Neon), bcrypt, JWT, Winston, Helmet. Frontend: vanilla JS modules and CSS, no build step.
 
 ## Setup
 
-1. Create a Neon project and a PostgreSQL database (use the Neon console or DB Pro tool)
-2. Copy your Neon database connection string
-3. Set the environment variables in `.env`
-4. Run the database migration: `npm run migrate`
-5. Start the app: `npm start` or `npm run dev`
+1. Create a Neon project (or any PostgreSQL database) and copy its connection string.
+2. `cp .env.example .env` and fill in `DATABASE_URL` and a fresh `JWT_SECRET` (`openssl rand -hex 32`).
+3. `npm install`
+4. `npm run migrate`
+5. `npm run dev` (or `npm start`, which migrates first)
 
-## Environment Variables
+## Environment variables
 
-See `.env.example` for required variables:
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | PostgreSQL connection string (required) |
+| `JWT_SECRET` | JWT signing secret (required) |
+| `DATABASE_SSL_REJECT_UNAUTHORIZED` | `false` for Neon in production / on Render |
+| `JWT_EXPIRES_IN` | token lifetime, default `7d` |
+| `GROQ_API_KEY`, `GROQ_MODEL`, `GROQ_BASE_URL` | optional AI task rating (without a key the app falls back to manual entry) |
+| `LOG_LEVEL`, `LOG_DIR`, `LOG_RETENTION_DAYS` | logging; DB logs older than 30 days (default) are purged |
+| `CLIENT_ORIGIN`, `DATABASE_POOL_MAX`, `PORT`, `NODE_ENV` | optional |
 
-- `DATABASE_URL` - Neon PostgreSQL connection string
-- `DATABASE_SSL_REJECT_UNAUTHORIZED` - set to `false` for Neon/self-signed certs (important for production/Render)
-- `JWT_SECRET` - secure random JWT signing secret
-- `JWT_EXPIRES_IN` - token expiry (default: `7d`)
-- `GROQ_API_KEY` - optional AI rating API key
-- `GROQ_MODEL` - AI model (default: `groq/compound`)
-- `PORT` - server port (default: `3000`)
-- `NODE_ENV` - environment (`development` or `production`)
+## Scripts
+
+| Command | What it does |
+|---|---|
+| `npm run dev` | server with `--watch` (does not migrate) |
+| `npm start` | migrate, then start (what Render runs) |
+| `npm run migrate` | apply new `database/migrations/*.sql` (idempotent) |
+| `npm run check` | syntax-check all first-party JS (backend, frontend, service worker, tests) |
+| `npm test` | unit and static frontend tests; integration tests run when `TEST_DATABASE_URL` is set |
+
+Integration tests need a throwaway local database, for example:
+
+```
+podman run -d --name pt-test -e POSTGRES_PASSWORD=test -e POSTGRES_DB=pt -p 54329:5432 docker.io/library/postgres:16-alpine
+export TEST_DATABASE_URL=postgresql://postgres:test@localhost:54329/pt
+DATABASE_URL=$TEST_DATABASE_URL JWT_SECRET=x npm run migrate
+npm run test:integration
+```
+
+CI (`.github/workflows/ci.yml`) runs check, migrate and the full test suite against a Postgres service.
 
 ## Deploying to Render
 
-1. Push this repo to GitHub and connect it to Render as a **Web Service** (free tier).
-2. Render auto-detects `render.yaml`. Confirm the build command is `npm install` and start command is `npm start`.
-3. In Render's service settings, add these **Environment Variables**:
-   - `DATABASE_URL` — your Neon connection string (copy from Neon dashboard).
-   - `DATABASE_SSL_REJECT_UNAUTHORIZED` — `false`.
-   - `JWT_SECRET` — the same secure string you used locally.
-   - `NODE_ENV` — `production`.
-4. **Do not** commit real secrets to the repo — `.env` is gitignored. Use Render's dashboard for secrets.
-5. Hit **Manual Deploy** after changing env vars.
+1. Connect the repo as a **Web Service** (free tier). `render.yaml` sets build `npm install`, start `npm start`, health check `/api/health`.
+2. Set `DATABASE_URL`, `DATABASE_SSL_REJECT_UNAUTHORIZED=false`, `JWT_SECRET` and `NODE_ENV=production` in the Render dashboard. Never commit secrets.
 
-## Database
-
-PostgreSQL through Neon. The schema is created with `database/migrate.js`. Tables:
-
-- `users` - user accounts with bcrypt password hashes
-- `profiles` - extended profile data (5-year goals, preferences)
-- `tasks` - task records with XP, productivity, difficulty
-- `xp_history` - immutable XP audit trail
-- `friends` - many-to-many friend relationships
-- `goals` - long-term goals
-- `groq_logs` - AI request/response logging
-- `system_logs` - application logs
-
-Manage the database with your DB Pro tool, the Neon SQL editor, or any PostgreSQL client.
-
-## API Routes
-
-- `POST /api/auth/register` - Register new user
-- `POST /api/auth/login` - Login user (returns JWT)
-- `GET /api/auth/me` - Current user profile
-- `GET /api/users/:username` - Get user by username
-- `PUT /api/users/:username` - Update user fields
-- `POST /api/users/:username/password` - Change password
-- `POST /api/users/:username/avatar` - Upload avatar
-- `POST /api/users/:username/change-username` - Change username
-- `GET/POST/DELETE /api/users/friends` - Friend management
-- `GET /api/users/leaderboard` - Leaderboard
-- `GET/POST/PUT/DELETE /api/tasks` - Task CRUD
-- `POST /api/tasks/:id/complete` - Complete task (awards XP)
-- `GET/POST/PUT/DELETE /api/goals` - Goal CRUD
-- `GET/POST /api/xp` - XP data
-- `GET /api/leaderboard` - Leaderboard
-- `GET/PUT /api/settings` - Settings
-- `POST /api/groq/rate` - AI task scoring
-- `GET /api/groq/status` - AI service status
-- Legacy `POST /api/ai/rate` and `GET /api/ai/status` are also supported
+The free tier spins down when idle, which also keeps Neon compute usage low. The first request afterwards can take up to a minute; the client retries automatically and shows a "server is waking up" banner.
 
 ## Features
 
-- Username + password sign in with "Remember me" JWT persistence
-- Add tasks using natural language and AI rating
-- XP calculated server-side via immutable `xp_history`
-- Rank progression: Newcomer -> Bronze -> Silver -> Gold -> Platinum -> Diamond -> Master
-- Leaderboard with friends (add by username)
-- Language toggle: English / Deutsch
-- Profile picture upload stored locally in `avatars/`
-- Goal management
-- Mobile-first responsive design with sidebar swipe gestures
+- **Tasks and XP**: XP is computed on the server (`productivity x difficulty + duration/5 + bonus`) and recorded in the immutable `xp_history` table. Tasks can be completed, un-completed, edited (XP is re-priced) and deleted.
+- **Ranks**: Newcomer, Bronze, Silver, Gold, Platinum, Diamond, Master, with badge artwork.
+- **Multiplier**: a catch-up mechanic among friends: the friend with the least XP earns up to 1.5x, the leader 0.7x, further reduced by rank.
+- **Streaks and daily goal**: consecutive days with a completed task, plus a configurable daily XP goal shown as a progress ring.
+- **Leaderboard**: you and your friends, all-time or this week, with a podium for the top three.
+- **Templates and recurring tasks**: save tasks as templates, add them with one click, or let daily/weekly templates add themselves.
+- **Activity**: full XP history with day grouping and pagination.
+- **PWA**: installable, app shell works offline, completing a task offline is queued and synced when you are back.
+- **Security**: strict CSP (Helmet), per-route rate limits, tokens revoked on password change, current password required to change it, avatars resized client-side and capped server-side.
+- **Accessibility**: semantic landmarks, native `<dialog>` focus handling, keyboard support, `prefers-reduced-motion`, audited with axe in both themes.
 
-## File Structure
+## API
+
+All routes except register, login, `/api/meta`, `/api/health` and `/api/ai/status` need `Authorization: Bearer <token>`. The client sends `X-Timezone` so streaks and "today" follow the user's local day. Errors look like `{ "success": false, "error": "...", "code": "..." }`.
+
+| Route | Purpose |
+|---|---|
+| `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me` | auth |
+| `GET /api/users/:username` | own profile, or public fields of someone else |
+| `PUT /api/users/:username` | update language and goals |
+| `POST /api/users/:username/password` | change password (needs `currentPassword`, returns a new token) |
+| `POST /api/users/:username/avatar`, `POST /api/users/:username/change-username` | avatar (max 512 KB), username |
+| `GET/POST/DELETE /api/users/friends` | friends |
+| `GET /api/users/quick-tasks`, `POST`, `PUT /:id`, `DELETE /:id`, `POST /:id/use`, `POST /spawn-recurring` | templates and recurring tasks |
+| `GET/POST /api/tasks`, `PUT/DELETE /api/tasks/:id`, `POST /api/tasks/:id/complete` | tasks (`PUT` edits fields and/or toggles `completed`) |
+| `GET /api/xp`, `GET /api/xp/stats` | XP history (paginated), streak / today / week / daily goal |
+| `GET /api/leaderboard?period=all\|week` | leaderboard |
+| `GET/PUT /api/settings` | language, goals, daily XP goal |
+| `GET/POST/PUT/DELETE /api/goals` | long-term goals |
+| `POST /api/groq/rate`, `GET /api/groq/status` | AI task rating (legacy `/api/ai/*` kept) |
+| `GET /api/meta` | rank thresholds and multipliers |
+| `GET /api/health` | health check |
+
+## Project structure
 
 ```
-productivity-tracker/
-├── index.html              # Main SPA
-├── css/
-│   └── styles.css          # Styling
-├── js/
-│   ├── app.js              # Main app controller
-│   ├── auth.js             # Auth state and session management
-│   ├── api.js              # Frontend API client
-│   ├── tasks.js            # Task operations and rendering
-│   ├── leaderboard.js      # Leaderboard logic
-│   ├── settings.js         # Settings panel
-│   ├── ui.js               # UI utilities
-│   ├── ai-service.js       # AI task rating client
-│   └── i18n.js             # Internationalization
-├── backend/
-│   ├── index.js            # Express entry point
-│   ├── config.js           # Environment config
-│   ├── routes/             # Route definitions
-│   ├── controllers/        # Request handling
-│   ├── models/             # Data access layer
-│   ├── services/           # Business logic and logging
-│   └── middleware/         # Auth, validation, errors
-├── database/
-│   ├── migrations/       # SQL migrations
-│   ├── migrate.js        # Schema migration runner
-│   └── migrate-data.js   # SQLite to PostgreSQL data migration
-├── avatars/                # Locally stored avatar images (gitignored)
-├── Badges/                 # Rank badge images
-├── .env.example            # Example environment variables
-└── README.md
+index.html, sw.js, offline.html, manifest.json
+css/        tokens (themes), base, components, layout, views
+js/         app.js, core/ (api, auth, state, i18n, dom, ui, ranks, theme, pwa, data), features/ (one module per view)
+backend/    index.js, routes/, controllers/, models/, services/, middleware/, utils/
+database/   migrate.js, migrations/, migrate-data.js (one-time SQLite import)
+scripts/    check.js
+test/       unit, frontend static checks, integration
+Badges/     rank badge images
 ```
 
-## Keeping the Service Awake
+`AGENTS.md` has the detailed architecture, invariants and conventions.
 
-Render's free tier spins the service down after ~15 minutes of inactivity. The first request after a spin-down can return **502/503** for 30–60 seconds while the instance wakes up. The client automatically retries API requests with backoff, but the page itself may briefly show a 503 until the instance is warm.
+## Known limitations
 
-To keep the instance warm, ping the health endpoint every few minutes with a free monitor like UptimeRobot:
-
-1. Sign up at https://uptimerobot.com
-2. Add a new monitor, **HTTP(s)**, URL `https://productivity-tracker-uguq.onrender.com/api/health`, interval **5 minutes**.
-3. Confirm the monitor shows **Up**.
-
-If you still see intermittent 502/503 after the monitor is Up, it is most often:
-- **Render/Neon maintenance** — free-tier databases and services can restart without notice; wait 1–2 minutes and refresh.
-- **Cold start** — hard refresh (`Ctrl + Shift + R`) to load the warm instance.
-- **A misconfigured monitor** — double-check that the monitor's last response was `200` and not a timeout/error.
-
-## Known Limitations
-
-- Avatars are stored locally in `avatars/`; use a CDN or object storage for production.
-- Changing a password invalidates existing sessions only if the user logs in again with the new password; existing JWT tokens remain valid until expiry.
-- SQLite data migration script (`database/migrate-data.js`) requires the old SQLite database.
-- The app does not include an admin panel; database administration is done externally through Neon.
-- **Render free tier**: the service may spin down after inactivity. The first request can fail; the client automatically retries with backoff. To keep it warm, ping `https://productivity-tracker-uguq.onrender.com/api/health` every few minutes with a service like UptimeRobot.
+- Rate limits and the multiplier audit are per process (in memory); fine for a single instance.
+- Avatars live in the database as small JPEG data URLs; use object storage if the user base grows large.
+- Only completing an existing task is queued offline; creating or editing tasks needs a connection.
+- No push notifications (they would need a push service and VAPID keys); feedback is in-app.
 
 ## Credits
 

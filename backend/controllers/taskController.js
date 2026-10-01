@@ -1,101 +1,65 @@
 const Task = require('../models/Task');
-const { recalculateMultiplier } = require('../models/User');
-const { logError } = require('../services/loggingService');
+const { asyncHandler, notFound } = require('../utils/errors');
 
-function formatTask(task) {
-    return task;
-}
+const EDIT_FIELDS = ['name', 'duration', 'productivity', 'difficulty', 'category', 'bonus'];
 
-async function getTasks(req, res) {
-    try {
-        const { completed, limit, offset } = req.query;
-        const options = {};
-        if (completed !== undefined) options.completed = completed === 'true';
-        if (limit) options.limit = parseInt(limit, 10);
-        if (offset) options.offset = parseInt(offset, 10);
-        const tasks = await Task.findByUserId(req.user.id, options);
-        return res.json(tasks.map(formatTask));
-    } catch (error) {
-        await logError(error, { context: 'getTasks', userId: req.user.id });
-        return res.status(500).json({ success: false, error: 'Failed to get tasks' });
+const getTasks = asyncHandler(async (req, res) => {
+    const { completed, limit, offset } = req.query;
+    const options = {};
+    if (completed !== undefined) options.completed = completed === 'true';
+    if (limit) options.limit = Math.min(500, Math.max(1, parseInt(limit, 10) || 100));
+    if (offset) options.offset = Math.max(0, parseInt(offset, 10) || 0);
+    res.json(await Task.findByUserId(req.user.id, options));
+});
+
+const createTask = asyncHandler(async (req, res) => {
+    res.status(201).json(await Task.create(req.user.id, req.body));
+});
+
+// PUT /:id edits fields (XP recalculated server-side) and/or toggles `completed`.
+const updateTask = asyncHandler(async (req, res) => {
+    const userId = req.user.id;
+    const id = req.params.id;
+    const hasEdits = EDIT_FIELDS.some((field) => req.body[field] !== undefined);
+    let task = null;
+    let xpChange = 0;
+    let newXP = null;
+
+    if (hasEdits) {
+        const edited = await Task.update(userId, id, req.body);
+        if (!edited) throw notFound('Task not found');
+        task = edited.task;
+        xpChange = edited.xpChange;
+        newXP = edited.totalXp;
     }
-}
 
-async function createTask(req, res) {
-    try {
-        const task = await Task.create(req.user.id, req.body);
-        return res.status(201).json(formatTask(task));
-    } catch (error) {
-        await logError(error, { context: 'createTask', userId: req.user.id });
-        return res.status(500).json({ success: false, error: 'Failed to create task' });
+    if (req.body.completed !== undefined) {
+        const result = await Task.setCompleted(userId, id, Boolean(req.body.completed));
+        if (!result) throw notFound('Task not found');
+        task = result.task;
+        xpChange += result.xpEarned;
+        newXP = result.totalXp;
     }
-}
 
-async function updateTask(req, res) {
-    try {
-        const current = await Task.findById(req.params.id);
-        if (!current) {
-            return res.status(404).json({ success: false, error: 'Task not found' });
-        }
-        if (current.userId !== req.user.id) {
-            return res.status(403).json({ success: false, error: 'Not authorized' });
-        }
-        if (req.body.completed !== undefined) {
-            const result = await Task.setCompleted(req.user.id, req.params.id, Boolean(req.body.completed));
-            if (!result) {
-                return res.status(404).json({ success: false, error: 'Task not found' });
-            }
-            await recalculateMultiplier(req.user.id).catch(() => {});
-            return res.json({
-                ...formatTask(result.task),
-                success: true,
-                xpEarned: result.xpEarned,
-                newXP: result.totalXp
-            });
-        }
-        const task = await Task.update(req.params.id, req.body);
-        return res.json(formatTask(task));
-    } catch (error) {
-        await logError(error, { context: 'updateTask', taskId: req.params.id });
-        return res.status(500).json({ success: false, error: 'Failed to update task' });
+    if (!task) {
+        task = await Task.findById(id);
+        if (!task || task.userId !== userId) throw notFound('Task not found');
     }
-}
+    if (newXP === null) newXP = await Task.getTotalXp(userId);
 
-async function completeTask(req, res) {
-    try {
-        const result = await Task.complete(req.user.id, req.params.id);
-        if (!result) {
-            return res.status(404).json({ success: false, error: 'Task not found' });
-        }
-        return res.json({
-            success: true,
-            task: formatTask(result.task),
-            xpEarned: result.xpEarned,
-            newXP: result.totalXp
-        });
-    } catch (error) {
-        await logError(error, { context: 'completeTask', taskId: req.params.id });
-        return res.status(500).json({ success: false, error: 'Failed to complete task' });
-    }
-}
+    res.json({ ...task, success: true, xpEarned: xpChange, xpChange, newXP });
+});
 
-async function deleteTask(req, res) {
-    try {
-        const result = await Task.delete(req.user.id, req.params.id);
-        if (!result) {
-            return res.status(404).json({ success: false, error: 'Task not found' });
-        }
-        return res.json({ success: true, newXP: result.totalXp, xpChange: result.xpChange });
-    } catch (error) {
-        await logError(error, { context: 'deleteTask', taskId: req.params.id });
-        return res.status(500).json({ success: false, error: 'Failed to delete task' });
-    }
-}
+const completeTask = asyncHandler(async (req, res) => {
+    const result = await Task.complete(req.user.id, req.params.id);
+    if (!result) throw notFound('Task not found');
+    res.json({ success: true, task: result.task, xpEarned: result.xpEarned, newXP: result.totalXp });
+});
 
-module.exports = {
-    getTasks,
-    createTask,
-    updateTask,
-    completeTask,
-    deleteTask
-};
+const deleteTask = asyncHandler(async (req, res) => {
+    const result = await Task.delete(req.user.id, req.params.id);
+    if (!result) throw notFound('Task not found');
+    res.json({ success: true, newXP: result.totalXp, xpChange: result.xpChange });
+});
+
+module.exports = { getTasks, createTask, updateTask, completeTask, deleteTask };

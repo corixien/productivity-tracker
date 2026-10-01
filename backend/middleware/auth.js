@@ -1,46 +1,27 @@
-const { verifyToken, extractTokenFromHeader } = require('../utils/jwt');
+const { verifyToken, extractTokenFromHeader, tokenMatchesVersion } = require('../utils/jwt');
+const { asyncHandler, unauthorized } = require('../utils/errors');
 const User = require('../models/User');
 
-async function authenticate(req, res, next) {
-    try {
-        const token = extractTokenFromHeader(req.headers.authorization);
-        if (!token) {
-            return res.status(401).json({ success: false, error: 'Authentication required' });
-        }
+async function resolveUser(req) {
+    const token = extractTokenFromHeader(req.headers.authorization);
+    if (!token) return { error: unauthorized('Authentication required', 'auth_required') };
 
-        const decoded = verifyToken(token);
-        if (!decoded) {
-            return res.status(401).json({ success: false, error: 'Invalid or expired token' });
-        }
+    const decoded = verifyToken(token);
+    if (!decoded) return { error: unauthorized('Invalid or expired token', 'invalid_token') };
 
-        const user = await User.findById(decoded.userId);
-        if (!user) {
-            return res.status(401).json({ success: false, error: 'User not found' });
-        }
-
-        req.user = { id: user.id, username: user.username };
-        next();
-    } catch (error) {
-        return res.status(500).json({ success: false, error: 'Authentication error' });
+    const user = await User.findAuthById(decoded.userId);
+    if (!user) return { error: unauthorized('User not found', 'user_not_found') };
+    if (!tokenMatchesVersion(decoded, user.token_version)) {
+        return { error: unauthorized('Session expired. Please sign in again.', 'session_revoked') };
     }
+    return { user: { id: user.id, username: user.username } };
 }
 
-async function optionalAuth(req, res, next) {
-    try {
-        const token = extractTokenFromHeader(req.headers.authorization);
-        if (!token) return next();
-
-        const decoded = verifyToken(token);
-        if (!decoded) return next();
-
-        const user = await User.findById(decoded.userId);
-        if (user) {
-            req.user = { id: user.id, username: user.username };
-        }
-    } catch (error) {
-        // Non-critical: allow public access with an unrecognized token
-    }
+const authenticate = asyncHandler(async (req, res, next) => {
+    const { user, error } = await resolveUser(req);
+    if (error) throw error;
+    req.user = user;
     next();
-}
+});
 
-module.exports = { authenticate, optionalAuth };
+module.exports = { authenticate };

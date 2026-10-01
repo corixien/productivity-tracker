@@ -1,175 +1,132 @@
 const User = require('../models/User');
 const { generateToken } = require('../utils/jwt');
-const {
-    logAuthAttempt,
-    logError,
-    logSystemEvent
-} = require('../services/loggingService');
+const { verifyPassword } = require('../utils/password');
+const { logAuthAttempt, logSystemEvent } = require('../services/loggingService');
 const { uploadAvatar } = require('../services/avatarService');
 const { resetAuthRateLimiter } = require('../middleware/rateLimiter');
+const { asyncHandler, AppError, badRequest, notFound, conflict, forbidden, warnOnError } = require('../utils/errors');
+
+const PRIVATE_FIELDS = ['password_hash', 'token_version'];
 
 function safeUser(user) {
     if (!user) return null;
-    const { password_hash, ...safe } = user;
-    return safe;
+    const safe = { ...user };
+    PRIVATE_FIELDS.forEach((field) => delete safe[field]);
+    return { ...safe, dailyGoalXp: user.daily_goal_xp };
 }
 
-async function register(req, res) {
-    try {
-        const { username, password } = req.body;
-        const existing = await User.findByUsername(username);
-        if (existing) {
-            await logAuthAttempt(username, false, req.ip);
-            return res.status(409).json({ success: false, error: 'Username already taken' });
-        }
+// What other users may see about someone.
+function publicUser(user) {
+    return {
+        username: user.username,
+        avatar: user.avatar || null,
+        xp: user.xp || 0,
+        level: user.level || 0,
+        rank: user.rank
+    };
+}
 
-        const user = await User.create(username, password);
-        const token = generateToken({ userId: user.id, username: user.username });
-        await logAuthAttempt(username, true, req.ip);
-        resetAuthRateLimiter(req.ip);
+function issueToken(user) {
+    return generateToken({ userId: user.id, username: user.username, tv: user.token_version });
+}
 
-        return res.status(201).json({
-            success: true,
-            username: user.username,
-            language: user.language,
-            avatar: user.avatar,
-            token
-        });
-    } catch (error) {
-        logError(error, { context: 'register', username: req.body.username });
-        return res.status(500).json({ success: false, error: 'Registration failed' });
+const register = asyncHandler(async (req, res) => {
+    const { username, password } = req.body;
+    if (await User.findByUsername(username)) {
+        logAuthAttempt(username, false, req.ip).catch(warnOnError('register.log'));
+        throw conflict('Username already taken', 'username_taken');
     }
-}
 
-async function login(req, res) {
-    try {
-        const { username, password } = req.body;
-        const user = await User.verifyCredentials(username, password);
-        if (!user) {
-            logAuthAttempt(username, false, req.ip);
-            return res.status(401).json({ success: false, error: 'Invalid username or password' });
-        }
+    const user = await User.create(username, password);
+    logAuthAttempt(username, true, req.ip).catch(warnOnError('register.log'));
+    resetAuthRateLimiter(req.ip);
 
-        const token = generateToken({ userId: user.id, username: user.username });
-        await logAuthAttempt(username, true, req.ip);
-        resetAuthRateLimiter(req.ip);
+    res.status(201).json({
+        success: true,
+        username: user.username,
+        language: user.language,
+        avatar: user.avatar,
+        token: issueToken(user)
+    });
+});
 
-        return res.json({
-            success: true,
-            username: user.username,
-            language: user.language,
-            avatar: user.avatar,
-            token
-        });
-    } catch (error) {
-        await logError(error, { context: 'login', username: req.body.username });
-        return res.status(500).json({ success: false, error: 'Login failed' });
+const login = asyncHandler(async (req, res) => {
+    const { username, password } = req.body;
+    const user = await User.verifyCredentials(username, password);
+    if (!user) {
+        logAuthAttempt(username, false, req.ip).catch(warnOnError('login.log'));
+        throw new AppError(401, 'Invalid username or password', 'invalid_credentials');
     }
-}
 
-async function getMe(req, res) {
-    try {
-        await User.recalculateMultiplier(req.user.id);
-        const user = await User.findById(req.user.id);
-        if (!user) {
-            return res.status(404).json({ success: false, error: 'User not found' });
-        }
-        return res.json(safeUser(user));
-    } catch (error) {
-        logError(error, { context: 'getMe', userId: req.user && req.user.id });
-        return res.status(500).json({ success: false, error: 'Failed to get user' });
+    logAuthAttempt(username, true, req.ip).catch(warnOnError('login.log'));
+    resetAuthRateLimiter(req.ip);
+
+    res.json({
+        success: true,
+        username: user.username,
+        language: user.language,
+        avatar: user.avatar,
+        token: issueToken(user)
+    });
+});
+
+const getMe = asyncHandler(async (req, res) => {
+    await User.recalculateMultiplier(req.user.id, true).catch(warnOnError('getMe.recalculate'));
+    const user = await User.findById(req.user.id);
+    if (!user) throw notFound('User not found');
+    res.json(safeUser(user));
+});
+
+const getUser = asyncHandler(async (req, res) => {
+    const user = await User.findByUsername(req.params.username);
+    if (!user) throw notFound('User not found');
+    if (user.id !== req.user.id) return res.json(publicUser(user));
+    await User.recalculateMultiplier(user.id).catch(warnOnError('getUser.recalculate'));
+    res.json(safeUser(await User.findById(user.id)));
+});
+
+const updateUser = asyncHandler(async (req, res) => {
+    const target = await User.findByUsername(req.params.username);
+    if (!target) throw notFound('User not found');
+    if (target.id !== req.user.id) throw forbidden('Not authorized to update this user');
+
+    const { language, goals } = req.body;
+    const updated = await User.update(target.id, { language, goals });
+    res.json(safeUser(updated));
+});
+
+const changePassword = asyncHandler(async (req, res) => {
+    const { currentPassword, newPassword } = req.body;
+    const user = await User.findById(req.user.id);
+    if (!user) throw notFound('User not found');
+    if (!await verifyPassword(currentPassword, user.password_hash)) {
+        throw new AppError(403, 'Current password is incorrect', 'wrong_password');
     }
-}
 
-async function getUser(req, res) {
-    try {
-        const user = await User.findByUsername(req.params.username);
-        if (!user) {
-            return res.status(404).json({ success: false, error: 'User not found' });
-        }
-        await User.recalculateMultiplier(user.id).catch(() => {});
-        return res.json(safeUser(user));
-    } catch (error) {
-        await logError(error, { context: 'getUser', username: req.params.username });
-        return res.status(500).json({ success: false, error: 'Failed to get user' });
-    }
-}
+    const updated = await User.updatePassword(req.user.id, newPassword);
+    await logSystemEvent('info', 'Password changed', { event: 'password_changed', user_id: req.user.id });
+    // token_version moved on: this response carries the only valid token for this session.
+    res.json({ success: true, token: issueToken(updated) });
+});
 
-async function updateUser(req, res) {
-    try {
-        const target = await User.findByUsername(req.params.username);
-        if (!target) {
-            return res.status(404).json({ success: false, error: 'User not found' });
-        }
-        if (target.id !== req.user.id) {
-            return res.status(403).json({ success: false, error: 'Not authorized to update this user' });
-        }
+const uploadUserAvatar = asyncHandler(async (req, res) => {
+    const avatarUrl = await uploadAvatar(req.user.id, req.body.avatar);
+    res.json({ success: true, avatar: avatarUrl, avatarUrl });
+});
 
-        const { newPassword, goals, ...updates } = req.body;
-        if (newPassword !== undefined) {
-            await User.updatePassword(target.id, newPassword);
-        }
-        if (goals !== undefined) {
-            await User.updateGoals(target.id, String(goals));
-        }
+const changeUsername = asyncHandler(async (req, res) => {
+    const { newUsername } = req.body;
+    const existing = await User.findByUsername(newUsername);
+    if (existing && existing.id !== req.user.id) throw conflict('Username already taken', 'username_taken');
 
-        const updatedUser = await User.update(target.id, updates);
-        return res.json(safeUser(updatedUser));
-    } catch (error) {
-        await logError(error, { context: 'updateUser', username: req.params.username });
-        return res.status(500).json({ success: false, error: 'Failed to update user' });
-    }
-}
-
-async function changePassword(req, res) {
-    try {
-        const updated = await User.updatePassword(req.user.id, req.body.newPassword);
-        if (!updated) {
-            return res.status(404).json({ success: false, error: 'User not found' });
-        }
-        await logSystemEvent('info', 'Password changed', {
-            event: 'password_changed',
-            user_id: req.user.id
-        });
-        return res.json({ success: true });
-    } catch (error) {
-        await logError(error, { context: 'changePassword', userId: req.user.id });
-        return res.status(500).json({ success: false, error: 'Failed to change password' });
-    }
-}
-
-async function uploadUserAvatar(req, res) {
-    try {
-        const avatarUrl = await uploadAvatar(req.user.id, req.body.avatar);
-        return res.json({ success: true, avatar: avatarUrl, avatarUrl });
-    } catch (error) {
-        await logError(error, { context: 'uploadAvatar', userId: req.user.id });
-        const status = error.statusCode || 500;
-        return res.status(status).json({ success: false, error: error.message || 'Failed to upload avatar' });
-    }
-}
-
-async function changeUsername(req, res) {
-    try {
-        const { newUsername } = req.body;
-        const existing = await User.findByUsername(newUsername);
-        if (existing && existing.id !== req.user.id) {
-            return res.status(409).json({ success: false, error: 'Username already taken' });
-        }
-
-        const user = await User.changeUsername(req.user.id, newUsername);
-        const token = generateToken({ userId: user.id, username: user.username });
-        await logSystemEvent('info', 'Username changed', {
-            event: 'username_changed',
-            user_id: user.id,
-            username: user.username
-        });
-        return res.json({ success: true, newUsername: user.username, username: user.username, token });
-    } catch (error) {
-        await logError(error, { context: 'changeUsername', userId: req.user.id });
-        return res.status(500).json({ success: false, error: 'Failed to change username' });
-    }
-}
+    const user = await User.changeUsername(req.user.id, newUsername);
+    await logSystemEvent('info', 'Username changed', {
+        event: 'username_changed',
+        user_id: user.id,
+        username: user.username
+    });
+    res.json({ success: true, newUsername: user.username, username: user.username, token: issueToken(user) });
+});
 
 module.exports = {
     register,

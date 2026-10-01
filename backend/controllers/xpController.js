@@ -1,20 +1,21 @@
 const Task = require('../models/Task');
-const { logError } = require('../services/loggingService');
+const { asyncHandler } = require('../utils/errors');
 
-async function getXp(req, res) {
-    try {
-        return res.json({
-            userId: req.user.id,
-            total: await Task.getTotalXp(req.user.id),
-            history: await Task.getXpHistory(req.user.id, {
-                limit: req.query.limit,
-                offset: req.query.offset
-            })
-        });
-    } catch (error) {
-        await logError(error, { context: 'getXp', userId: req.user.id });
-        return res.status(500).json({ success: false, error: 'Failed to get XP data' });
-    }
-}
+const getXp = asyncHandler(async (req, res) => {
+    const { rows, hasMore } = await Task.getXpHistory(req.user.id, {
+        limit: req.query.limit,
+        offset: req.query.offset
+    });
+    res.json({
+        userId: req.user.id,
+        total: await Task.getTotalXp(req.user.id),
+        history: rows,
+        hasMore
+    });
+});
 
-module.exports = { getXp };
+const getStats = asyncHandler(async (req, res) => {
+    res.json(await Task.getStats(req.user.id, req.tz));
+});
+
+module.exports = { getXp, getStats };

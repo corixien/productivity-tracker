@@ -1,7 +1,11 @@
 const { query, transaction } = require('../utils/database');
-const { hashPassword, verifyPassword } = require('../utils/password');
+const { hashPassword, verifyPassword, isLegacyPasswordHash } = require('../utils/password');
 const { logSystemEvent, logError } = require('../services/loggingService');
-const { getRankMultiplier } = require('../services/rankService');
+const { getRankMultiplier, computePositionMultiplier } = require('../services/rankService');
+const { warnOnError } = require('../utils/errors');
+
+// Any object with .query(text, params): the pool wrapper by default, or a transaction client.
+const defaultDb = { query };
 
 const USER_WITH_PROFILE = `
     SELECT
@@ -31,6 +35,12 @@ async function findById(id) {
     return normalizeUser(result.rows[0]);
 }
 
+// Lightweight lookup for per-request authentication (no avatar blob, no profile join).
+async function findAuthById(id) {
+    const result = await query('SELECT id, username, token_version FROM users WHERE id = $1', [id]);
+    return result.rows[0] || null;
+}
+
 async function findByUsernameOrId(identifier) {
     if (/^[0-9a-f-]{36}$/i.test(identifier)) {
         return findById(identifier);
@@ -39,29 +49,28 @@ async function findByUsernameOrId(identifier) {
 }
 
 async function create(username, password) {
-    return transaction(async (client) => {
-        const passwordHash = await hashPassword(password);
+    const passwordHash = await hashPassword(password);
+    const user = await transaction(async (client) => {
         const userResult = await client.query(
             `INSERT INTO users (username, password_hash, xp, level, rank, language, avatar_url, goals, created_at, updated_at)
              VALUES ($1, $2, 0, 0, 'Newcomer', 'en', NULL, '', NOW(), NOW())
              RETURNING *`,
             [username, passwordHash]
         );
-        const user = userResult.rows[0];
+        const created = userResult.rows[0];
         await client.query(
             `INSERT INTO profiles (user_id, five_year_goal, productivity_preferences, created_at, updated_at)
              VALUES ($1, '', '{}'::jsonb, NOW(), NOW())`,
-            [user.id]
+            [created.id]
         );
-        return user;
-    }).then(async (user) => {
-        await logSystemEvent('info', 'User registered', {
-            event: 'user_registered',
-            user_id: user.id,
-            username
-        });
-        return normalizeUser(user);
+        return created;
     });
+    await logSystemEvent('info', 'User registered', {
+        event: 'user_registered',
+        user_id: user.id,
+        username
+    });
+    return normalizeUser(user);
 }
 
 async function update(id, updates) {
@@ -71,7 +80,7 @@ async function update(id, updates) {
         delete updates.goals;
     }
 
-    const allowedFields = ['username', 'language', 'avatar_url'];
+    const allowedFields = ['language', 'daily_goal_xp'];
     const setClause = [];
     const values = [];
     let paramIndex = 1;
@@ -103,13 +112,11 @@ async function updateAvatar(userId, avatarUrl) {
 }
 
 async function changeUsername(id, newUsername) {
-    return transaction(async (client) => {
-        const result = await client.query(
-            'UPDATE users SET username = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
-            [newUsername, id]
-        );
-        return normalizeUser(result.rows[0]);
-    });
+    const result = await query(
+        'UPDATE users SET username = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+        [newUsername, id]
+    );
+    return normalizeUser(result.rows[0]);
 }
 
 async function updateGoals(id, goals) {
@@ -139,27 +146,37 @@ async function updateSettings(id, settings) {
          RETURNING *`,
         [id, JSON.stringify(productivityPreferences)]
     );
-    if (settings.language) await update(id, { language: settings.language });
+    const userUpdates = {};
+    if (settings.language) userUpdates.language = settings.language;
+    if (settings.dailyGoalXp !== undefined) userUpdates.daily_goal_xp = settings.dailyGoalXp;
+    if (Object.keys(userUpdates).length > 0) await update(id, userUpdates);
     return result.rows[0];
 }
 
+// Changing the password bumps token_version, which invalidates every previously issued JWT.
 async function updatePassword(id, newPassword) {
     const passwordHash = await hashPassword(newPassword);
     const result = await query(
-        'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2 RETURNING id',
+        `UPDATE users SET password_hash = $1, token_version = token_version + 1, updated_at = NOW()
+         WHERE id = $2 RETURNING id, username, token_version`,
         [passwordHash, id]
     );
-    return Boolean(result.rows[0]);
+    return result.rows[0] || null;
 }
 
 async function verifyCredentials(username, password) {
     const user = await findByUsername(username);
     if (!user || !await verifyPassword(password, user.password_hash)) return null;
+    if (isLegacyPasswordHash(user.password_hash)) {
+        const upgraded = await hashPassword(password);
+        await query('UPDATE users SET password_hash = $1 WHERE id = $2', [upgraded, user.id])
+            .catch(warnOnError('verifyCredentials.rehash'));
+    }
     return user;
 }
 
-async function getFriends(userId) {
-    const result = await query(
+async function getFriends(userId, db = defaultDb) {
+    const result = await db.query(
         `SELECT f.friend_id, f.added_at, u.username, u.avatar_url, u.avatar_url AS avatar
          FROM friends f
          JOIN users u ON u.id = f.friend_id
@@ -224,59 +241,53 @@ async function upsertProfile(userId, profileData) {
     return result.rows[0];
 }
 
-async function getPositionMultiplier(userId, xp) {
-    const friends = await getFriends(userId);
-    const friendIds = friends.map(f => f.friend_id);
-
-    let friendXps = [];
-    if (friendIds.length > 0) {
-        const placeholders = friendIds.map((_, i) => `$${i + 1}`).join(',');
-        const result = await query(
-            `SELECT xp FROM users WHERE id IN (${placeholders})`,
-            friendIds
-        );
-        friendXps = result.rows.map(r => r.xp || 0);
-    }
-
-    const entries = [...friendXps, xp || 0];
-    const total = entries.length;
-
-    if (total <= 1) return 1.0;
-
+// Rank among the user and their friends, computed in SQL.
+async function getPositionMultiplier(userId, xp, db = defaultDb) {
     const userXp = xp || 0;
-    const lowerXpCount = entries.filter(x => x < userXp).length;
-    const position = lowerXpCount;
-
-    return 1.5 - (position / (total - 1)) * 0.8;
+    const result = await db.query(
+        `SELECT COUNT(*)::int AS friends, COUNT(*) FILTER (WHERE u.xp < $2)::int AS lower
+         FROM friends f JOIN users u ON u.id = f.friend_id
+         WHERE f.user_id = $1`,
+        [userId, userXp]
+    );
+    const { friends, lower } = result.rows[0];
+    return computePositionMultiplier(lower, friends + 1);
 }
 
-async function recalculateMultiplier(userId, force = false) {
-    const userResult = await query('SELECT username, rank, xp, last_multiplier_check FROM users WHERE id = $1', [userId]);
-    if (!userResult.rows[0]) return;
+function combineMultipliers(positionMultiplier, rankMultiplier) {
+    return Math.round((positionMultiplier - (1 - rankMultiplier)) * 100) / 100;
+}
+
+async function recalculateMultiplier(userId, force = false, db = defaultDb) {
+    const userResult = await db.query('SELECT rank, xp, last_multiplier_check FROM users WHERE id = $1', [userId]);
+    if (!userResult.rows[0]) return null;
 
     if (!force) {
         const lastCheck = userResult.rows[0].last_multiplier_check;
         if (lastCheck && (Date.now() - new Date(lastCheck).getTime() < 60000)) {
-            return;
+            return null;
         }
     }
 
     const { rank, xp } = userResult.rows[0];
     const rankMultiplier = getRankMultiplier(rank);
-    const positionMultiplier = await getPositionMultiplier(userId, xp);
-    const combined = Math.round((positionMultiplier - (1 - rankMultiplier)) * 100) / 100;
-    const tasksResult = await query('SELECT COUNT(*) AS count FROM tasks WHERE user_id = $1 AND completed = true', [userId]);
-    const tasksCompleted = parseInt(tasksResult.rows[0].count, 10);
+    const positionMultiplier = await getPositionMultiplier(userId, xp, db);
+    const combined = combineMultipliers(positionMultiplier, rankMultiplier);
 
-    await query(
-        'UPDATE users SET multiplier = $1, position_based_multiplier = $2, rank_based_multiplier = $3, tasks_completed = $4, last_multiplier_check = NOW(), updated_at = NOW() WHERE id = $5',
-        [combined, positionMultiplier, rankMultiplier, tasksCompleted, userId]
+    await db.query(
+        `UPDATE users SET multiplier = $1, position_based_multiplier = $2, rank_based_multiplier = $3,
+             tasks_completed = (SELECT COUNT(*) FROM tasks WHERE user_id = $5 AND completed = true),
+             last_multiplier_check = NOW(), updated_at = NOW()
+         WHERE id = $4`,
+        [combined, positionMultiplier, rankMultiplier, userId, userId]
     );
+    return combined;
 }
 
 async function monitorMultipliers(maxAgeMinutes = 5) {
     const staleUsers = await query(
-        'SELECT id, username, multiplier, position_based_multiplier, rank_based_multiplier, xp, rank, last_multiplier_check FROM users WHERE last_multiplier_check < NOW() - INTERVAL $1 MINUTES',
+        `SELECT id, username, multiplier, position_based_multiplier, rank_based_multiplier, xp, rank, last_multiplier_check
+         FROM users WHERE last_multiplier_check < NOW() - make_interval(mins => $1) LIMIT 200`,
         [maxAgeMinutes]
     );
 
@@ -284,7 +295,7 @@ async function monitorMultipliers(maxAgeMinutes = 5) {
     for (const user of staleUsers.rows) {
         const currentRankMultiplier = getRankMultiplier(user.rank);
         const currentPositionMultiplier = await getPositionMultiplier(user.id, user.xp);
-        const expectedCombined = Math.round((currentPositionMultiplier - (1 - currentRankMultiplier)) * 100) / 100;
+        const expectedCombined = combineMultipliers(currentPositionMultiplier, currentRankMultiplier);
 
         if (Math.abs((user.multiplier || 0) - expectedCombined) > 0.01) {
             discrepancies.push({
@@ -301,7 +312,7 @@ async function monitorMultipliers(maxAgeMinutes = 5) {
             });
         }
 
-        await recalculateMultiplier(user.id, true).catch(() => {});
+        await recalculateMultiplier(user.id, true).catch(warnOnError('monitorMultipliers.recalculate'));
     }
 
     if (discrepancies.length > 0) {
@@ -315,9 +326,59 @@ async function monitorMultipliers(maxAgeMinutes = 5) {
     return discrepancies;
 }
 
+// The server sleeps on the free tier, so there is no reliable timer: run the audit
+// opportunistically from request handlers, at most once per interval.
+let lastMonitorRun = 0;
+function monitorMultipliersThrottled(intervalMs = 5 * 60 * 1000) {
+    const now = Date.now();
+    if (now - lastMonitorRun < intervalMs) return;
+    lastMonitorRun = now;
+    monitorMultipliers(5).catch(warnOnError('monitorMultipliersThrottled'));
+}
+
+// Friend-group leaderboard (self + friends) in one query.
+// period 'week' ranks by XP earned since Monday 00:00 in the user's timezone.
+async function getLeaderboard(userId, period, tz) {
+    const result = await query(
+        `WITH members AS (
+             SELECT id FROM users WHERE id = $1
+             UNION
+             SELECT friend_id FROM friends WHERE user_id = $1
+         ), week AS (
+             SELECT user_id, GREATEST(0, SUM(xp_amount))::int AS xp
+             FROM xp_history
+             WHERE user_id IN (SELECT id FROM members)
+               AND created_at >= date_trunc('week', NOW() AT TIME ZONE $2) AT TIME ZONE $2
+             GROUP BY user_id
+         )
+         SELECT u.id, u.username, u.avatar_url AS avatar, u.xp, u.level, u.rank,
+                u.tasks_completed AS tasks, COALESCE(w.xp, 0) AS week_xp,
+                (u.id = $1) AS is_self
+         FROM users u
+         JOIN members m ON m.id = u.id
+         LEFT JOIN week w ON w.user_id = u.id
+         ORDER BY ${period === 'week' ? 'COALESCE(w.xp, 0)' : 'u.xp'} DESC, u.username ASC`,
+        [userId, tz]
+    );
+    return result.rows.map((row) => ({
+        id: row.id,
+        username: row.username,
+        avatar: row.avatar || null,
+        xp: row.xp || 0,
+        level: row.level || 0,
+        rank: row.rank,
+        tasks: row.tasks || 0,
+        weekXp: row.week_xp,
+        score: period === 'week' ? row.week_xp : row.xp || 0,
+        isSelf: row.is_self,
+        friendId: row.is_self ? null : row.id
+    }));
+}
+
 module.exports = {
     findByUsername,
     findById,
+    findAuthById,
     findByUsernameOrId,
     create,
     update,
@@ -335,6 +396,9 @@ module.exports = {
     upsertProfile,
     normalizeUser,
     getPositionMultiplier,
+    combineMultipliers,
     recalculateMultiplier,
-    monitorMultipliers
+    monitorMultipliers,
+    monitorMultipliersThrottled,
+    getLeaderboard
 };

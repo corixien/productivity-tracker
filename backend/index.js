@@ -4,7 +4,15 @@ const cors = require('cors');
 const path = require('path');
 const { logger } = require('./utils/logger');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
-const { closePool } = require('./utils/database');
+const { closePool, getPool } = require('./utils/database');
+const { securityHeaders } = require('./middleware/security');
+const { apiRateLimiter } = require('./middleware/rateLimiter');
+const { timezone } = require('./middleware/timezone');
+const { startRetentionJob } = require('./services/retentionService');
+const groqController = require('./controllers/groqController');
+const { authenticate } = require('./middleware/auth');
+const { validateAiRate } = require('./middleware/validation');
+const { aiRateLimiter } = require('./middleware/rateLimiter');
 
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
@@ -14,13 +22,7 @@ const groqRoutes = require('./routes/groq');
 const xpRoutes = require('./routes/xp');
 const leaderboardRoutes = require('./routes/leaderboard');
 const settingsRoutes = require('./routes/settings');
-const groqController = require('./controllers/groqController');
-const { authenticate } = require('./middleware/auth');
-const { validateAiRate } = require('./middleware/validation');
-const { securityHeaders } = require('./middleware/security');
-const { authRateLimiter } = require('./middleware/rateLimiter');
-const { getPool } = require('./utils/database');
-const User = require('./models/User');
+const metaRoutes = require('./routes/meta');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -36,21 +38,24 @@ app.use(securityHeaders);
 app.use(cors({
     origin: process.env.CLIENT_ORIGIN || true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Timezone']
 }));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+
+// Avatars arrive as base64 JSON: raise the limit for that one route only (must precede the global parser).
+app.use('/api/users/:username/avatar', express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '100kb' }));
+app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 
 app.use((req, res, next) => {
     const startedAt = Date.now();
     res.on('finish', () => {
-        const duration = Date.now() - startedAt;
+        if (!req.originalUrl.startsWith('/api')) return;
         logger.info('HTTP request completed', {
             event: 'http_request',
             method: req.method,
             path: req.originalUrl,
             status: res.statusCode,
-            duration_ms: duration,
+            duration_ms: Date.now() - startedAt,
             ip: req.ip,
             user_agent: req.get('user-agent')
         });
@@ -58,24 +63,25 @@ app.use((req, res, next) => {
     next();
 });
 
-app.use('/api', (req, res, next) => {
-    res.set('Cache-Control', 'no-store');
-    next();
-});
-
 app.get('/api/health', async (req, res) => {
     const health = { status: 'ok', timestamp: new Date().toISOString(), db: 'checking' };
     try {
-        const pool = getPool();
-        await pool.query('SELECT 1');
+        await getPool().query('SELECT 1');
         health.db = 'ok';
     } catch (error) {
         health.db = 'error';
         health.dbError = error.message;
         health.status = 'degraded';
     }
-    res.json(health);
+    res.set('Cache-Control', 'no-store').json(health);
 });
+
+app.use('/api', (req, res, next) => {
+    res.set('Cache-Control', 'no-store');
+    next();
+});
+app.use('/api', apiRateLimiter);
+app.use('/api', timezone);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -85,49 +91,55 @@ app.use('/api/xp', xpRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/groq', groqRoutes);
+app.use('/api/meta', metaRoutes);
 
-app.post('/api/ai/rate', authenticate, validateAiRate, groqController.rateTask);
+// Legacy routes kept for compatibility with older clients.
+app.post('/api/ai/rate', authenticate, aiRateLimiter, validateAiRate, groqController.rateTask);
 app.get('/api/ai/status', groqController.getAiStatus);
 
-app.get('/', (req, res) => {
-    res.sendFile(path.join(FRONTEND_DIR, 'index.html'));
-});
-app.get('/LOGO.png', (req, res) => {
-    res.sendFile(path.join(FRONTEND_DIR, 'LOGO.png'));
-});
-app.get('/manifest.json', (req, res) => {
-    res.sendFile(path.join(FRONTEND_DIR, 'manifest.json'));
-});
-app.use('/icons', express.static(path.join(FRONTEND_DIR, 'icons'), { maxAge: '1h' }));
-app.use('/js', express.static(path.join(FRONTEND_DIR, 'js'), { maxAge: '1h' }));
-app.use('/css', express.static(path.join(FRONTEND_DIR, 'css'), { maxAge: '1h' }));
-app.use('/avatars', express.static(path.join(FRONTEND_DIR, 'avatars'), { maxAge: '1h' }));
-app.use('/Badges', express.static(path.join(FRONTEND_DIR, 'Badges'), { maxAge: '1h' }));
-app.use('/assets', express.static(path.join(FRONTEND_DIR, 'assets'), { maxAge: '1h' }));
+// Frontend: always revalidate code (ETag => cheap 304), cache binary assets for a week.
+const revalidate = { maxAge: 0, etag: true };
+const longCache = { maxAge: '7d' };
+const sendRoot = (file, headers = {}) => (req, res) => {
+    res.set(headers);
+    res.sendFile(path.join(FRONTEND_DIR, file));
+};
+
+app.get('/', sendRoot('index.html', { 'Cache-Control': 'no-cache' }));
+app.get('/manifest.json', sendRoot('manifest.json', { 'Cache-Control': 'no-cache' }));
+app.get('/sw.js', sendRoot('sw.js', { 'Cache-Control': 'no-cache', 'Service-Worker-Allowed': '/' }));
+app.get('/offline.html', sendRoot('offline.html', { 'Cache-Control': 'no-cache' }));
+app.get('/LOGO.png', sendRoot('LOGO.png', { 'Cache-Control': 'public, max-age=604800' }));
+app.use('/js', express.static(path.join(FRONTEND_DIR, 'js'), revalidate));
+app.use('/css', express.static(path.join(FRONTEND_DIR, 'css'), revalidate));
+app.use('/icons', express.static(path.join(FRONTEND_DIR, 'icons'), longCache));
+app.use('/Badges', express.static(path.join(FRONTEND_DIR, 'Badges'), longCache));
 
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-const server = app.listen(PORT, '0.0.0.0', () => {
-    logger.info('Productivity Tracker API running', { port: PORT, environment: process.env.NODE_ENV || 'development' });
-    setInterval(async () => {
-        try {
-            await User.monitorMultipliers(5).catch(() => {});
-        } catch (e) {
-            logger.error('Periodic multiplier check failed', { error: e.message });
-        }
-    }, 300000);
-});
-
-async function shutdown(signal) {
-    logger.info('Shutdown received', { signal });
-    server.close(async () => {
-        await closePool();
-        process.exit(0);
+function start() {
+    const server = app.listen(PORT, '0.0.0.0', () => {
+        logger.info('Productivity Tracker API running', { port: PORT, environment: process.env.NODE_ENV || 'development' });
+        startRetentionJob();
     });
+
+    async function shutdown(signal) {
+        logger.info('Shutdown received', { signal });
+        server.close(async () => {
+            await closePool();
+            process.exit(0);
+        });
+    }
+
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
+    return server;
 }
 
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
+if (require.main === module) {
+    start();
+}
 
 module.exports = app;
+module.exports.start = start;

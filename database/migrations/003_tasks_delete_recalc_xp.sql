@@ -37,6 +37,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS tasks_delete_recalc_xp ON tasks;
 CREATE TRIGGER tasks_delete_recalc_xp
 BEFORE DELETE ON tasks
 FOR EACH ROW EXECUTE FUNCTION recalculate_user_xp_after_task_delete();
