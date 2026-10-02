@@ -63,7 +63,7 @@
     display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px;
     padding: 14px 16px; border-radius: var(--radius);
     transition: border-color 0.2s, background 0.2s, transform 0.2s var(--ease), opacity 0.3s;
-    animation: card-in 0.35s var(--ease) both;
+    animation: card-in 0.35s var(--ease) backwards;
 }
 .task-card:hover { background: var(--glass-bg); }
 .task-card.is-done .task-name { color: var(--text-muted); text-decoration: line-through; text-decoration-color: var(--text-faint); }
@@ -382,4 +382,22 @@
     .filter-where { display: none; }
     .filter-row .filter-value { grid-column: 1 / -1; order: 5; }
     .db-range { margin-left: 0; width: 100%; }
+}
+
+/* ---- Hover zoom for boxes ----
+   Cards grow a little with a spring and lift; leaving plays the spring back. Small rows grow a bit
+   more than large panels (a big panel zooming hard looks jumpy). Transform only: cheap to animate. */
+.task-card, .stat, .board-row, .podium-spot, .hero, .streak-hero, .chart-card, .settings-card, .history-items, .day-circle {
+    transition: transform 0.5s var(--spring), box-shadow 0.35s var(--ease), background 0.25s, border-color 0.25s, opacity 0.3s;
+}
+@media (hover: hover) {
+    .task-card:hover, .stat:hover, .board-row:hover, .podium-spot:hover {
+        position: relative; z-index: 2; transform: scale(1.03);
+        box-shadow: var(--glass-shadow), 0 20px 38px -18px rgba(0, 12, 48, 0.6);
+    }
+    .hero:hover, .streak-hero:hover, .chart-card:hover, .settings-card:hover, .history-items:hover {
+        position: relative; z-index: 2; transform: scale(1.015);
+        box-shadow: var(--glass-shadow), 0 26px 46px -22px rgba(0, 12, 48, 0.6);
+    }
+    .day-dot:hover .day-circle { transform: scale(1.14); }
 }
