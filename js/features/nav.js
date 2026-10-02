@@ -2,9 +2,9 @@ import { state } from '../core/state.js';
 import { h, icon, $, $$ } from '../core/dom.js';
 import { t, onLanguageChange } from '../core/i18n.js';
 
-// The admin area lives behind a secret hash prefix. The prefix only hides the entry point:
+// The admin area lives under #/admin. The route is public knowledge:
 // every admin API call is checked on the server against users.is_admin.
-const ADMIN_PREFIX = 'admin-4321';
+const ADMIN_PREFIX = 'admin';
 
 const APP_VIEWS = [
     { id: 'tasks', hash: 'tasks', icon: 'tasks', label: 'navTasks' },
@@ -27,7 +27,7 @@ let mode = 'app';
 const isAdmin = () => Boolean(state.user && state.user.isAdmin);
 const currentViews = () => (mode === 'admin' ? ADMIN_VIEWS : APP_VIEWS);
 
-// Accepts #/tasks, #/admin-4321/logs and the "#?/" spelling.
+// Accepts #/tasks, #/admin/logs and the "#?/" spelling.
 function resolveRoute() {
     const raw = location.hash.replace(/^#\??\/?/, '');
     if (raw === ADMIN_PREFIX || raw.startsWith(`${ADMIN_PREFIX}/`)) {
