@@ -1,102 +1,237 @@
 import { api } from '../../core/api.js';
 import { on } from '../../core/state.js';
-import { h, icon, $, setBusy } from '../../core/dom.js';
+import { h, icon, $, replaceChildren } from '../../core/dom.js';
 import { t, onLanguageChange, locale } from '../../core/i18n.js';
-import { toast, confirmDialog, emptyState, skeletonList, showError } from '../../core/ui.js';
+import { toast, confirmDialog, emptyState, skeletonList, showError, openDialog, closeDialog } from '../../core/ui.js';
 import { currentView } from '../nav.js';
 import { warnNonCritical } from '../shared.js';
 
-const PAGE = 50;
-const STORAGE = '__storage';
+const CHUNK = 200;   // rows added to the DOM at a time while scrolling; all rows are already loaded
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const OPERATORS = ['=', '!=', '>', '>=', '<', '<=', 'LIKE', 'ILIKE', 'NOT LIKE', 'IN', 'IS NULL', 'IS NOT NULL'];
+const NO_VALUE = new Set(['IS NULL', 'IS NOT NULL']);
+const TABLE_ORDER = ['users', 'tasks', 'xp_history', 'friends', 'templates', 'system_logs', 'groq_logs', 'user_activity', 'uptime_samples', 'schema_migrations'];
+const orderOf = (name) => (TABLE_ORDER.includes(name) ? TABLE_ORDER.indexOf(name) : TABLE_ORDER.length);
 
-const TABLE_ORDER = ['users', 'tasks', 'xp_history', 'friends', 'quick_tasks', 'system_logs', 'groq_logs', 'user_activity', 'uptime_samples', 'schema_migrations'];
-const rankOf = (name) => (TABLE_ORDER.includes(name) ? TABLE_ORDER.indexOf(name) : TABLE_ORDER.length);
-
-const view = { tables: [], current: 'users', rows: [], total: 0, offset: 0, q: '', loaded: false, avatars: null, editing: false };
+const view = { tables: [], current: 'users', rows: [], total: 0, capped: false, shown: 0, q: '', filters: [], sort: { column: '', dir: 'asc' }, loaded: false };
 let reloadTimer = null;
 let searchTimer = null;
+let observer = null;
+let openPopover = null;
 
 const tableMeta = () => view.tables.find((table) => table.name === view.current);
 const formatTime = (iso) => new Intl.DateTimeFormat(locale(), { dateStyle: 'short', timeStyle: 'medium' }).format(new Date(iso));
+const formatCount = (n) => new Intl.NumberFormat(locale(), { notation: n >= 10000 ? 'compact' : 'standard' }).format(n);
 
 /* ---------- cells ---------- */
 function plainValue(column, value) {
-    if (value === null || value === undefined) return h('span', { class: 'cell-null' }, '—');
+    if (value === null || value === undefined) return h('span', { class: 'cell-null' }, 'NULL');
     if (typeof value === 'boolean') return h('span', { class: `cell-bool ${value ? 'is-true' : ''}` }, String(value));
     if (column.type.includes('timestamp')) return h('span', { class: 'cell-time' }, formatTime(value));
     if (typeof value === 'string' && UUID.test(value)) return h('span', { class: 'cell-id', title: value }, value.slice(0, 8));
-    const text = typeof value === 'object' ? JSON.stringify(value) : String(value);
-    return h('span', { class: 'cell-text', title: text.length > 40 ? text : null }, text.length > 60 ? `${text.slice(0, 60)}…` : text);
+    const text = String(value);
+    return h('span', { class: 'cell-text' }, text.length > 60 ? `${text.slice(0, 60)}…` : text);
 }
 
-function editorFor(column, value, commit, cancel) {
-    const options = column.options;
-    let input;
-    if (options) {
-        input = h('select', { class: 'cell-input' }, ...options.map((option) => h('option', { value: option }, option)));
-        input.value = value;
-    } else {
-        const numeric = ['integer', 'numeric', 'bigint', 'smallint'].includes(column.type);
-        input = h('input', { class: 'cell-input', type: numeric ? 'number' : 'text', value: value ?? '' });
-    }
-    input.setAttribute('aria-label', column.name);
-    let done = false;
-    const finish = (save) => {
-        if (done) return;
-        done = true;
-        view.editing = false;
-        if (save) commit(input.value); else cancel();
-    };
-    input.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter') { event.preventDefault(); finish(true); }
-        if (event.key === 'Escape') finish(false);
-    });
-    input.addEventListener('blur', () => finish(true));
-    if (options) input.addEventListener('change', () => finish(true));
-    return input;
+async function saveCell(table, row, column, raw) {
+    const { row: updated } = await api.adminUpdate(table.name, row.__key, column.name, raw);
+    Object.assign(row, updated);
+    toast(t('cellSaved'), { type: 'success', duration: 1500 });
+    renderRows();
 }
 
 function cell(table, column, row) {
     const value = row[column.name];
-    if (!column.editable) return h('td', { dataset: { col: column.name } }, plainValue(column, value));
-
-    const td = h('td', { dataset: { col: column.name }, class: 'is-editable' });
-    const save = async (raw) => {
-        if (String(raw) === String(value ?? '')) { td.replaceChildren(show()); return; }
-        try {
-            const { row: updated } = await api.adminUpdate(table.name, row.__key, column.name, raw);
-            Object.assign(row, updated);
-            renderBody();
-            toast(t('cellSaved'), { type: 'success', duration: 1500 });
-        } catch (error) {
-            showError(error);
-            td.replaceChildren(show());
-        }
-    };
-    function show() {
-        if (typeof value === 'boolean') {
-            return h('button', {
-                type: 'button', class: `toggle${value ? ' is-on' : ''}`, role: 'switch', 'aria-checked': String(value),
-                'aria-label': column.name, onClick: () => save(String(!value))
-            }, h('span', { class: 'toggle-knob' }));
-        }
-        return h('button', {
-            type: 'button', class: 'cell-edit', title: t('editCell'),
-            onClick: () => {
-                view.editing = true;
-                const input = editorFor(column, value, save, () => td.replaceChildren(show()));
-                td.replaceChildren(input);
-                input.focus();
-                if (input.select) input.select();
-            }
-        }, plainValue(column, value), icon('edit2'));
+    const td = h('td', { dataset: { col: column.name } });
+    if (column.editable && typeof value === 'boolean') {
+        td.append(h('button', {
+            type: 'button', class: `toggle${value ? ' is-on' : ''}`, role: 'switch', 'aria-checked': String(value), 'aria-label': column.name,
+            onClick: () => saveCell(table, row, column, String(!value)).catch(showError)
+        }, h('span', { class: 'toggle-knob' })));
+        return td;
     }
-    td.append(show());
+    td.classList.add('is-clickable');
+    td.tabIndex = 0;
+    td.setAttribute('role', 'button');
+    td.setAttribute('aria-label', `${column.name}: ${t('openCell')}`);
+    td.append(plainValue(column, value));
+    const open = () => openCell(table, column, row);
+    td.addEventListener('click', open);
+    td.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); open(); } });
     return td;
 }
 
-/* ---------- table view ---------- */
+/* ---------- big cell editor (dialog with a multi-line field) ---------- */
+async function openCell(table, column, row) {
+    const dialog = $('#cell-dialog');
+    const field = $('#cell-text');
+    const save = $('#cell-save');
+    const preview = $('#cell-preview');
+    $('#cell-title').textContent = `${table.name}.${column.name}`;
+    $('#cell-error').textContent = '';
+    field.value = '';
+    field.placeholder = '';
+    preview.hidden = true;
+    save.hidden = !column.editable;
+    field.readOnly = !column.editable;
+    $('#cell-meta').textContent = column.editable ? column.type : `${column.type} · ${t('readOnly')}`;
+    openDialog(dialog);
+
+    let value = row[column.name];
+    if ((row.__truncated || []).includes(column.name)) {
+        field.placeholder = t('cellLoading');
+        try { value = (await api.adminCell(table.name, row.__key, column.name)).value; } catch (error) { showError(error); closeDialog(dialog); return; }
+    }
+    field.value = value ?? '';
+    field.placeholder = value === null ? 'NULL' : '';
+    if (typeof value === 'string' && value.startsWith('data:image/')) {
+        preview.src = value;
+        preview.hidden = false;
+    }
+    field.focus();
+
+    $('#cell-copy').onclick = async () => {
+        try { await navigator.clipboard.writeText(field.value); toast(t('cellCopied'), { type: 'success', duration: 1500 }); } catch (error) { field.select(); }
+    };
+    save.onclick = async () => {
+        try {
+            await saveCell(table, row, column, field.value);
+            closeDialog(dialog);
+        } catch (error) {
+            $('#cell-error').textContent = error.network ? t('networkError') : error.message;
+        }
+    };
+}
+
+/* ---------- toolbar: search, filter, sort ---------- */
+function closePopover() {
+    if (!openPopover) return;
+    openPopover.panel.hidden = true;
+    openPopover.button.setAttribute('aria-expanded', 'false');
+    openPopover = null;
+}
+
+function togglePopover(button, panel) {
+    const wasOpen = openPopover && openPopover.panel === panel;
+    closePopover();
+    if (wasOpen) return;
+    panel.hidden = false;
+    button.setAttribute('aria-expanded', 'true');
+    openPopover = { button, panel };
+}
+
+function columnSelect(table, value, label) {
+    const select = h('select', { class: 'select-sm', 'aria-label': label }, ...table.columns.map((column) => h('option', { value: column.name }, column.name)));
+    select.value = value;
+    return select;
+}
+
+function filterRow(table, draft, index, rerender) {
+    const entry = draft[index];
+    const column = columnSelect(table, entry.column, t('filterColumn'));
+    const operator = h('select', { class: 'select-sm', 'aria-label': t('filterOperator') }, ...OPERATORS.map((op) => h('option', { value: op }, op)));
+    operator.value = entry.op;
+    const value = h('input', { type: 'text', class: 'filter-value', value: entry.value, placeholder: entry.op === 'IN' ? t('filterValueIn') : t('filterValue'), 'aria-label': t('filterValue'), autocomplete: 'off' });
+    value.hidden = NO_VALUE.has(entry.op);
+    column.addEventListener('change', () => { entry.column = column.value; });
+    operator.addEventListener('change', () => { entry.op = operator.value; rerender(); });
+    value.addEventListener('input', () => { entry.value = value.value; });
+    value.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); $('#filter-apply').click(); } });
+    return h('div', { class: 'filter-row' },
+        h('span', { class: 'filter-where' }, index === 0 ? 'WHERE' : 'AND'),
+        column, operator, value,
+        h('button', { type: 'button', class: 'icon-btn is-danger', 'aria-label': t('removeFilter'), onClick: () => { draft.splice(index, 1); rerender(); } }, icon('close'))
+    );
+}
+
+function buildFilterPanel(table, apply) {
+    const draft = view.filters.map((filter) => ({ ...filter }));
+    const list = h('div', { class: 'filter-list' });
+    const rerender = () => {
+        if (draft.length === 0) list.replaceChildren(h('p', { class: 'hint' }, t('noFilters')));
+        else list.replaceChildren(...draft.map((_, index) => filterRow(table, draft, index, rerender)));
+    };
+    rerender();
+    return h('div', { class: 'popover card filter-panel', role: 'dialog', 'aria-label': t('filterBtn'), hidden: true },
+        list,
+        h('div', { class: 'popover-actions' },
+            h('button', { type: 'button', class: 'btn btn-ghost', onClick: () => { draft.push({ column: table.columns[0].name, op: '=', value: '' }); rerender(); } }, icon('plus'), t('addFilter')),
+            h('span', { class: 'spacer' }),
+            h('button', { type: 'button', class: 'btn btn-ghost', onClick: () => { draft.length = 0; rerender(); apply([]); } }, t('clearFilters')),
+            h('button', { type: 'button', class: 'btn btn-primary', id: 'filter-apply', onClick: () => apply(draft.filter((entry) => NO_VALUE.has(entry.op) || entry.value !== '').map((entry) => ({ ...entry }))) }, t('applyFilters')))
+    );
+}
+
+function buildSortPanel(table, apply) {
+    const column = h('select', { class: 'select-sm', 'aria-label': t('sortColumn') },
+        h('option', { value: '' }, t('sortNone')), ...table.columns.map((entry) => h('option', { value: entry.name }, entry.name)));
+    column.value = view.sort.column;
+    const dir = h('select', { class: 'select-sm', 'aria-label': t('sortDirection') },
+        h('option', { value: 'asc' }, t('sortAsc')), h('option', { value: 'desc' }, t('sortDesc')));
+    dir.value = view.sort.dir;
+    dir.disabled = !column.value;
+    const change = () => { dir.disabled = !column.value; apply({ column: column.value, dir: dir.value }); };
+    column.addEventListener('change', change);
+    dir.addEventListener('change', change);
+    return h('div', { class: 'popover card sort-panel', role: 'dialog', 'aria-label': t('sortBtn'), hidden: true },
+        h('label', { class: 'popover-label' }, t('sortColumn'), column),
+        h('label', { class: 'popover-label' }, t('sortDirection'), dir));
+}
+
+function buildToolbar(table) {
+    const search = h('input', { type: 'text', class: 'db-search', value: view.q, placeholder: t('searchRows'), 'aria-label': t('searchRows'), autocomplete: 'off' });
+    search.addEventListener('input', () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => { view.q = search.value.trim(); reload(); }, 250);
+    });
+
+    const filterBadge = h('span', { class: 'badge', hidden: view.filters.length === 0 }, String(view.filters.length));
+    const filterButton = h('button', { type: 'button', class: 'btn btn-secondary tool-btn', 'aria-expanded': 'false', 'aria-haspopup': 'dialog' }, icon('filter'), t('filterBtn'), filterBadge);
+    const filterPanel = buildFilterPanel(table, (filters) => {
+        view.filters = filters;
+        closePopover();
+        reload();
+        renderToolbar();
+    });
+    filterButton.addEventListener('click', () => togglePopover(filterButton, filterPanel));
+
+    const sortBadge = h('span', { class: 'badge', hidden: !view.sort.column }, view.sort.dir === 'desc' ? '↓' : '↑');
+    const sortButton = h('button', { type: 'button', class: 'btn btn-secondary tool-btn', 'aria-expanded': 'false', 'aria-haspopup': 'dialog' }, icon('sort'), t('sortBtn'), sortBadge);
+    const sortPanel = buildSortPanel(table, (sort) => {
+        view.sort = sort;
+        sortBadge.hidden = !sort.column;
+        sortBadge.textContent = sort.dir === 'desc' ? '↓' : '↑';
+        reload();
+    });
+    sortButton.addEventListener('click', () => togglePopover(sortButton, sortPanel));
+
+    return h('div', { class: 'db-toolbar' },
+        h('div', { class: 'db-search-wrap' }, icon('search'), search),
+        h('div', { class: 'db-tools' },
+            h('div', { class: 'popover-anchor' }, filterButton, filterPanel),
+            h('div', { class: 'popover-anchor' }, sortButton, sortPanel)),
+        h('span', { class: 'db-range', id: 'db-range', role: 'status' }));
+}
+
+function renderToolbar() {
+    const table = tableMeta();
+    const body = $('#admin-db-body');
+    const existing = body.querySelector('.db-toolbar');
+    const toolbar = buildToolbar(table);
+    if (existing) existing.replaceWith(toolbar); else body.prepend(toolbar);
+    closePopover();
+    updateRange();
+}
+
+function updateRange() {
+    const range = $('#db-range');
+    if (!range) return;
+    const table = tableMeta();
+    const text = view.capped ? t('rowsCapped', { n: formatCount(view.rows.length), total: formatCount(view.total) }) : t('rowsCount', { n: formatCount(view.total) });
+    replaceChildren(range, text, table && table.readonly ? h('span', { class: 'chip chip-warn' }, t('readOnly')) : null);
+}
+
+/* ---------- table ---------- */
 async function removeRow(table, row) {
     const confirmed = await confirmDialog({
         title: t('confirmDeleteRowTitle'),
@@ -113,163 +248,139 @@ async function removeRow(table, row) {
     }
 }
 
-function renderTabs() {
-    const tabs = [
-        ...view.tables.map((table) => ({ id: table.name, label: table.name, count: table.count })),
-        { id: STORAGE, label: t('storageTab'), count: null }
-    ];
-    const container = $('#admin-table-tabs');
-    container.replaceChildren(...tabs.map((tab) =>
-        h('button', {
-            type: 'button', class: 'segment table-tab', 'aria-pressed': String(tab.id === view.current),
-            onClick: () => select(tab.id)
-        }, tab.label, tab.count !== null ? h('span', { class: 'count' }, formatCount(tab.count)) : null)
-    ));
-}
-
-const formatCount = (n) => new Intl.NumberFormat(locale(), { notation: n >= 10000 ? 'compact' : 'standard' }).format(n);
-
-function renderBody() {
-    const body = $('#admin-db-body');
-    if (view.current === STORAGE) return renderStorage(body);
-    const table = tableMeta();
-    if (!table || !view.loaded) {
-        body.replaceChildren(h('ul', {}, ...skeletonList(4)));
-        return undefined;
-    }
-
-    const from = view.total === 0 ? 0 : view.offset + 1;
-    const to = Math.min(view.offset + PAGE, view.total);
-    const search = h('input', { type: 'text', class: 'db-search', value: view.q, placeholder: t('searchRows'), 'aria-label': t('searchRows'), autocomplete: 'off' });
-    search.addEventListener('input', () => {
-        clearTimeout(searchTimer);
-        searchTimer = setTimeout(() => { view.q = search.value.trim(); view.offset = 0; reload(); }, 250);
-    });
-
-    const toolbar = h('div', { class: 'db-toolbar' },
-        h('div', { class: 'db-search-wrap' }, icon('search'), search),
-        h('span', { class: 'db-range' }, t('rowsRange', { from, to, total: view.total }), table.readonly ? h('span', { class: 'chip chip-warn' }, t('readOnly')) : null),
-        h('div', { class: 'db-pager' },
-            h('button', { type: 'button', class: 'btn btn-secondary', disabled: view.offset === 0, onClick: () => page(-1) }, t('pagePrev')),
-            h('button', { type: 'button', class: 'btn btn-secondary', disabled: to >= view.total, onClick: () => page(1) }, t('pageNext')))
-    );
-
-    const head = h('tr', {}, ...table.columns.map((column) => h('th', { scope: 'col' }, column.name)), table.deletable ? h('th', { scope: 'col', class: 'col-actions' }, h('span', { class: 'sr-only' }, t('delete'))) : null);
-    const rows = view.rows.map((row) => h('tr', { dataset: { key: row.__key } },
+function rowElement(table, row) {
+    return h('tr', { dataset: { key: row.__key } },
         ...table.columns.map((column) => cell(table, column, row)),
         table.deletable ? h('td', { class: 'col-actions' }, h('button', {
             type: 'button', class: 'icon-btn is-danger', 'aria-label': t('delete'), title: t('delete'), onClick: () => removeRow(table, row)
-        }, icon('trash'))) : null
+        }, icon('trash'))) : null);
+}
+
+function appendChunk(tbody, table) {
+    const next = view.rows.slice(view.shown, view.shown + CHUNK);
+    tbody.append(...next.map((row) => rowElement(table, row)));
+    view.shown += next.length;
+}
+
+// Every loaded row is in view.rows; the DOM grows while the user scrolls so thousands of rows stay fast.
+function renderRows() {
+    const container = $('#db-table');
+    const table = tableMeta();
+    if (!container || !table) return;
+    if (observer) observer.disconnect();
+    if (!view.loaded) {
+        container.replaceChildren(h('ul', {}, ...skeletonList(4)));
+        return;
+    }
+    updateRange();
+    if (view.rows.length === 0) {
+        container.replaceChildren(h('ul', {}, emptyState('database', t('noRowsTitle'), t('noRowsText'))));
+        return;
+    }
+    const previous = container.querySelector('.table-scroll');
+    const scrollTop = previous ? previous.scrollTop : 0;
+    const scrollLeft = previous ? previous.scrollLeft : 0;
+
+    const head = h('tr', {}, ...table.columns.map((column) => h('th', { scope: 'col' }, column.name)),
+        table.deletable ? h('th', { scope: 'col', class: 'col-actions' }, h('span', { class: 'sr-only' }, t('delete'))) : null);
+    const tbody = h('tbody', {});
+    const sentinel = h('div', { class: 'table-sentinel', 'aria-hidden': 'true' });
+    const scroller = h('div', { class: 'table-scroll' }, h('table', { class: 'data-table' }, h('thead', {}, head), tbody), sentinel);
+    view.shown = 0;
+    const target = Math.max(CHUNK, Math.ceil((previous ? previous.querySelectorAll('tbody tr').length : 0) / CHUNK) * CHUNK);
+    while (view.shown < Math.min(target, view.rows.length)) appendChunk(tbody, table);
+    container.replaceChildren(h('div', { class: 'card table-card' }, scroller));
+    scroller.scrollTop = scrollTop;
+    scroller.scrollLeft = scrollLeft;
+
+    observer = new IntersectionObserver((entries) => {
+        if (entries.some((entry) => entry.isIntersecting) && view.shown < view.rows.length) appendChunk(tbody, table);
+    }, { root: scroller, rootMargin: '400px' });
+    observer.observe(sentinel);
+}
+
+function renderTabs() {
+    const container = $('#admin-table-tabs');
+    container.replaceChildren(...view.tables.map((table) =>
+        h('button', {
+            type: 'button', class: 'segment table-tab', 'aria-pressed': String(table.name === view.current),
+            onClick: () => select(table.name)
+        }, table.name, h('span', { class: 'count' }, formatCount(table.count)))
     ));
-
-    body.replaceChildren(
-        toolbar,
-        view.rows.length === 0
-            ? h('ul', {}, emptyState('database', t('noRowsTitle'), t('noRowsText')))
-            : h('div', { class: 'card table-card' }, h('div', { class: 'table-scroll' }, h('table', { class: 'data-table' }, h('thead', {}, head), h('tbody', {}, ...rows))))
-    );
-    const searchInput = body.querySelector('.db-search');
-    if (view.q && document.activeElement === document.body) searchInput.focus();
-    return undefined;
 }
 
-function renderStorage(body) {
-    if (!view.avatars) {
-        body.replaceChildren(h('ul', {}, ...skeletonList(3)));
-        return;
-    }
-    if (view.avatars.length === 0) {
-        body.replaceChildren(h('ul', {}, emptyState('database', t('storageEmptyTitle'), t('storageEmptyText'))));
-        return;
-    }
-    const total = view.avatars.reduce((sum, item) => sum + item.bytes, 0);
-    body.replaceChildren(
-        h('p', { class: 'hint storage-summary' }, t('storageSummary', { n: view.avatars.length, kb: Math.round(total / 1024) })),
-        h('div', { class: 'storage-grid' }, ...view.avatars.map((item) => h('figure', { class: 'card storage-card' },
-            h('img', { src: item.dataUrl, alt: item.username, width: 96, height: 96, loading: 'lazy' }),
-            h('figcaption', {}, h('strong', {}, item.username), h('span', {}, `${Math.round(item.bytes / 1024 * 10) / 10} KB`)),
-            h('button', { type: 'button', class: 'btn btn-danger', onClick: (event) => removeAvatar(item, event.currentTarget) }, icon('trash'), t('storageRemove'))
-        )))
-    );
-}
-
-async function removeAvatar(item, button) {
-    const confirmed = await confirmDialog({ title: t('storageRemoveTitle'), message: item.username, confirmLabel: t('delete'), danger: true });
-    if (!confirmed) return;
-    setBusy(button, true);
-    try {
-        await api.adminRemoveAvatar(item.userId);
-        toast(t('storageRemoved'), { type: 'success' });
-        await loadStorage();
-    } catch (error) {
-        showError(error);
-        setBusy(button, false);
-    }
+function renderShell() {
+    const body = $('#admin-db-body');
+    body.replaceChildren(h('div', { id: 'db-table' }));
+    if (tableMeta()) renderToolbar();
+    renderRows();
 }
 
 /* ---------- loading ---------- */
 async function loadTables() {
     const { tables } = await api.adminTables();
-    view.tables = tables.sort((a, b) => rankOf(a.name) - rankOf(b.name) || a.name.localeCompare(b.name));
+    view.tables = tables.sort((a, b) => orderOf(a.name) - orderOf(b.name) || a.name.localeCompare(b.name));
+    if (!view.tables.some((table) => table.name === view.current)) view.current = view.tables[0] ? view.tables[0].name : '';
     renderTabs();
 }
 
 async function loadRows() {
-    const data = await api.adminRows(view.current, { limit: PAGE, offset: view.offset, q: view.q });
+    const data = await api.adminRows(view.current, { q: view.q, filters: view.filters, sort: view.sort.column, dir: view.sort.dir });
     view.rows = data.rows;
     view.total = data.total;
+    view.capped = data.capped;
     view.loaded = true;
-}
-
-async function loadStorage() {
-    view.avatars = (await api.adminStorage()).avatars;
-    renderBody();
 }
 
 async function reload() {
     try {
-        await Promise.all([loadTables(), view.current === STORAGE ? loadStorage() : loadRows()]);
-        renderBody();
+        await Promise.all([loadTables(), loadRows()]);
+        renderRows();
+    } catch (error) {
+        showError(error);
+        if (!view.loaded) { view.loaded = true; renderRows(); }
+    }
+}
+
+function select(name) {
+    view.current = name;
+    view.q = '';
+    view.filters = [];
+    view.sort = { column: '', dir: 'asc' };
+    view.loaded = false;
+    view.rows = [];
+    renderTabs();
+    renderShell();
+    reload();
+}
+
+async function showDatabase() {
+    renderTabs();
+    renderShell();
+    try {
+        await loadTables();
+        renderShell();
+        await loadRows();
+        renderRows();
     } catch (error) {
         showError(error);
     }
 }
 
-function select(id) {
-    view.current = id;
-    view.offset = 0;
-    view.q = '';
-    view.loaded = false;
-    renderTabs();
-    renderBody();
-    reload();
-}
-
-function page(direction) {
-    view.offset = Math.max(0, view.offset + direction * PAGE);
-    view.loaded = false;
-    renderBody();
-    reload();
-}
-
-function showDatabase() {
-    renderTabs();
-    renderBody();
-    reload();
-}
-
 function onLiveDatabase({ tables = [] }) {
-    if (currentView() !== 'admin-database' || view.editing) return;
-    const relevant = view.current === STORAGE ? tables.includes('users') : tables.includes(view.current);
-    // Counts in the tabs change with any table, rows only when the open table changed.
+    if (currentView() !== 'admin-database' || $('#cell-dialog').open) return;
     clearTimeout(reloadTimer);
-    reloadTimer = setTimeout(() => (relevant ? reload() : loadTables().catch(warnNonCritical('admin.tables'))), 500);
+    reloadTimer = setTimeout(() => (tables.includes(view.current) ? reload() : loadTables().catch(warnNonCritical('admin.tables'))), 500);
 }
 
 function initDatabase() {
     on('live:db', onLiveDatabase);
-    on('auth:logout', () => { view.tables = []; view.rows = []; view.loaded = false; view.avatars = null; });
-    onLanguageChange(() => { if (currentView() === 'admin-database') { renderTabs(); renderBody(); } });
+    on('auth:logout', () => { view.tables = []; view.rows = []; view.loaded = false; view.filters = []; view.sort = { column: '', dir: 'asc' }; });
+    document.addEventListener('pointerdown', (event) => {
+        if (openPopover && !openPopover.panel.contains(event.target) && !openPopover.button.contains(event.target)) closePopover();
+    });
+    document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closePopover(); });
+    onLanguageChange(() => { if (currentView() === 'admin-database') { renderTabs(); renderShell(); } });
 }
 
 export { initDatabase, showDatabase };

@@ -6,7 +6,7 @@ const EDITABLE_FIELDS = ['name', 'duration', 'productivity', 'difficulty', 'cate
 
 async function findByUserId(userId) {
     const result = await query(
-        `SELECT ${COLUMNS} FROM quick_tasks WHERE user_id = $1 ORDER BY created_at DESC`,
+        `SELECT ${COLUMNS} FROM templates WHERE user_id = $1 ORDER BY created_at DESC`,
         [userId]
     );
     return result.rows;
@@ -14,7 +14,7 @@ async function findByUserId(userId) {
 
 async function findOwned(id, userId) {
     const result = await query(
-        `SELECT ${COLUMNS} FROM quick_tasks WHERE id = $1 AND user_id = $2`,
+        `SELECT ${COLUMNS} FROM templates WHERE id = $1 AND user_id = $2`,
         [id, userId]
     );
     return result.rows[0] || null;
@@ -22,7 +22,7 @@ async function findOwned(id, userId) {
 
 async function create(userId, data) {
     const result = await query(
-        `INSERT INTO quick_tasks (user_id, name, duration, productivity, difficulty, category, bonus)
+        `INSERT INTO templates (user_id, name, duration, productivity, difficulty, category, bonus)
          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING ${COLUMNS}`,
         [userId, data.name, data.duration, data.productivity, data.difficulty, data.category, data.bonus]
     );
@@ -41,14 +41,14 @@ async function update(id, userId, updates) {
     if (setClause.length === 0) return findOwned(id, userId);
     values.push(id, userId);
     const result = await query(
-        `UPDATE quick_tasks SET ${setClause.join(', ')} WHERE id = $${values.length - 1} AND user_id = $${values.length} RETURNING ${COLUMNS}`,
+        `UPDATE templates SET ${setClause.join(', ')} WHERE id = $${values.length - 1} AND user_id = $${values.length} RETURNING ${COLUMNS}`,
         values
     );
     return result.rows[0] || null;
 }
 
 async function remove(id, userId) {
-    const result = await query('DELETE FROM quick_tasks WHERE id = $1 AND user_id = $2 RETURNING id', [id, userId]);
+    const result = await query('DELETE FROM templates WHERE id = $1 AND user_id = $2 RETURNING id', [id, userId]);
     return Boolean(result.rows[0]);
 }
 

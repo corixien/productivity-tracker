@@ -211,11 +211,14 @@ const api = {
     useTemplate: (id) => apiRequest(`/users/quick-tasks/${id}/use`, { method: 'POST' }),
 
     adminTables: () => apiRequest('/admin/tables'),
-    adminRows: (table, { limit, offset, q }) => apiRequest(`/admin/tables/${table}?limit=${limit}&offset=${offset}&q=${encodeURIComponent(q || '')}`),
+    adminRows(table, { q = '', filters = [], sort = '', dir = 'asc' }) {
+        const params = new URLSearchParams({ q, sort, dir });
+        if (filters.length) params.set('filters', JSON.stringify(filters));
+        return apiRequest(`/admin/tables/${table}?${params}`);
+    },
+    adminCell: (table, key, column) => apiRequest(`/admin/tables/${table}/${encodeURIComponent(key)}/cell?column=${encodeURIComponent(column)}`),
     adminUpdate: (table, key, column, value) => apiRequest(`/admin/tables/${table}/${encodeURIComponent(key)}`, { method: 'PATCH', body: { column, value } }),
     adminDelete: (table, key) => apiRequest(`/admin/tables/${table}/${encodeURIComponent(key)}`, { method: 'DELETE' }),
-    adminStorage: () => apiRequest('/admin/storage'),
-    adminRemoveAvatar: (userId) => apiRequest(`/admin/storage/${userId}`, { method: 'DELETE' }),
     adminLogs: (params) => apiRequest(`/admin/logs?${new URLSearchParams(params)}`),
     adminAnalytics: () => apiRequest('/admin/analytics'),
 

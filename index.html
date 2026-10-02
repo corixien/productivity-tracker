@@ -456,6 +456,27 @@
         </div>
     </dialog>
 
+    <!-- Cell viewer/editor (admin database) -->
+    <dialog id="cell-dialog" class="dialog dialog-wide" aria-labelledby="cell-title">
+        <header class="dialog-header">
+            <div>
+                <h2 id="cell-title"></h2>
+                <p class="hint cell-meta" id="cell-meta"></p>
+            </div>
+            <button type="button" class="icon-btn" data-close data-i18n-aria="close" aria-label="Close"></button>
+        </header>
+        <div class="dialog-body stack">
+            <img id="cell-preview" class="cell-preview" alt="" hidden>
+            <label class="sr-only" for="cell-text" data-i18n="cellValueLabel">Value</label>
+            <textarea id="cell-text" class="cell-textarea" rows="12" spellcheck="false"></textarea>
+            <p id="cell-error" class="form-error" role="alert"></p>
+            <div class="dialog-actions">
+                <button type="button" class="btn btn-ghost" id="cell-copy" data-i18n="cellCopy">Copy</button>
+                <button type="button" class="btn btn-primary" id="cell-save" data-i18n="save">Save</button>
+            </div>
+        </div>
+    </dialog>
+
     <!-- Confirm dialog -->
     <dialog id="confirm-dialog" class="dialog dialog-sm" aria-labelledby="confirm-title" aria-describedby="confirm-message">
         <header class="dialog-header">

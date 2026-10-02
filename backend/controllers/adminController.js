@@ -10,12 +10,26 @@ const listTables = asyncHandler(async (req, res) => {
     res.json({ tables: await admin.listTables() });
 });
 
+function parseFilters(raw) {
+    if (!raw) return [];
+    let parsed;
+    try { parsed = JSON.parse(raw); } catch (error) { throw badRequest('filters must be JSON'); }
+    if (!Array.isArray(parsed) || parsed.length > 20) throw badRequest('filters must be a list of at most 20 entries');
+    return parsed;
+}
+
 const getRows = asyncHandler(async (req, res) => {
     res.json(await admin.getRows(req.params.table, {
-        limit: int(req.query.limit, 50),
-        offset: int(req.query.offset, 0),
-        q: String(req.query.q || '').slice(0, 100)
+        limit: int(req.query.limit, 5000),
+        q: String(req.query.q || '').slice(0, 100),
+        filters: parseFilters(req.query.filters),
+        sort: String(req.query.sort || ''),
+        dir: req.query.dir === 'desc' ? 'desc' : 'asc'
     }));
+});
+
+const getCell = asyncHandler(async (req, res) => {
+    res.json({ value: await admin.getCell(req.params.table, req.params.key, String(req.query.column || '')) });
 });
 
 const updateCell = asyncHandler(async (req, res) => {
@@ -26,15 +40,6 @@ const updateCell = asyncHandler(async (req, res) => {
 
 const deleteRow = asyncHandler(async (req, res) => {
     await admin.deleteRow(req.user, req.params.table, req.params.key);
-    res.json({ success: true });
-});
-
-const listAvatars = asyncHandler(async (req, res) => {
-    res.json({ avatars: await admin.listAvatars() });
-});
-
-const removeAvatar = asyncHandler(async (req, res) => {
-    await admin.removeAvatar(req.user, req.params.userId);
     res.json({ success: true });
 });
 
@@ -56,4 +61,4 @@ const getAnalytics = asyncHandler(async (req, res) => {
     res.json(await admin.getAnalytics());
 });
 
-module.exports = { listTables, getRows, updateCell, deleteRow, listAvatars, removeAvatar, getLogs, getAnalytics };
+module.exports = { listTables, getRows, getCell, updateCell, deleteRow, getLogs, getAnalytics };

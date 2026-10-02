@@ -7,10 +7,9 @@ router.use(authenticate, requireAdmin);
 
 router.get('/tables', adminController.listTables);
 router.get('/tables/:table', adminController.getRows);
+router.get('/tables/:table/:key/cell', adminController.getCell);
 router.patch('/tables/:table/:key', adminController.updateCell);
 router.delete('/tables/:table/:key', adminController.deleteRow);
-router.get('/storage', adminController.listAvatars);
-router.delete('/storage/:userId', adminController.removeAvatar);
 router.get('/logs', adminController.getLogs);
 router.get('/analytics', adminController.getAnalytics);
 

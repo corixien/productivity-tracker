@@ -246,7 +246,7 @@ test('API integration', { skip }, async (t) => {
 
         const tables = (await call('GET', '/api/admin/tables', { token: tokenC })).json.tables;
         const names = tables.map((table) => table.name);
-        for (const name of ['users', 'tasks', 'xp_history', 'friends', 'quick_tasks', 'groq_logs', 'system_logs', 'schema_migrations']) assert.ok(names.includes(name), name);
+        for (const name of ['users', 'tasks', 'xp_history', 'friends', 'templates', 'groq_logs', 'system_logs', 'schema_migrations']) assert.ok(names.includes(name), name);
         assert.ok(!names.includes('profiles') && !names.includes('goals'));
         const users = tables.find((table) => table.name === 'users');
         assert.ok(!users.columns.some((col) => col.name === 'password_hash'), 'secrets are never exposed');
@@ -283,11 +283,41 @@ test('API integration', { skip }, async (t) => {
         assert.equal((await call('PATCH', `/api/admin/tables/xp_history/${key}`, { token: tokenC, body: { column: 'xp_amount', value: 1 } })).status, 404);
         assert.equal((await call('DELETE', `/api/admin/tables/users/${(await call('GET', `/api/admin/tables/users?q=carol_${suffix}`, { token: tokenC })).json.rows[0].__key}`, { token: tokenC })).status, 400, 'cannot delete yourself');
 
-        // avatar storage
-        const aliceAvatar = (await call('GET', '/api/admin/storage', { token: tokenC })).json.avatars.find((entry) => entry.username === `alice_${suffix}`);
-        assert.ok(aliceAvatar && aliceAvatar.bytes > 0);
-        assert.equal((await call('DELETE', `/api/admin/storage/${aliceAvatar.userId}`, { token: tokenC })).status, 200);
+        // avatar_url is a normal column: truncated in lists, full value on demand, editable, NULL removes it
+        const withAvatar = (await call('GET', `/api/admin/tables/users?q=alice_${suffix}`, { token: tokenC })).json.rows[0];
+        assert.match(withAvatar.avatar_url, /^data:image\/png;base64,/);
+        const full = (await call('GET', `/api/admin/tables/users/${withAvatar.__key}/cell?column=avatar_url`, { token: tokenC })).json.value;
+        assert.ok(full.startsWith('data:image/png;base64,') && full.length >= withAvatar.avatar_url.length);
+        assert.equal((await call('PATCH', `/api/admin/tables/users/${withAvatar.__key}`, { token: tokenC, body: { column: 'avatar_url', value: 'http://evil.example/x.png' } })).status, 400);
+        const cleared = await call('PATCH', `/api/admin/tables/users/${withAvatar.__key}`, { token: tokenC, body: { column: 'avatar_url', value: '' } });
+        assert.equal(cleared.status, 200);
+        assert.equal(cleared.json.row.avatar_url, null);
         assert.equal((await call('GET', `/api/users/alice_${suffix}`, { token: tokenA })).json.avatar, null);
+        assert.equal((await call('GET', '/api/admin/storage', { token: tokenC })).status, 404, 'storage endpoint is gone');
+
+        // filters and sorting (Neon style)
+        const rowsFor = async (params) => (await call('GET', `/api/admin/tables/users?${new URLSearchParams(params)}`, { token: tokenC }));
+        const f = (filters) => JSON.stringify(filters);
+        const mine = `${suffix}`;
+        const eq = await rowsFor({ filters: f([{ column: 'username', op: '=', value: `alice_${suffix}` }]) });
+        assert.equal(eq.json.rows.length, 1);
+        const ilike = await rowsFor({ filters: f([{ column: 'username', op: 'ILIKE', value: `%${mine.toUpperCase()}` }]) });
+        assert.ok(ilike.json.rows.length >= 3);
+        const notLike = await rowsFor({ filters: f([{ column: 'username', op: 'ILIKE', value: `%${mine}` }, { column: 'username', op: 'NOT LIKE', value: 'alice%' }]) });
+        assert.ok(notLike.json.rows.every((row) => !row.username.startsWith('alice')));
+        const inList = await rowsFor({ filters: f([{ column: 'username', op: 'IN', value: `alice_${suffix}, bob_${suffix}` }]) });
+        assert.equal(inList.json.rows.length, 2);
+        const gte = await rowsFor({ filters: f([{ column: 'xp', op: '>=', value: 700 }, { column: 'username', op: 'LIKE', value: `%${mine}` }]) });
+        assert.ok(gte.json.rows.length >= 1 && gte.json.rows.every((row) => row.xp >= 700));
+        const noAvatar = await rowsFor({ filters: f([{ column: 'avatar_url', op: 'IS NULL' }, { column: 'username', op: 'LIKE', value: `%${mine}` }]) });
+        assert.ok(noAvatar.json.rows.length >= 3);
+        const sorted = await rowsFor({ filters: f([{ column: 'username', op: 'LIKE', value: `%${mine}` }]), sort: 'xp', dir: 'desc' });
+        assert.ok(sorted.json.rows.every((row, i, all) => i === 0 || all[i - 1].xp >= row.xp), 'sorted by xp desc');
+        assert.equal(sorted.json.capped, false);
+        assert.equal((await rowsFor({ filters: f([{ column: 'nope', op: '=', value: 1 }]) })).status, 400);
+        assert.equal((await rowsFor({ filters: f([{ column: 'xp', op: 'DROP', value: 1 }]) })).status, 400);
+        assert.equal((await rowsFor({ sort: 'nope' })).status, 400);
+        assert.equal((await rowsFor({ filters: f([{ column: 'xp', op: '>', value: 'abc' }]) })).status, 400, 'bad value for the column type');
 
         // logs: compact, filterable, include the admin edit
         const logs = (await call('GET', '/api/admin/logs?limit=100', { token: tokenC })).json.logs;

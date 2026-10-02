@@ -226,6 +226,7 @@ input[aria-invalid="true"] { border-color: var(--danger); }
 }
 .dialog[open] { display: flex; flex-direction: column; animation: dialog-in 0.5s var(--spring); }
 .dialog-sm { width: min(420px, calc(100vw - 24px)); }
+.dialog-wide { width: min(760px, calc(100vw - 24px)); }
 .dialog::backdrop { background: rgba(2, 10, 30, 0.45); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); animation: fade-in 0.25s ease; }
 .dialog-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 20px 6px; }
 .dialog-body { padding: 14px 20px 20px; overflow-y: auto; overscroll-behavior: contain; }

@@ -38,7 +38,7 @@ backend/
                             activityTracker (user_activity/last_seen), uptimeService (minute samples)
   middleware/               auth, validation, rateLimiter (factory + presets), security (Helmet CSP), timezone, errorHandler
   utils/                    database, jwt, password, logger, validation, errors (AppError, asyncHandler, warnOnError), events (SSE hub)
-database/                   migrate.js, migrations/NNN_*.sql (next = 012), migrate-data.js (one-time SQLite import)
+database/                   migrate.js, migrations/NNN_*.sql (next = 013), migrate-data.js (one-time SQLite import)
 scripts/check.js            syntax-checks every first-party JS file
 test/                       node:test suites (unit, frontend static checks, integration)
 Badges/ icons/ LOGO.png     static assets (Badges: one PNG per rank, Platinum reuses silver with a tint; icons/logo.svg is the logo source, PNG icons and LOGO.png are rendered from it)
@@ -60,11 +60,11 @@ Public: `GET /api/health`, `GET /api/meta` (rank thresholds/multipliers), `GET /
 
 ## API surface
 
-`/api/auth` (register, login, me) · `/api/users` (me, friends, leaderboard, quick-tasks incl. `:id/use`, then `:username` get/put/password/avatar/change-username) · `/api/tasks` (CRUD, `PUT` edits fields and/or toggles `completed`, `:id/complete`) · `/api/xp` (history, paginated) and `/api/xp/stats` (streak, today, week, daily goal) · `/api/leaderboard?period=all|week` · `/api/settings` · `/api/events` (SSE) · `/api/admin/*` (tables, storage, logs, analytics) · `/api/groq` (`/`, `/rate`, `/status`) · legacy `/api/ai/rate`, `/api/ai/status` (kept on purpose) · `/api/meta` · `/api/health`. Full list: README.md.
+`/api/auth` (register, login, me) · `/api/users` (me, friends, leaderboard, quick-tasks incl. `:id/use`, then `:username` get/put/password/avatar/change-username) · `/api/tasks` (CRUD, `PUT` edits fields and/or toggles `completed`, `:id/complete`) · `/api/xp` (history, paginated) and `/api/xp/stats` (streak, today, week, daily goal) · `/api/leaderboard?period=all|week` · `/api/settings` · `/api/events` (SSE) · `/api/admin/*` (tables with filters/sort/cell values, logs, analytics) · `/api/groq` (`/`, `/rate`, `/status`) · legacy `/api/ai/rate`, `/api/ai/status` (kept on purpose) · `/api/meta` · `/api/health`. Full list: README.md.
 
 ## Database
 
-Tables: `users`, `tasks`, `xp_history` (audit log), `friends` (directional), `quick_tasks` (templates), `groq_logs`, `system_logs` (activity log: `user_id, username, action, message, metadata`), `user_activity` (user x hour, analytics), `uptime_samples` (minute samples, analytics). `users` carries `xp, level, rank, goals, multiplier, last_multiplier_check, tasks_completed, token_version, daily_goal_xp, is_admin, last_seen_at`. Avatars are small JPEG data URLs in `users.avatar_url` (client resizes to 256 px, server caps at 512 KB). Migrations are the schema source of truth.
+Tables: `users`, `tasks`, `xp_history` (audit log), `friends` (directional), `templates` (task templates, renamed from quick_tasks in migration 012), `groq_logs`, `system_logs` (activity log: `user_id, username, action, message, metadata`), `user_activity` (user x hour, analytics), `uptime_samples` (minute samples, analytics). `users` carries `xp, level, rank, goals, multiplier, last_multiplier_check, tasks_completed, token_version, daily_goal_xp, is_admin, last_seen_at`. Avatars are small JPEG data URLs in `users.avatar_url` (client resizes to 256 px, server caps at 512 KB). Migrations are the schema source of truth.
 
 Links enforced in the database (`users_sync_progress`, `users_audit_xp` triggers, migration 011): `rank` and `level` always follow `xp`; changing `rank` moves `xp` into that rank's range; lowering `tasks_completed` deletes the oldest completed tasks and takes their XP back (0 removes all completed tasks, raising it is capped at the real count); a direct change of `xp` that `xp_history` does not explain is booked as an `admin_adjust` row; `tasks.completed` and `completed_at` must agree (CHECK). SQL rank thresholds (`rank_for_xp`) must match `rankService` (integration test).
 
@@ -98,5 +98,5 @@ Links enforced in the database (`users_sync_progress`, `users_audit_xp` triggers
 - CommonJS in backend, ES modules in `js/`. 4-space indent, single quotes, semicolons.
 - Parameterized SQL only. Build DOM with `h()` (text nodes only); never `innerHTML` with data.
 - Log through `utils/logger`/`loggingService`; swallowed errors use `warnOnError(context)` so they stay visible.
-- New DB change = new migration (next number 012); never edit applied migrations (003 was made idempotent for fresh DBs, 010 and 011 reshaped the schema).
+- New DB change = new migration (next number 013); never edit applied migrations (003 was made idempotent for fresh DBs, 010 and 011 reshaped the schema).
 - Config via env only: `DATABASE_URL`, `JWT_SECRET` required; optional `DATABASE_SSL_REJECT_UNAUTHORIZED`, `JWT_EXPIRES_IN`, `GROQ_API_KEY`, `GROQ_MODEL`, `GROQ_BASE_URL`, `LOG_LEVEL`, `LOG_DIR`, `LOG_RETENTION_DAYS` (default 30), `ADMIN_USERNAMES`, `PORT`, `NODE_ENV`, `CLIENT_ORIGIN`, `DATABASE_POOL_MAX`.

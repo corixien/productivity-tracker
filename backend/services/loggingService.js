@@ -16,9 +16,9 @@ const TABLES_BY_PREFIX = {
     task: ['tasks', 'xp_history', 'users'],
     profile: ['users'],
     friend: ['friends'],
-    template: ['quick_tasks'],
+    template: ['templates'],
     ai: ['groq_logs'],
-    admin: ['users', 'tasks', 'xp_history', 'friends', 'quick_tasks']
+    admin: ['users', 'tasks', 'xp_history', 'friends', 'templates']
 };
 
 // Central activity log: one compact message per event plus the full context as metadata.

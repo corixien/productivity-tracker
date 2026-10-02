@@ -9,7 +9,10 @@ const events = require('../utils/events');
 const { logActivity } = require('./loggingService');
 
 const SECRET_COLUMNS = new Set(['password_hash', 'token_version']);
-const BLOB_COLUMNS = new Set(['avatar_url']);
+const MAX_ROWS = 5000;
+const PREVIEW_CHARS = 200;      // longer cell values are cut in lists; the full value is fetched when a cell is opened
+const MAX_AVATAR_CHARS = 700000;
+const FILTER_OPERATORS = new Set(['=', '!=', '>', '>=', '<', '<=', 'LIKE', 'ILIKE', 'NOT LIKE', 'IN', 'IS NULL', 'IS NOT NULL']);
 const KEY_SEPARATOR = '~';
 const RANKS = RANK_THRESHOLDS.map((rank) => rank.name);
 
@@ -21,7 +24,7 @@ const TABLES = {
         deletable: true,
         editable: {
             username: 'text', language: 'enum:en,de', xp: 'int:0', rank: `enum:${RANKS.join(',')}`,
-            tasks_completed: 'int:0', daily_goal_xp: 'int:10:5000', goals: 'text', is_admin: 'bool'
+            tasks_completed: 'int:0', daily_goal_xp: 'int:10:5000', goals: 'text', is_admin: 'bool', avatar_url: 'avatar'
         }
     },
     tasks: {
@@ -35,7 +38,7 @@ const TABLES = {
     },
     xp_history: { pk: ['id'], order: 'created_at DESC', deletable: false, editable: {} },
     friends: { pk: ['user_id', 'friend_id'], order: 'added_at DESC', deletable: true, editable: {} },
-    quick_tasks: {
+    templates: {
         pk: ['id'],
         order: 'created_at DESC',
         deletable: true,
@@ -64,7 +67,7 @@ function describeColumns(name, rows) {
         .filter((row) => !SECRET_COLUMNS.has(row.column_name))
         .map((row) => ({
             name: row.column_name,
-            type: BLOB_COLUMNS.has(row.column_name) ? 'blob' : row.data_type,
+            type: row.data_type,
             editable: Boolean(cfg.editable[row.column_name]),
             options: optionsOf(cfg.editable[row.column_name])
         }));
@@ -103,12 +106,21 @@ async function tableMeta(name) {
 /* ---- rows ---- */
 const keyOf = (cfg, row) => cfg.pk.map((column) => (row[column] instanceof Date ? row[column].toISOString() : String(row[column]))).join(KEY_SEPARATOR);
 
+// Values are sent as display strings; long ones are cut and listed in __truncated.
 function presentRow(cfg, columns, row) {
     const out = { __key: keyOf(cfg, row) };
+    const truncated = [];
     for (const column of columns) {
-        if (column.type === 'blob') out[`${column.name}`] = row[column.name] ? `${Math.round(row[column.name].length / 1024 * 10) / 10} KB` : null;
-        else out[column.name] = row[column.name] instanceof Date ? row[column.name].toISOString() : row[column.name];
+        let value = row[column.name];
+        if (value instanceof Date) value = value.toISOString();
+        else if (value !== null && typeof value === 'object') value = JSON.stringify(value);
+        if (typeof value === 'string' && value.length > PREVIEW_CHARS) {
+            value = value.slice(0, PREVIEW_CHARS);
+            truncated.push(column.name);
+        }
+        out[column.name] = value;
     }
+    if (truncated.length) out.__truncated = truncated;
     return out;
 }
 
@@ -118,22 +130,63 @@ function keyWhere(cfg, key, startIndex = 1) {
     return { sql: cfg.pk.map((column, i) => `"${column}"::text = $${startIndex + i}`).join(' AND '), params: parts };
 }
 
-async function getRows(name, { limit = 50, offset = 0, q = '' }) {
-    const { table, cfg } = await tableMeta(name);
-    const searchable = table.columns.filter((col) => col.type !== 'blob');
+// Neon-style filters: [{ column, op, value }]. Column names are checked against the catalog and
+// operators against a whitelist; values are always bound parameters.
+function buildWhere(table, { q, filters }) {
+    const names = new Set(table.columns.map((column) => column.name));
     const params = [];
-    let where = '';
-    if (q) {
-        params.push(`%${q}%`);
-        where = `WHERE ${searchable.map((col) => `"${col.name}"::text ILIKE $1`).join(' OR ')}`;
+    const clauses = [];
+    const bind = (value) => { params.push(value); return `$${params.length}`; };
+
+    for (const filter of filters || []) {
+        if (!filter || !names.has(filter.column)) throw badRequest('Unknown filter column');
+        const op = String(filter.op || '').toUpperCase();
+        if (!FILTER_OPERATORS.has(op)) throw badRequest('Unknown filter operator');
+        const column = `"${filter.column}"`;
+        if (op === 'IS NULL' || op === 'IS NOT NULL') clauses.push(`${column} ${op}`);
+        else if (op === 'IN') {
+            const items = String(filter.value ?? '').split(',').map((item) => item.trim()).filter(Boolean);
+            if (items.length === 0) throw badRequest('IN needs at least one value');
+            clauses.push(`${column}::text = ANY(${bind(items)}::text[])`);
+        } else if (['LIKE', 'ILIKE', 'NOT LIKE'].includes(op)) clauses.push(`${column}::text ${op} ${bind(String(filter.value ?? ''))}`);
+        else clauses.push(`${column} ${op} ${bind(String(filter.value ?? ''))}`);
     }
-    const order = cfg.order ? `ORDER BY ${cfg.order}` : '';
+    if (q) {
+        const needle = bind(`%${q}%`);
+        clauses.push(`(${table.columns.map((column) => `"${column.name}"::text ILIKE ${needle}`).join(' OR ')})`);
+    }
+    return { sql: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '', params };
+}
+
+async function getRows(name, { limit = MAX_ROWS, q = '', filters = [], sort = '', dir = 'asc' }) {
+    const { table, cfg } = await tableMeta(name);
+    const where = buildWhere(table, { q, filters });
+    const names = new Set(table.columns.map((column) => column.name));
+    let order = cfg.order ? `ORDER BY ${cfg.order}` : '';
+    if (sort) {
+        if (!names.has(sort)) throw badRequest('Unknown sort column');
+        const tieBreak = cfg.pk.filter((column) => column !== sort).map((column) => `, "${column}"`).join('');
+        order = `ORDER BY "${sort}" ${dir === 'desc' ? 'DESC' : 'ASC'} NULLS LAST${tieBreak}`;
+    }
     const select = table.columns.map((col) => `"${col.name}"`).join(', ');
     const [rows, total] = await Promise.all([
-        query(`SELECT ${select} FROM "${name}" ${where} ${order} LIMIT ${Math.min(200, Math.max(1, limit))} OFFSET ${Math.max(0, offset)}`, params),
-        query(`SELECT COUNT(*)::int AS n FROM "${name}" ${where}`, params)
+        query(`SELECT ${select} FROM "${name}" ${where.sql} ${order} LIMIT ${Math.min(MAX_ROWS, Math.max(1, limit))}`, where.params),
+        query(`SELECT COUNT(*)::int AS n FROM "${name}" ${where.sql}`, where.params)
     ]);
-    return { table, rows: rows.rows.map((row) => presentRow(cfg, table.columns, row)), total: total.rows[0].n };
+    return { table, rows: rows.rows.map((row) => presentRow(cfg, table.columns, row)), total: total.rows[0].n, capped: total.rows[0].n > rows.rows.length };
+}
+
+// Full, untruncated value of one cell (pretty-printed for JSON).
+async function getCell(name, key, column) {
+    const { table, cfg } = await tableMeta(name);
+    if (!table.columns.some((entry) => entry.name === column)) throw badRequest('Unknown column');
+    const where = keyWhere(cfg, key);
+    const result = await query(`SELECT "${column}" AS value FROM "${name}" WHERE ${where.sql}`, where.params);
+    if (!result.rows[0]) throw notFound('Row not found');
+    let value = result.rows[0].value;
+    if (value instanceof Date) value = value.toISOString();
+    else if (value !== null && typeof value === 'object') value = JSON.stringify(value, null, 2);
+    return value;
 }
 
 async function getRow(name, key) {
@@ -160,6 +213,14 @@ function coerce(spec, value, column) {
         if (b !== undefined && number > Number(b)) throw badRequest(`${column} must be at most ${b}`);
         return number;
     }
+    if (kind === 'avatar') {
+        const text = String(value ?? '').trim();
+        if (text === '') return null;
+        if (text.length > MAX_AVATAR_CHARS || !/^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(text)) {
+            throw badRequest('avatar_url must be empty or a data:image URL (png, jpeg, webp, gif) under 512 KB');
+        }
+        return text;
+    }
     if (kind === 'enum') {
         if (!a.split(',').includes(String(value))) throw badRequest(`${column} must be one of ${a.replace(/,/g, ', ')}`);
         return String(value);
@@ -185,7 +246,8 @@ async function updateCell(admin, name, key, column, rawValue) {
     let value = coerce(spec, rawValue, column);
     const userId = name === 'users' ? raw.id : raw.user_id;
     const label = name === 'users' ? raw.username : (raw.name || key);
-    const describe = (shown) => `Admin ${admin.username} set ${name}.${column} = ${shown} (${label})`;
+    const shortValue = column === 'avatar_url' ? (value === null ? 'NULL' : '(image)') : value;
+    const describe = () => `Admin ${admin.username} set ${name}.${column} = ${shortValue} (${label})`;
 
     if (name === 'users') {
         if (column === 'username') {
@@ -212,7 +274,7 @@ async function updateCell(admin, name, key, column, rawValue) {
         await query(`UPDATE "${name}" SET "${column}" = $1 WHERE ${where.sql}`, [value, ...where.params]);
     }
 
-    await afterChange(admin, { table: name, key, userId, message: describe(value), meta: { column, value } });
+    await afterChange(admin, { table: name, key, userId, message: describe(), meta: { column, value: column === 'avatar_url' ? shortValue : value } });
     return (await getRow(name, key)).row;
 }
 
@@ -239,24 +301,6 @@ async function deleteRow(admin, name, key) {
     await afterChange(admin, {
         table: name, key, userId, revoke: name === 'users',
         message: `Admin ${admin.username} deleted ${name} row (${label})`, meta: { deleted: true }
-    });
-}
-
-/* ---- avatar storage ---- */
-async function listAvatars() {
-    const result = await query(
-        `SELECT id, username, avatar_url, LENGTH(avatar_url) AS bytes, updated_at FROM users
-         WHERE avatar_url IS NOT NULL ORDER BY LENGTH(avatar_url) DESC LIMIT 200`
-    );
-    return result.rows.map((row) => ({ userId: row.id, username: row.username, bytes: Number(row.bytes), updatedAt: row.updated_at, dataUrl: row.avatar_url }));
-}
-
-async function removeAvatar(admin, userId) {
-    const result = await query('UPDATE users SET avatar_url = NULL, updated_at = NOW() WHERE id = $1 AND avatar_url IS NOT NULL RETURNING username', [userId]);
-    if (!result.rows[0]) throw notFound('No avatar');
-    await afterChange(admin, {
-        table: 'users', key: userId, userId,
-        message: `Admin ${admin.username} removed the profile picture of ${result.rows[0].username}`, meta: { column: 'avatar_url' }
     });
 }
 
@@ -323,4 +367,4 @@ async function promoteConfiguredAdmins() {
     return result.rowCount;
 }
 
-module.exports = { listTables, getRows, updateCell, deleteRow, listAvatars, removeAvatar, getLogs, getAnalytics, promoteConfiguredAdmins };
+module.exports = { listTables, getRows, getCell, updateCell, deleteRow, getLogs, getAnalytics, promoteConfiguredAdmins };
