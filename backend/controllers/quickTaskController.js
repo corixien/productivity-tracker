@@ -1,4 +1,5 @@
 const QuickTask = require('../models/QuickTask');
+const { logActivity } = require('../services/loggingService');
 const { asyncHandler, notFound } = require('../utils/errors');
 
 const getQuickTasks = asyncHandler(async (req, res) => {
@@ -6,7 +7,9 @@ const getQuickTasks = asyncHandler(async (req, res) => {
 });
 
 const createQuickTask = asyncHandler(async (req, res) => {
-    res.status(201).json(await QuickTask.create(req.user.id, req.body));
+    const template = await QuickTask.create(req.user.id, req.body);
+    await logActivity({ userId: req.user.id, action: 'template.create', message: `Saved template "${template.name}"`, meta: { templateId: template.id } });
+    res.status(201).json(template);
 });
 
 const updateQuickTask = asyncHandler(async (req, res) => {
@@ -17,18 +20,15 @@ const updateQuickTask = asyncHandler(async (req, res) => {
 
 const deleteQuickTask = asyncHandler(async (req, res) => {
     if (!await QuickTask.remove(req.params.id, req.user.id)) throw notFound('Quick task not found');
+    await logActivity({ userId: req.user.id, action: 'template.delete', message: 'Deleted a template', meta: { templateId: req.params.id } });
     res.json({ success: true });
 });
 
 const useQuickTask = asyncHandler(async (req, res) => {
     const task = await QuickTask.createTaskFrom(req.params.id, req.user.id);
     if (!task) throw notFound('Quick task not found');
+    await logActivity({ userId: req.user.id, action: 'template.use', message: `Added task "${task.name}" from template`, meta: { templateId: req.params.id, taskId: task.id } });
     res.status(201).json(task);
 });
 
-const spawnRecurring = asyncHandler(async (req, res) => {
-    const tasks = await QuickTask.spawnRecurring(req.user.id, req.tz);
-    res.json({ success: true, tasks });
-});
-
-module.exports = { getQuickTasks, createQuickTask, updateQuickTask, deleteQuickTask, useQuickTask, spawnRecurring };
+module.exports = { getQuickTasks, createQuickTask, updateQuickTask, deleteQuickTask, useQuickTask };

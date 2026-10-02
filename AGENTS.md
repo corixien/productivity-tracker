@@ -4,11 +4,11 @@ Project guide for agents. Complements `/home/mateo/AGENTS.md` (workspace-level r
 
 ## What it is
 
-Web app for friend groups competing on productivity. Users register/login (username + password), log tasks (natural language, optionally AI-rated), complete them to earn XP, climb ranks (Newcomer, Bronze, Silver, Gold, Platinum, Diamond, Master), keep streaks and a daily XP goal, compare on an all-time/weekly leaderboard, reuse tasks as templates (optionally recurring). UI languages: English and German. Installable PWA.
+Web app for friend groups competing on productivity. Users register/login (username + password), log tasks (natural language, optionally AI-rated), complete them to earn XP, climb ranks (Newcomer, Bronze, Silver, Gold, Platinum, Diamond, Master), keep streaks and a daily XP goal, compare on an all-time/weekly leaderboard, reuse tasks as templates. UI languages: English and German. Installable PWA. Admin area for the owner.
 
 ## Stack
 
-- Frontend: vanilla JS ES modules, single `index.html`, plain CSS split by concern. Visual style: calm blue "liquid glass" with bright blue only as accent (translucent gradients, heavy backdrop blur, bright top edge, spring hover/press animations, a gliding glass lens behind the active nav item) driven by `--glass-*` and `--blur` tokens in `css/tokens.css`. No framework, no bundler, no build step.
+- Frontend: vanilla JS ES modules, single `index.html`, plain CSS split by concern, Lexend Deca font self-hosted in `fonts/`. Visual style: calm blue "liquid glass" with bright blue only as accent (translucent gradients, heavy backdrop blur, bright top edge, spring hover/press animations, a gliding glass lens behind the active nav item) driven by `--glass-*` and `--blur` tokens in `css/tokens.css`. No framework, no bundler, no build step.
 - Backend: Node >=18 (CI uses 22), Express 4, `pg` pool, bcrypt, JWT, Winston, Helmet.
 - DB: PostgreSQL on Neon. Deploy: Render free tier (`render.yaml`). The service is allowed to spin down; do not add keep-alive pings.
 - AI: Groq API proxied via backend (key never reaches the browser).
@@ -19,25 +19,26 @@ Web app for friend groups competing on productivity. Users register/login (usern
 index.html                  SPA shell: static markup + <dialog>s (no inline script/style: strict CSP)
 sw.js, offline.html         service worker (app-shell cache, API never cached) + offline page
 manifest.json               PWA manifest
-css/                        tokens (themes) -> base -> components -> layout -> views
+css/                        fonts -> tokens (themes) -> base -> components -> layout -> views
 js/
   app.js                    bootstrap and wiring
   theme-boot.js             classic script in <head>: applies saved theme before first paint
-  core/                     api (fetch, retry, offline queue), auth, state (store + event bus), data (loaders),
+  core/                     api (fetch, retry, offline queue), auth, state (store + event bus), data (loaders), live (SSE client),
                             i18n (EN/DE), dom (h(), icons, formatters), ui (toasts, banners, dialogs), ranks, theme, pwa, glass (pointer highlight + ripple for the liquid-glass buttons)
   features/                 nav (hash routing), auth-view, dashboard (hero + task list), task-dialog (add/edit),
-                            templates, activity, streak (streak card, charts, calendar), leaderboard, settings, stats, shared
+                            templates, activity, streak (streak card, charts, calendar), leaderboard, settings, stats, charts (SVG), shared, admin/ (database, logs, analytics)
 backend/
   index.js                  Express entry (exports app; listens only when run directly)
   config.js                 env readers
   routes/                   thin route tables
   controllers/              handlers wrapped in asyncHandler, throw AppError
-  models/                   SQL: User, Task, Goal, QuickTask (templates)
+  models/                   SQL: User, Task, QuickTask (templates)
   services/                 rankService (thresholds, XP formula, multipliers, meta), groqService, avatarService,
-                            loggingService, retentionService (log purge)
+                            loggingService (logActivity: compact log + admin feed), retentionService, adminService,
+                            activityTracker (user_activity/last_seen), uptimeService (minute samples)
   middleware/               auth, validation, rateLimiter (factory + presets), security (Helmet CSP), timezone, errorHandler
-  utils/                    database, jwt, password, logger, validation, errors (AppError, asyncHandler, warnOnError)
-database/                   migrate.js, migrations/NNN_*.sql (next = 011), migrate-data.js (one-time SQLite import)
+  utils/                    database, jwt, password, logger, validation, errors (AppError, asyncHandler, warnOnError), events (SSE hub)
+database/                   migrate.js, migrations/NNN_*.sql (next = 012), migrate-data.js (one-time SQLite import)
 scripts/check.js            syntax-checks every first-party JS file
 test/                       node:test suites (unit, frontend static checks, integration)
 Badges/ icons/ LOGO.png     static assets (Badges: one PNG per rank, Platinum reuses silver with a tint; icons/logo.svg is the logo source, PNG icons and LOGO.png are rendered from it)
@@ -59,11 +60,13 @@ Public: `GET /api/health`, `GET /api/meta` (rank thresholds/multipliers), `GET /
 
 ## API surface
 
-`/api/auth` (register, login, me) · `/api/users` (me, friends, leaderboard, profile, quick-tasks incl. `:id/use` and `spawn-recurring`, then `:username` get/put/password/avatar/change-username) · `/api/tasks` (CRUD, `PUT` edits fields and/or toggles `completed`, `:id/complete`) · `/api/goals` · `/api/xp` (history, paginated) and `/api/xp/stats` (streak, today, week, daily goal) · `/api/leaderboard?period=all|week` · `/api/settings` · `/api/groq` (`/`, `/rate`, `/status`) · legacy `/api/ai/rate`, `/api/ai/status` (kept on purpose) · `/api/meta` · `/api/health`. Full list: README.md.
+`/api/auth` (register, login, me) · `/api/users` (me, friends, leaderboard, quick-tasks incl. `:id/use`, then `:username` get/put/password/avatar/change-username) · `/api/tasks` (CRUD, `PUT` edits fields and/or toggles `completed`, `:id/complete`) · `/api/xp` (history, paginated) and `/api/xp/stats` (streak, today, week, daily goal) · `/api/leaderboard?period=all|week` · `/api/settings` · `/api/events` (SSE) · `/api/admin/*` (tables, storage, logs, analytics) · `/api/groq` (`/`, `/rate`, `/status`) · legacy `/api/ai/rate`, `/api/ai/status` (kept on purpose) · `/api/meta` · `/api/health`. Full list: README.md.
 
 ## Database
 
-Tables: `users`, `profiles`, `tasks`, `xp_history` (immutable audit log), `friends` (directional), `goals`, `groq_logs`, `system_logs`, `quick_tasks` (templates; `recurrence`, `last_spawned_on`). `users` carries `xp, level, rank, multiplier, position_based_multiplier, rank_based_multiplier, last_multiplier_check, tasks_completed, token_version, daily_goal_xp`. Avatars are stored as small JPEG data URLs in `users.avatar_url` (client resizes to 256 px, server caps at 512 KB). Migrations are the schema source of truth.
+Tables: `users`, `tasks`, `xp_history` (audit log), `friends` (directional), `quick_tasks` (templates), `groq_logs`, `system_logs` (activity log: `user_id, username, action, message, metadata`), `user_activity` (user x hour, analytics), `uptime_samples` (minute samples, analytics). `users` carries `xp, level, rank, goals, multiplier, last_multiplier_check, tasks_completed, token_version, daily_goal_xp, is_admin, last_seen_at`. Avatars are small JPEG data URLs in `users.avatar_url` (client resizes to 256 px, server caps at 512 KB). Migrations are the schema source of truth.
+
+Links enforced in the database (`users_sync_progress`, `users_audit_xp` triggers, migration 011): `rank` and `level` always follow `xp`; changing `rank` moves `xp` into that rank's range; lowering `tasks_completed` deletes the oldest completed tasks and takes their XP back (0 removes all completed tasks, raising it is capped at the real count); a direct change of `xp` that `xp_history` does not explain is booked as an `admin_adjust` row; `tasks.completed` and `completed_at` must agree (CHECK). SQL rank thresholds (`rank_for_xp`) must match `rankService` (integration test).
 
 ## Game mechanics
 
@@ -75,7 +78,7 @@ Tables: `users`, `profiles`, `tasks`, `xp_history` (immutable audit log), `frien
 
 ## Invariants and gotchas
 
-- Never write `users.xp` directly: do it inside a transaction via `Task.syncUserTotals` (insert `xp_history`, re-sum, update users, recalc multiplier).
+- Never write `users.xp` directly from app code: do it inside a transaction via `Task.syncUserTotals` (insert `xp_history`, re-sum, update `xp` only; rank and level come from the trigger, then recalc the multiplier).
 - Auth: JWT carries `tv` (= `users.token_version`). Changing the password bumps it, revoking all older tokens; the response returns the new token. `authenticate` only loads `id, username, token_version`.
 - Password change requires the current password. `PUT /api/users/:username` only accepts `language` and `goals`; other users get public fields only from `GET /api/users/:username`.
 - In `routes/users.js`, fixed paths must stay above `/:username`.
@@ -83,6 +86,10 @@ Tables: `users`, `profiles`, `tasks`, `xp_history` (immutable audit log), `frien
 - Every new CSS/JS file must be added to the `SHELL` list in `sw.js` (the test fails otherwise); bump `VERSION` there when shell files change in a way that must invalidate caches.
 - New UI text needs both `en` and `de` in `js/core/i18n.js` (test enforces key parity and usage).
 - Rate limiters are in-memory (per process, reset on restart).
+- Admin: `users.is_admin` (set from `ADMIN_USERNAMES` for existing accounts at boot, editable in the admin database page). `requireAdmin` answers 404 to everyone else. The secret route prefix (`ADMIN_PREFIX` in `features/nav.js`, currently `admin-4321`) only hides the entry point; the server check is the real protection.
+- Live channel: `GET /api/events` (SSE, `utils/events.js`, single instance). Users get `sync`/`revoked` after admin edits; admins get `log` and `db` events from `logActivity`. Client (`core/live.js`) keeps it open only while the tab is visible.
+- Log every user-visible action through `logActivity({ userId, action: 'category.verb', message })` with a compact human message (`Completed task "X" = +21 XP`); put full context in `meta`. Categories feed the admin log filters: auth, task, profile, friend, template, ai, admin, system.
+- Performance rules for the glass UI: real `backdrop-filter` only on large persistent surfaces (card, sidebar, dock, toast, dialog), never on list rows or buttons; no infinite animations; the ambient background is one static layer. Refraction is faked with gradients and a chromatic inset rim (`--glass-*` tokens).
 - Render free tier cold start: first request may 502/503; `core/api.js` retries and shows a "server waking up" banner. Only completing an existing task is queued offline.
 - `logs/` and `.env` are gitignored; the test server logs to `LOG_DIR`.
 
@@ -91,5 +98,5 @@ Tables: `users`, `profiles`, `tasks`, `xp_history` (immutable audit log), `frien
 - CommonJS in backend, ES modules in `js/`. 4-space indent, single quotes, semicolons.
 - Parameterized SQL only. Build DOM with `h()` (text nodes only); never `innerHTML` with data.
 - Log through `utils/logger`/`loggingService`; swallowed errors use `warnOnError(context)` so they stay visible.
-- New DB change = new migration (next number 011); never edit applied migrations (003 was made idempotent for fresh DBs, 010 dropped its trigger).
-- Config via env only: `DATABASE_URL`, `JWT_SECRET` required; optional `DATABASE_SSL_REJECT_UNAUTHORIZED`, `JWT_EXPIRES_IN`, `GROQ_API_KEY`, `GROQ_MODEL`, `GROQ_BASE_URL`, `LOG_LEVEL`, `LOG_DIR`, `LOG_RETENTION_DAYS` (default 30), `PORT`, `NODE_ENV`, `CLIENT_ORIGIN`, `DATABASE_POOL_MAX`.
+- New DB change = new migration (next number 012); never edit applied migrations (003 was made idempotent for fresh DBs, 010 and 011 reshaped the schema).
+- Config via env only: `DATABASE_URL`, `JWT_SECRET` required; optional `DATABASE_SSL_REJECT_UNAUTHORIZED`, `JWT_EXPIRES_IN`, `GROQ_API_KEY`, `GROQ_MODEL`, `GROQ_BASE_URL`, `LOG_LEVEL`, `LOG_DIR`, `LOG_RETENTION_DAYS` (default 30), `ADMIN_USERNAMES`, `PORT`, `NODE_ENV`, `CLIENT_ORIGIN`, `DATABASE_POOL_MAX`.

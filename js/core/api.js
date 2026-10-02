@@ -209,7 +209,15 @@ const api = {
     updateTemplate: (id, data) => apiRequest(`/users/quick-tasks/${id}`, { method: 'PUT', body: data }),
     deleteTemplate: (id) => apiRequest(`/users/quick-tasks/${id}`, { method: 'DELETE' }),
     useTemplate: (id) => apiRequest(`/users/quick-tasks/${id}/use`, { method: 'POST' }),
-    spawnRecurring: () => apiRequest('/users/quick-tasks/spawn-recurring', { method: 'POST' }),
+
+    adminTables: () => apiRequest('/admin/tables'),
+    adminRows: (table, { limit, offset, q }) => apiRequest(`/admin/tables/${table}?limit=${limit}&offset=${offset}&q=${encodeURIComponent(q || '')}`),
+    adminUpdate: (table, key, column, value) => apiRequest(`/admin/tables/${table}/${encodeURIComponent(key)}`, { method: 'PATCH', body: { column, value } }),
+    adminDelete: (table, key) => apiRequest(`/admin/tables/${table}/${encodeURIComponent(key)}`, { method: 'DELETE' }),
+    adminStorage: () => apiRequest('/admin/storage'),
+    adminRemoveAvatar: (userId) => apiRequest(`/admin/storage/${userId}`, { method: 'DELETE' }),
+    adminLogs: (params) => apiRequest(`/admin/logs?${new URLSearchParams(params)}`),
+    adminAnalytics: () => apiRequest('/admin/analytics'),
 
     rateTask(description, goals, signal) {
         return apiRequest('/groq', { method: 'POST', body: { description, goals }, signal });

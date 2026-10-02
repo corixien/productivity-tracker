@@ -1,8 +1,8 @@
-const { query, transaction } = require('../utils/database');
+const { query } = require('../utils/database');
 const Task = require('./Task');
 
-const COLUMNS = 'id, name, duration, productivity, difficulty, category, bonus, recurrence, last_spawned_on';
-const EDITABLE_FIELDS = ['name', 'duration', 'productivity', 'difficulty', 'category', 'bonus', 'recurrence'];
+const COLUMNS = 'id, name, duration, productivity, difficulty, category, bonus';
+const EDITABLE_FIELDS = ['name', 'duration', 'productivity', 'difficulty', 'category', 'bonus'];
 
 async function findByUserId(userId) {
     const result = await query(
@@ -22,9 +22,9 @@ async function findOwned(id, userId) {
 
 async function create(userId, data) {
     const result = await query(
-        `INSERT INTO quick_tasks (user_id, name, duration, productivity, difficulty, category, bonus, recurrence)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING ${COLUMNS}`,
-        [userId, data.name, data.duration, data.productivity, data.difficulty, data.category, data.bonus, data.recurrence]
+        `INSERT INTO quick_tasks (user_id, name, duration, productivity, difficulty, category, bonus)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING ${COLUMNS}`,
+        [userId, data.name, data.duration, data.productivity, data.difficulty, data.category, data.bonus]
     );
     return result.rows[0];
 }
@@ -59,33 +59,4 @@ async function createTaskFrom(id, userId) {
     return Task.create(userId, template);
 }
 
-// Creates one pending task per due recurring template (daily: once per local day,
-// weekly: once per 7 days). Marking and creation share a transaction, so a template
-// is never marked spawned without its task. A template is skipped while a pending
-// task with the same name still exists.
-async function spawnRecurring(userId, tz) {
-    return transaction(async (client) => {
-        const due = await client.query(
-            `UPDATE quick_tasks SET last_spawned_on = (NOW() AT TIME ZONE $2)::date
-             WHERE user_id = $1 AND recurrence <> 'none' AND (
-                 last_spawned_on IS NULL
-                 OR (recurrence = 'daily' AND last_spawned_on < (NOW() AT TIME ZONE $2)::date)
-                 OR (recurrence = 'weekly' AND last_spawned_on <= (NOW() AT TIME ZONE $2)::date - 7)
-             )
-             RETURNING ${COLUMNS}`,
-            [userId, tz]
-        );
-        const created = [];
-        for (const template of due.rows) {
-            const existing = await client.query(
-                'SELECT 1 FROM tasks WHERE user_id = $1 AND completed = false AND LOWER(name) = LOWER($2) LIMIT 1',
-                [userId, template.name]
-            );
-            if (existing.rows.length > 0) continue;
-            created.push(await Task.create(userId, template, client));
-        }
-        return created;
-    });
-}
-
-module.exports = { findByUserId, findOwned, create, update, remove, createTaskFrom, spawnRecurring };
+module.exports = { findByUserId, findOwned, create, update, remove, createTaskFrom };

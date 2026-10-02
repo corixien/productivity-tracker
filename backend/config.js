@@ -32,7 +32,13 @@ function getAuthConfig() {
     };
 }
 
+// Usernames (comma separated, case-insensitive) that become admins at startup and cannot be registered by others.
+function getAdminUsernames() {
+    return new Set((process.env.ADMIN_USERNAMES || '').split(',').map((name) => name.trim().toLowerCase()).filter(Boolean));
+}
+
 module.exports = {
+    getAdminUsernames,
     DEFAULT_GROQ_MODEL,
     getDatabaseConfig,
     getGroqConfig,

@@ -124,11 +124,11 @@ test('timezone validation', () => {
 test('quick task validation', async () => {
     const ok = await run(validateQuickTask, { method: 'POST', body: { name: ' Read ', duration: '20' } });
     assert.ok(ok.next);
-    assert.deepEqual(ok.req.body, { name: 'Read', duration: 20, productivity: 0, difficulty: 3, category: 'other', bonus: 0, recurrence: 'none' });
-    const bad = await run(validateQuickTask, { method: 'POST', body: { name: 'x', duration: 20, recurrence: 'hourly' } });
+    assert.deepEqual(ok.req.body, { name: 'Read', duration: 20, productivity: 0, difficulty: 3, category: 'other', bonus: 0 });
+    const bad = await run(validateQuickTask, { method: 'POST', body: { name: 'x', duration: 5000 } });
     assert.equal(bad.code, 400);
-    const partial = await run(validateQuickTask, { method: 'PUT', body: { recurrence: 'daily' } });
-    assert.deepEqual(partial.req.body, { recurrence: 'daily' });
+    const partial = await run(validateQuickTask, { method: 'PUT', body: { category: 'learning' } });
+    assert.deepEqual(partial.req.body, { category: 'learning' });
 });
 
 test('password change requires current password', async () => {
@@ -140,7 +140,7 @@ test('password change requires current password', async () => {
 test('settings validation', async () => {
     assert.equal((await run(validateSettings, { body: { dailyGoalXp: 5 } })).code, 400);
     assert.equal((await run(validateSettings, { body: { language: 'fr' } })).code, 400);
-    const ok = await run(validateSettings, { body: { fiveYearGoal: ' be great ', dailyGoalXp: '80' } });
+    const ok = await run(validateSettings, { body: { goals: ' be great ', dailyGoalXp: '80' } });
     assert.equal(ok.req.body.goals, 'be great');
     assert.equal(ok.req.body.dailyGoalXp, 80);
 });

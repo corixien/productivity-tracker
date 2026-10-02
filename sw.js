@@ -1,5 +1,5 @@
 // Service worker: makes the app shell load offline. API calls are never cached.
-const VERSION = 'v2';
+const VERSION = 'v4';
 const SHELL_CACHE = `pt-shell-${VERSION}`;
 const RUNTIME_CACHE = `pt-runtime-${VERSION}`;
 
@@ -9,6 +9,7 @@ const SHELL = [
     '/offline.html',
     '/manifest.json',
     '/LOGO.png',
+    '/css/fonts.css',
     '/css/tokens.css',
     '/css/base.css',
     '/css/components.css',
@@ -21,6 +22,7 @@ const SHELL = [
     '/js/core/data.js',
     '/js/core/dom.js',
     '/js/core/glass.js',
+    '/js/core/live.js',
     '/js/core/i18n.js',
     '/js/core/pwa.js',
     '/js/core/ranks.js',
@@ -28,7 +30,11 @@ const SHELL = [
     '/js/core/theme.js',
     '/js/core/ui.js',
     '/js/features/activity.js',
+    '/js/features/admin/analytics.js',
+    '/js/features/admin/database.js',
+    '/js/features/admin/logs.js',
     '/js/features/auth-view.js',
+    '/js/features/charts.js',
     '/js/features/dashboard.js',
     '/js/features/leaderboard.js',
     '/js/features/nav.js',
@@ -46,7 +52,9 @@ const SHELL = [
     '/Badges/master.png',
     '/icons/favicon-32x32.png',
     '/icons/favicon-192x192.png',
-    '/icons/logo.svg'
+    '/icons/logo.svg',
+    '/fonts/lexend-deca-latin-wght-normal.woff2',
+    '/fonts/lexend-deca-latin-ext-wght-normal.woff2'
 ];
 
 self.addEventListener('install', (event) => {

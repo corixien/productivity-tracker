@@ -1,13 +1,17 @@
-/* Liquid glass surfaces: translucent gradient, heavy backdrop blur, bright top edge */
-.card, .sidebar, .tabbar, .stat, .task-card, .history-items, .board-row, .podium-spot, .user-mini, .segmented, .toast, .banner {
+/* Liquid glass. Surfaces get depth from layered gradients, a bright top edge and a chromatic rim
+   (blue on the left, pink on the right) that fakes refraction at the glass edge. All of that is
+   plain painting. Real backdrop blur is reserved for the few surfaces that sit over moving content. */
+.card, .sidebar, .tabbar, .stat, .task-card, .history-items, .board-row, .podium-spot, .user-mini, .segmented, .toast, .banner, .ice-panel {
     background: var(--glass-bg-soft);
     border: 1px solid var(--glass-border);
     box-shadow: var(--glass-shadow);
-    -webkit-backdrop-filter: var(--blur);
-    backdrop-filter: var(--blur);
 }
 .card, .sidebar, .tabbar { background: var(--glass-bg); }
 .card { border-radius: var(--radius-lg); }
+.card, .sidebar, .tabbar, .toast, .banner { -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); }
+
+/* Long lists: skip rendering of off-screen rows */
+.task-card, .history-item, .board-row { content-visibility: auto; contain-intrinsic-size: auto 92px; }
 
 /* Buttons */
 .btn {
@@ -22,11 +26,11 @@
 
 .btn-primary {
     background: linear-gradient(to bottom, rgba(255, 255, 255, 0.3), transparent 55%), var(--grad);
-    color: var(--on-accent); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), var(--glow);
+    color: var(--on-accent); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), inset 2px 0 3px -1px rgba(255, 255, 255, 0.25), inset -2px 0 3px -1px rgba(120, 190, 255, 0.35), var(--glow);
 }
-.btn-primary:hover { filter: brightness(1.06); }
+.btn-primary:hover { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65), inset 2px 0 3px -1px rgba(255, 255, 255, 0.3), inset -2px 0 3px -1px rgba(120, 190, 255, 0.4), 0 10px 26px -6px rgba(10, 132, 255, 0.7); }
 
-.btn-secondary { background: var(--glass-bg-soft); border-color: var(--glass-border); box-shadow: inset 0 1px 0 var(--glass-edge); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); }
+.btn-secondary { background: var(--glass-bg-soft); border-color: var(--glass-border); box-shadow: inset 0 1px 0 var(--glass-edge), var(--glass-fringe); }
 .btn-secondary:hover { border-color: var(--accent); }
 
 .btn-ghost { background: transparent; color: var(--text-muted); }
@@ -61,18 +65,17 @@
 /* Liquid-glass interaction: spring hover/press, pointer-following specular highlight, press ripple */
 .btn, .icon-btn, .segment, .nav-link, .fab, .check-btn, button.chip {
     position: relative; overflow: hidden; isolation: isolate; -webkit-tap-highlight-color: transparent;
-    transition: transform 0.5s var(--spring), box-shadow 0.3s var(--ease), background 0.25s, border-color 0.25s, color 0.25s, filter 0.25s, opacity 0.2s;
+    transition: transform 0.5s var(--spring), box-shadow 0.3s var(--ease), background-color 0.25s, border-color 0.25s, color 0.25s, opacity 0.2s;
 }
 .btn::after, .icon-btn::after, .segment::after, .nav-link::after, .fab::after, .check-btn::after, button.chip::after {
     content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; opacity: 0;
-    background: radial-gradient(130px circle at var(--mx, 50%) var(--my, 0%), rgba(255, 255, 255, 0.4), transparent 70%);
-    transition: opacity 0.35s var(--ease);
+    background: radial-gradient(110px circle at var(--mx, 50%) var(--my, 0%), rgba(255, 255, 255, 0.4), transparent 70%);
+    transition: opacity 0.3s var(--ease);
 }
 @media (hover: hover) {
     .btn:hover::after, .icon-btn:hover::after, .segment:hover::after, .nav-link:hover::after, .fab:hover::after, .check-btn:hover::after, button.chip:hover::after { opacity: 1; }
-    .btn:hover, .icon-btn:hover, .nav-link:hover, button.chip:hover { transform: translateY(-1px) scale(1.04); }
+    .btn:hover, .icon-btn:hover, .nav-link:hover, button.chip:hover { transform: translateY(-1px) scale(1.03); }
     .segment:hover { transform: scale(1.04); }
-    .fab:hover { transform: scale(1.1); }
 }
 .btn:active, .icon-btn:active, .segment:active, .nav-link:active, .fab:active, .check-btn:active, button.chip:active {
     transform: scale(0.92); transition-duration: 0.12s;
@@ -98,7 +101,7 @@
 input[type="text"], input[type="password"], input[type="number"], select, textarea {
     width: 100%; min-height: 46px; padding: 10px 14px;
     background: var(--surface); border: 1px solid var(--glass-border); border-radius: 14px;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), inset 1px 0 2px -1px rgba(120, 200, 255, 0.2);
     transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
 }
 textarea { resize: vertical; min-height: 96px; line-height: 1.45; }
@@ -137,7 +140,7 @@ input[aria-invalid="true"] { border-color: var(--danger); }
 .segment {
     min-height: 38px; padding: 0 18px; border: 0; border-radius: 999px;
     background: transparent; color: var(--text-muted); font-weight: 650; font-size: 0.92rem;
-    transition: background 0.2s, color 0.2s;
+    transition: background-color 0.2s, color 0.2s;
 }
 .segment:hover { color: var(--text); }
 .segment[aria-selected="true"], .segment[aria-pressed="true"] {
@@ -157,7 +160,7 @@ input[aria-invalid="true"] { border-color: var(--danger); }
 .progress-fill::after {
     content: ""; position: absolute; inset: 0;
     background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.45) 50%, transparent 70%);
-    transform: translateX(-100%); animation: shimmer 3.2s ease-in-out infinite;
+    transform: translateX(-100%); animation: shimmer 3.2s ease-in-out 3;
 }
 @keyframes shimmer { 60%, 100% { transform: translateX(100%); } }
 
@@ -202,9 +205,9 @@ input[aria-invalid="true"] { border-color: var(--danger); }
 .dialog {
     width: min(560px, calc(100vw - 24px)); max-height: min(90dvh, 860px);
     padding: 0; border: 1px solid var(--glass-border); border-radius: var(--radius-lg);
-    background: color-mix(in srgb, var(--surface-solid) 62%, transparent); color: var(--text);
+    background: var(--glass-bg), color-mix(in srgb, var(--surface-solid) 66%, transparent); color: var(--text);
     -webkit-backdrop-filter: var(--blur-strong); backdrop-filter: var(--blur-strong);
-    box-shadow: var(--glass-shadow), 0 40px 90px -20px rgba(0, 10, 40, 0.65);
+    box-shadow: var(--glass-shadow), 0 40px 80px -24px rgba(0, 10, 40, 0.6);
     overflow: hidden; margin: auto;
 }
 .dialog[open] { display: flex; flex-direction: column; animation: dialog-in 0.5s var(--spring); }

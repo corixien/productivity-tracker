@@ -45,13 +45,15 @@ function streakHero(stats) {
                     streak.current === 0 ? t('streakStart') : streak.activeToday ? t('longestStreak', { n: streak.longest }) : t('streakKeep'))
             )
         ),
-        weekStrip(days),
-        h('div', { class: 'ice-panel', title: t('iceHint') },
-            h('span', { class: 'ice-title' }, icon('snowflake'), t('iceTitle')),
-            h('span', { class: 'ice-slots', role: 'img', 'aria-label': t('iceCount', { n: streak.freezes, max: streak.maxFreezes }) }, ...iceSlots(streak)),
-            h('span', { class: 'ice-text' }, iceText(streak))
+        h('div', { class: 'streak-side' },
+            weekStrip(days),
+            h('div', { class: 'ice-panel', title: t('iceHint') },
+                h('span', { class: 'ice-title' }, icon('snowflake'), t('iceTitle')),
+                h('span', { class: 'ice-slots', role: 'img', 'aria-label': t('iceCount', { n: streak.freezes, max: streak.maxFreezes }) }, ...iceSlots(streak)),
+                h('span', { class: 'ice-text' }, iceText(streak))
+            )
         ),
-        h('p', { class: 'hint' }, t('iceHint'))
+        h('p', { class: 'hint streak-hint' }, t('iceHint'))
     );
 }
 
@@ -112,13 +114,16 @@ function calendar(stats) {
     );
 }
 
-function renderStreakPanel(container) {
+function renderStreakHero(container) {
     const stats = state.stats;
-    if (!stats || !stats.days) {
-        container.replaceChildren(h('div', { class: 'skeleton', 'aria-hidden': 'true' }), h('div', { class: 'skeleton', 'aria-hidden': 'true' }));
-        return;
-    }
-    container.replaceChildren(streakHero(stats), h('div', { class: 'chart-grid' }, barChart(stats), calendar(stats)));
+    if (!stats || !stats.days) container.replaceChildren(h('div', { class: 'skeleton skeleton-tall', 'aria-hidden': 'true' }));
+    else container.replaceChildren(streakHero(stats));
 }
 
-export { renderStreakPanel };
+function renderCharts(container) {
+    const stats = state.stats;
+    if (!stats || !stats.days) container.replaceChildren(h('div', { class: 'skeleton skeleton-tall', 'aria-hidden': 'true' }), h('div', { class: 'skeleton skeleton-tall', 'aria-hidden': 'true' }));
+    else container.replaceChildren(barChart(stats), calendar(stats));
+}
+
+export { renderStreakHero, renderCharts };

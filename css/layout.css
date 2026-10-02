@@ -18,9 +18,13 @@
     display: grid; place-items: center; width: 62px; height: 62px; padding: 0;
     border: 0; border-radius: 50%;
     background: linear-gradient(to bottom, rgba(255, 255, 255, 0.3), transparent 55%), var(--grad);
-    color: var(--on-accent); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), var(--glow);
+    color: var(--on-accent); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), inset 2px 0 3px -1px rgba(255, 255, 255, 0.25), inset -2px 0 3px -1px rgba(120, 190, 255, 0.35), var(--glow);
+    transition: transform 0.6s cubic-bezier(0.34, 1.45, 0.64, 1), box-shadow 0.3s var(--ease);
 }
 .fab svg { width: 28px; height: 28px; }
+/* Swirl: a fast full turn while growing on hover; leaving plays the same turn backwards while shrinking back. */
+@media (hover: hover) { .fab:hover { transform: rotate(360deg) scale(1.28); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65), 0 14px 32px -6px rgba(10, 132, 255, 0.75); } }
+.fab:active { transform: rotate(360deg) scale(1.12); transition-duration: 0.15s; }
 
 /* App shell */
 .app-screen { min-height: 100dvh; }
@@ -47,7 +51,6 @@
     background: var(--grad-soft), var(--glass-bg);
     border: 1px solid var(--glass-border);
     box-shadow: var(--glass-shadow), 0 8px 20px -10px rgba(10, 132, 255, 0.6);
-    -webkit-backdrop-filter: blur(10px) saturate(150%); backdrop-filter: blur(10px) saturate(150%);
     transition: translate 0.65s var(--spring), width 0.65s var(--spring), height 0.65s var(--spring);
 }
 .nav-indicator.no-motion { transition: none; }

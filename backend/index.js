@@ -9,6 +9,10 @@ const { securityHeaders } = require('./middleware/security');
 const { apiRateLimiter } = require('./middleware/rateLimiter');
 const { timezone } = require('./middleware/timezone');
 const { startRetentionJob } = require('./services/retentionService');
+const { startUptimeSampler, stopUptimeSampler } = require('./services/uptimeService');
+const { promoteConfiguredAdmins } = require('./services/adminService');
+const { logActivity } = require('./services/loggingService');
+const { warnOnError } = require('./utils/errors');
 const groqController = require('./controllers/groqController');
 const { authenticate } = require('./middleware/auth');
 const { validateAiRate } = require('./middleware/validation');
@@ -17,12 +21,13 @@ const { aiRateLimiter } = require('./middleware/rateLimiter');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const taskRoutes = require('./routes/tasks');
-const goalRoutes = require('./routes/goals');
 const groqRoutes = require('./routes/groq');
 const xpRoutes = require('./routes/xp');
 const leaderboardRoutes = require('./routes/leaderboard');
 const settingsRoutes = require('./routes/settings');
 const metaRoutes = require('./routes/meta');
+const adminRoutes = require('./routes/admin');
+const eventRoutes = require('./routes/events');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -86,12 +91,13 @@ app.use('/api', timezone);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/tasks', taskRoutes);
-app.use('/api/goals', goalRoutes);
 app.use('/api/xp', xpRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/groq', groqRoutes);
 app.use('/api/meta', metaRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/events', eventRoutes);
 
 // Legacy routes kept for compatibility with older clients.
 app.post('/api/ai/rate', authenticate, aiRateLimiter, validateAiRate, groqController.rateTask);
@@ -114,6 +120,7 @@ app.use('/js', express.static(path.join(FRONTEND_DIR, 'js'), revalidate));
 app.use('/css', express.static(path.join(FRONTEND_DIR, 'css'), revalidate));
 app.use('/icons', express.static(path.join(FRONTEND_DIR, 'icons'), longCache));
 app.use('/Badges', express.static(path.join(FRONTEND_DIR, 'Badges'), longCache));
+app.use('/fonts', express.static(path.join(FRONTEND_DIR, 'fonts'), { maxAge: '365d', immutable: true }));
 
 app.use(notFoundHandler);
 app.use(errorHandler);
@@ -122,11 +129,16 @@ function start() {
     const server = app.listen(PORT, '0.0.0.0', () => {
         logger.info('Productivity Tracker API running', { port: PORT, environment: process.env.NODE_ENV || 'development' });
         startRetentionJob();
+        startUptimeSampler();
+        promoteConfiguredAdmins()
+            .then((promoted) => logActivity({ action: 'system.boot', message: `Server started${promoted ? `, ${promoted} admin(s) promoted` : ''}`, meta: { port: PORT } }))
+            .catch(warnOnError('boot'));
     });
 
     async function shutdown(signal) {
         logger.info('Shutdown received', { signal });
         server.close(async () => {
+            await stopUptimeSampler();
             await closePool();
             process.exit(0);
         });

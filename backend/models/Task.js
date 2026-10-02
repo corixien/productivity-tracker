@@ -1,6 +1,6 @@
 const { query, transaction } = require('../utils/database');
-const { logTaskCreation, logXpGeneration } = require('../services/loggingService');
-const { getRankName, getLevel, calculateXpFromTask } = require('../services/rankService');
+const { logActivity } = require('../services/loggingService');
+const { calculateXpFromTask } = require('../services/rankService');
 const { recalculateMultiplier } = require('../models/User');
 const { warnOnError } = require('../utils/errors');
 
@@ -11,9 +11,7 @@ function normalizeTask(task) {
     return {
         id: task.id,
         userId: task.user_id,
-        taskText: task.task_text,
-        name: task.name || task.task_text,
-        aiScore: task.ai_score,
+        name: task.name,
         xp: task.xp_awarded,
         xpAwarded: task.xp_awarded,
         duration: task.duration,
@@ -28,7 +26,7 @@ function normalizeTask(task) {
 }
 
 async function create(userId, taskData, db = defaultDb) {
-    const name = taskData.name || taskData.taskText;
+    const name = taskData.name;
     const productivity = Number(taskData.productivity || 0);
     const difficulty = Number(taskData.difficulty || 3);
     const bonus = Number(taskData.bonus || 0);
@@ -36,13 +34,16 @@ async function create(userId, taskData, db = defaultDb) {
         ? Number(taskData.xp)
         : calculateXpFromTask(Number(taskData.duration), productivity, difficulty, bonus);
     const result = await db.query(
-        `INSERT INTO tasks (user_id, task_text, name, ai_score, xp_awarded, duration, productivity, difficulty, category, bonus, completed, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, false, NOW())
+        `INSERT INTO tasks (user_id, name, xp_awarded, duration, productivity, difficulty, category, bonus, completed, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false, NOW())
          RETURNING *`,
-        [userId, name, name, productivity, xp, Number(taskData.duration), productivity, difficulty, taskData.category || 'other', bonus]
+        [userId, name, xp, Number(taskData.duration), productivity, difficulty, taskData.category || 'other', bonus]
     );
     const task = normalizeTask(result.rows[0]);
-    await logTaskCreation(userId, task);
+    await logActivity({
+        userId, action: 'task.create', message: `Created task "${task.name}" (${task.xp} XP)`,
+        meta: { taskId: task.id, xp: task.xp, duration: task.duration, category: task.category }
+    });
     return task;
 }
 
@@ -83,17 +84,15 @@ async function getAwardedXp(client, userId, taskId) {
     return Math.max(0, parseInt(result.rows[0].total, 10));
 }
 
-// Re-sums xp_history and writes users.xp/level/rank. Must run inside the caller's transaction.
+// Re-sums xp_history and writes users.xp (rank and level are derived by a trigger). Must run inside the caller's transaction.
 async function syncUserTotals(client, userId) {
     const totalResult = await client.query(
         'SELECT COALESCE(SUM(xp_amount), 0) AS total FROM xp_history WHERE user_id = $1',
         [userId]
     );
     const totalXp = parseInt(totalResult.rows[0].total, 10);
-    await client.query(
-        'UPDATE users SET xp = $1, level = $2, rank = $3, updated_at = NOW() WHERE id = $4',
-        [totalXp, getLevel(totalXp), getRankName(totalXp), userId]
-    );
+    // rank and level follow xp inside the database (users_sync_progress trigger)
+    await client.query('UPDATE users SET xp = $1, updated_at = NOW() WHERE id = $2', [totalXp, userId]);
     return totalXp;
 }
 
@@ -126,10 +125,10 @@ async function update(userId, id, updates) {
             : task.xp_awarded;
 
         const updated = await client.query(
-            `UPDATE tasks SET name = $1, task_text = $2, duration = $3, productivity = $4, difficulty = $5,
-                 category = $6, bonus = $7, xp_awarded = $8, updated_at = NOW()
-             WHERE id = $9 RETURNING *`,
-            [next.name, next.name, next.duration, next.productivity, next.difficulty, next.category, next.bonus, newXp, id]
+            `UPDATE tasks SET name = $1, duration = $2, productivity = $3, difficulty = $4,
+                 category = $5, bonus = $6, xp_awarded = $7, updated_at = NOW()
+             WHERE id = $8 RETURNING *`,
+            [next.name, next.duration, next.productivity, next.difficulty, next.category, next.bonus, newXp, id]
         );
 
         let xpChange = 0;
@@ -146,8 +145,12 @@ async function update(userId, id, updates) {
         }
         return { task: normalizeTask(updated.rows[0]), xpChange, totalXp };
     });
-    if (outcome && outcome.xpChange !== 0) {
-        await logXpGeneration(userId, outcome.xpChange, 'task_edit').catch(warnOnError('Task.update.log'));
+    if (outcome) {
+        const delta = outcome.xpChange !== 0 ? ` (${outcome.xpChange > 0 ? '+' : ''}${outcome.xpChange} XP)` : '';
+        await logActivity({
+            userId, action: 'task.edit', message: `Edited task "${outcome.task.name}"${delta}`,
+            meta: { taskId: id, xpChange: outcome.xpChange, changes: updates }
+        }).catch(warnOnError('Task.update.log'));
     }
     return outcome;
 }
@@ -194,7 +197,13 @@ async function setCompleted(userId, taskId, completed) {
         return { task: normalizeTask(updatedResult.rows[0]), totalXp, xpEarned: xpChange, changed: true };
     });
     if (outcome && outcome.changed) {
-        await logXpGeneration(userId, outcome.xpEarned, completed ? 'task' : 'task_uncomplete').catch(warnOnError('Task.setCompleted.log'));
+        const sign = outcome.xpEarned > 0 ? '+' : '';
+        await logActivity({
+            userId,
+            action: completed ? 'task.complete' : 'task.uncomplete',
+            message: `${completed ? 'Completed' : 'Undid'} task "${outcome.task.name}" = ${sign}${outcome.xpEarned} XP`,
+            meta: { taskId, xpChange: outcome.xpEarned, totalXp: outcome.totalXp }
+        }).catch(warnOnError('Task.setCompleted.log'));
     }
     return outcome;
 }
@@ -220,10 +229,14 @@ async function deleteTask(userId, taskId) {
         await client.query('DELETE FROM tasks WHERE id = $1', [taskId]);
         const totalXp = await syncUserTotals(client, userId);
         await recalculateMultiplier(userId, true, client);
-        return { deleted: true, totalXp, xpChange };
+        return { deleted: true, totalXp, xpChange, name: task.name };
     });
     if (outcome) {
-        await logXpGeneration(userId, outcome.xpChange, 'task_delete').catch(warnOnError('Task.delete.log'));
+        const delta = outcome.xpChange !== 0 ? ` (${outcome.xpChange} XP)` : '';
+        await logActivity({
+            userId, action: 'task.delete', message: `Deleted task "${outcome.name}"${delta}`,
+            meta: { taskId, xpChange: outcome.xpChange, totalXp: outcome.totalXp }
+        }).catch(warnOnError('Task.delete.log'));
     }
     return outcome;
 }

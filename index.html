@@ -14,6 +14,8 @@
     <link rel="apple-touch-icon" sizes="180x180" href="icons/favicon-192x192.png">
     <link rel="manifest" href="manifest.json">
     <script src="js/theme-boot.js"></script>
+    <link rel="preload" href="fonts/lexend-deca-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="css/fonts.css">
     <link rel="stylesheet" href="css/tokens.css">
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/components.css">
@@ -80,6 +82,7 @@
             <div class="brand">
                 <img src="LOGO.png" alt="" width="36" height="36">
                 <span data-i18n="appTitle">Productivity Tracker</span>
+                <span class="admin-badge" id="admin-badge" data-i18n="adminBadge" hidden>Admin</span>
             </div>
             <nav id="sidebar-nav" class="nav" data-i18n-aria="navMain" aria-label="Main"></nav>
             <div class="sidebar-footer">
@@ -144,7 +147,7 @@
                 <header class="view-header">
                     <div>
                         <h1 id="h-templates" data-i18n="navTemplates">Templates</h1>
-                        <p class="subtitle" data-i18n="templatesSubtitle">Save tasks you repeat. Recurring templates add themselves to your list.</p>
+                        <p class="subtitle" data-i18n="templatesSubtitle">Save tasks you repeat and add them with one click.</p>
                     </div>
                 </header>
                 <ul id="template-list" class="task-list"></ul>
@@ -158,8 +161,9 @@
                         <p class="subtitle" data-i18n="activitySubtitle">Every XP change, newest first.</p>
                     </div>
                 </header>
-                <div id="streak-panel" class="streak-panel"></div>
+                <div id="streak-panel"></div>
                 <div class="stat-row" id="activity-stats"></div>
+                <div id="activity-charts" class="chart-grid"></div>
                 <div id="history-list" class="history"></div>
                 <div class="load-more">
                     <button type="button" class="btn btn-secondary" id="history-more" hidden data-i18n="loadMore">Load more</button>
@@ -251,6 +255,65 @@
                     </section>
                 </div>
             </section>
+
+            <!-- Admin: database -->
+            <section id="view-admin-database" class="view" data-view="admin-database" aria-labelledby="h-admin-database" hidden>
+                <header class="view-header">
+                    <div>
+                        <h1 id="h-admin-database" data-i18n="navDatabase">Database</h1>
+                        <p class="subtitle" id="admin-db-subtitle" data-i18n="dbSubtitle">Every table. Changes sync to users instantly.</p>
+                    </div>
+                </header>
+                <div class="table-tabs" id="admin-table-tabs" role="group" data-i18n-aria="tablesLabel" aria-label="Tables"></div>
+                <div id="admin-db-body" class="admin-db-body"></div>
+            </section>
+
+            <!-- Admin: logs -->
+            <section id="view-admin-logs" class="view" data-view="admin-logs" aria-labelledby="h-admin-logs" hidden>
+                <header class="view-header">
+                    <div>
+                        <h1 id="h-admin-logs" data-i18n="navLogs">Logs</h1>
+                        <p class="subtitle" data-i18n="logsSubtitle">Everything that happens on the site, newest first.</p>
+                    </div>
+                </header>
+                <form class="log-controls" id="log-controls" role="search">
+                    <label class="sr-only" for="log-search" data-i18n="logSearchLabel">Search logs</label>
+                    <input type="text" id="log-search" data-i18n-placeholder="logSearch" autocomplete="off" spellcheck="false">
+                    <label class="sr-only" for="log-level" data-i18n="logLevelLabel">Level</label>
+                    <select id="log-level" class="select-sm">
+                        <option value="" data-i18n="logLevelAll">All levels</option>
+                        <option value="info">info</option>
+                        <option value="warn">warn</option>
+                        <option value="error">error</option>
+                    </select>
+                    <label class="sr-only" for="log-category" data-i18n="logCategoryLabel">Category</label>
+                    <select id="log-category" class="select-sm">
+                        <option value="" data-i18n="logCategoryAll">All categories</option>
+                        <option value="auth" data-i18n="logCatAuth">Auth</option>
+                        <option value="task" data-i18n="logCatTask">Tasks</option>
+                        <option value="profile" data-i18n="logCatProfile">Profile</option>
+                        <option value="friend" data-i18n="logCatFriend">Friends</option>
+                        <option value="template" data-i18n="logCatTemplate">Templates</option>
+                        <option value="ai" data-i18n="logCatAi">AI</option>
+                        <option value="admin" data-i18n="logCatAdmin">Admin</option>
+                        <option value="system" data-i18n="logCatSystem">System</option>
+                    </select>
+                    <label class="check log-live"><input type="checkbox" id="log-live" checked><span data-i18n="logLive">Live</span></label>
+                </form>
+                <ol id="log-list" class="terminal" data-i18n-aria="logsNavLabel" aria-label="Log entries"></ol>
+                <p class="hint" id="log-count"></p>
+            </section>
+
+            <!-- Admin: analytics -->
+            <section id="view-admin-analytics" class="view" data-view="admin-analytics" aria-labelledby="h-admin-analytics" hidden>
+                <header class="view-header">
+                    <div>
+                        <h1 id="h-admin-analytics" data-i18n="navAnalytics">Analytics</h1>
+                        <p class="subtitle" data-i18n="analyticsSubtitle">The last 24 hours at a glance.</p>
+                    </div>
+                </header>
+                <div id="analytics-grid" class="analytics-grid"></div>
+            </section>
         </main>
 
         <nav id="tabbar" class="tabbar" data-i18n-aria="navMain" aria-label="Main"></nav>
@@ -320,17 +383,10 @@
                         <input type="checkbox" id="task-done">
                         <span data-i18n="markDone">Already done</span>
                     </label>
-                    <div class="field-row field-row-center">
-                        <label class="check">
-                            <input type="checkbox" id="task-save-template">
-                            <span data-i18n="saveTemplate">Save as template</span>
-                        </label>
-                        <select id="task-recurrence" class="select-sm" data-i18n-aria="recurrence" aria-label="Repeat" disabled>
-                            <option value="none" data-i18n="recurNone">No repeat</option>
-                            <option value="daily" data-i18n="recurDaily">Every day</option>
-                            <option value="weekly" data-i18n="recurWeekly">Every week</option>
-                        </select>
-                    </div>
+                    <label class="check">
+                        <input type="checkbox" id="task-save-template">
+                        <span data-i18n="saveTemplate">Save as template</span>
+                    </label>
                 </div>
 
                 <div class="xp-preview" id="xp-preview" aria-live="polite">

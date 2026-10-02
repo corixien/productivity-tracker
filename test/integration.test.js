@@ -136,18 +136,14 @@ test('API integration', { skip }, async (t) => {
         assert.deepEqual(Object.keys(other.json).sort(), ['avatar', 'level', 'rank', 'username', 'xp']);
     });
 
-    await t.test('templates and recurring tasks', async () => {
-        const created = await call('POST', '/api/users/quick-tasks', { token: tokenA, body: { name: 'Daily reading', duration: 20, productivity: 3, recurrence: 'daily' } });
+    await t.test('templates', async () => {
+        const created = await call('POST', '/api/users/quick-tasks', { token: tokenA, body: { name: 'Daily reading', duration: 20, productivity: 3 } });
         assert.equal(created.status, 201);
         const list = await call('GET', '/api/users/quick-tasks', { token: tokenA });
         assert.equal(list.json.length, 1);
-        const first = await call('POST', '/api/users/quick-tasks/spawn-recurring', { token: tokenA });
-        assert.equal(first.json.tasks.length, 1);
-        assert.equal(first.json.tasks[0].name, 'Daily reading');
-        const again = await call('POST', '/api/users/quick-tasks/spawn-recurring', { token: tokenA });
-        assert.equal(again.json.tasks.length, 0);
         const used = await call('POST', `/api/users/quick-tasks/${created.json.id}/use`, { token: tokenA });
         assert.equal(used.status, 201);
+        assert.equal(used.json.name, 'Daily reading');
         assert.equal((await call('DELETE', `/api/users/quick-tasks/${created.json.id}`, { token: tokenA })).status, 200);
     });
 
@@ -197,10 +193,128 @@ test('API integration', { skip }, async (t) => {
         await query("DELETE FROM system_logs WHERE message = 'retention-new'");
     });
 
-    await t.test('deleting a completed task removes its XP', async () => {
+    await t.test('database links rank, level, xp and the task count', async () => {
+        const { query } = require('../backend/utils/database');
+        const { getRankName } = require('../backend/services/rankService');
+        const rankOf = async (name) => (await query('SELECT xp, level, rank, tasks_completed FROM users WHERE username = $1', [name])).rows[0];
+
+        // SQL thresholds match rankService
+        for (const xp of [0, 99, 100, 299, 300, 599, 600, 1199, 1200, 2399, 2400, 4999, 5000, 9000]) {
+            const { rows } = await query('SELECT rank_for_xp($1) AS rank', [xp]);
+            assert.equal(rows[0].rank, getRankName(xp), `rank_for_xp(${xp})`);
+        }
+
+        await query('UPDATE users SET xp = 700 WHERE username = $1', [nameB]);
+        assert.deepEqual(await rankOf(nameB), { xp: 700, level: 7, rank: 'Gold', tasks_completed: 0 });
+        const audit = await query("SELECT xp_amount FROM xp_history WHERE source = 'admin_adjust' AND user_id = (SELECT id FROM users WHERE username = $1)", [nameB]);
+        assert.equal(audit.rows[0].xp_amount, 700, 'direct xp edit is booked as an adjustment');
+
+        await query("UPDATE users SET rank = 'Silver' WHERE username = $1", [nameB]);
+        assert.deepEqual(await rankOf(nameB), { xp: 599, level: 5, rank: 'Silver', tasks_completed: 0 }, 'lowering the rank lowers xp');
+        await query("UPDATE users SET rank = 'Diamond' WHERE username = $1", [nameB]);
+        assert.equal((await rankOf(nameB)).xp, 2400, 'raising the rank raises xp');
+
+        // task count: trim completed tasks, take their XP back, keep pending ones
+        const ids = [];
+        for (let i = 0; i < 3; i += 1) {
+            const task = await call('POST', '/api/tasks', { token: tokenB, body: { name: `Link ${i}`, duration: 30, productivity: 4, difficulty: 3 } });
+            ids.push(task.json.id);
+        }
+        for (const id of ids.slice(0, 2)) await call('POST', `/api/tasks/${id}/complete`, { token: tokenB });
+        assert.equal((await rankOf(nameB)).tasks_completed, 2);
+        await query('UPDATE users SET tasks_completed = 99 WHERE username = $1', [nameB]);
+        assert.equal((await rankOf(nameB)).tasks_completed, 2, 'cannot exceed the real count');
+        await query('UPDATE users SET tasks_completed = 1 WHERE username = $1', [nameB]);
+        const left = await query("SELECT name FROM tasks WHERE user_id = (SELECT id FROM users WHERE username = $1) AND completed", [nameB]);
+        assert.deepEqual(left.rows.map((row) => row.name), ['Link 1'], 'oldest completed task is removed first');
+        await query('UPDATE users SET tasks_completed = 0 WHERE username = $1', [nameB]);
+        const remaining = await query("SELECT completed FROM tasks WHERE user_id = (SELECT id FROM users WHERE username = $1)", [nameB]);
+        assert.deepEqual(remaining.rows, [{ completed: false }], 'count 0 removes completed tasks, pending stays');
+        const sum = await query("SELECT COALESCE(SUM(xp_amount), 0)::int AS sum FROM xp_history WHERE user_id = (SELECT id FROM users WHERE username = $1)", [nameB]);
+        assert.equal(sum.rows[0].sum, (await rankOf(nameB)).xp, 'history always explains users.xp');
+    });
+
+    await t.test('admin API: access, edits, storage, logs, analytics, live sync', async () => {
+        const { query } = require('../backend/utils/database');
+        const c = await call('POST', '/api/auth/register', { body: { username: `carol_${suffix}`, password: 'secret3' } });
+        let tokenC = c.token || c.json.token;
+        assert.equal((await call('GET', '/api/admin/tables', { token: tokenC })).status, 404, 'non-admins get 404');
+        assert.equal((await call('GET', '/api/admin/tables')).status, 401);
+        await query('UPDATE users SET is_admin = true WHERE username = $1', [`carol_${suffix}`]);
+        const me = await call('GET', '/api/auth/me', { token: tokenC });
+        assert.equal(me.json.isAdmin, true);
+
+        const tables = (await call('GET', '/api/admin/tables', { token: tokenC })).json.tables;
+        const names = tables.map((table) => table.name);
+        for (const name of ['users', 'tasks', 'xp_history', 'friends', 'quick_tasks', 'groq_logs', 'system_logs', 'schema_migrations']) assert.ok(names.includes(name), name);
+        assert.ok(!names.includes('profiles') && !names.includes('goals'));
+        const users = tables.find((table) => table.name === 'users');
+        assert.ok(!users.columns.some((col) => col.name === 'password_hash'), 'secrets are never exposed');
+
+        const listed = (await call('GET', `/api/admin/tables/users?q=alice_${suffix}`, { token: tokenC })).json;
+        assert.equal(listed.rows.length, 1);
+        const key = listed.rows[0].__key;
+
+        // live sync: a connected user hears about the admin edit
+        const controller = new AbortController();
+        const stream = await fetch(`${base}/api/events`, { headers: { Authorization: `Bearer ${tokenA}` }, signal: controller.signal });
+        const reader = stream.body.getReader();
+        let received = '';
+        const gotSync = (async () => {
+            const decoder = new TextDecoder();
+            while (!received.includes('event: sync')) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                received += decoder.decode(value);
+            }
+            return received;
+        })();
+        await new Promise((resolve) => setTimeout(resolve, 150));
+
+        const edited = await call('PATCH', `/api/admin/tables/users/${key}`, { token: tokenC, body: { column: 'xp', value: 750 } });
+        assert.equal(edited.status, 200);
+        assert.equal(edited.json.row.xp, 750);
+        assert.equal(edited.json.row.rank, 'Gold');
+        assert.match(await Promise.race([gotSync, new Promise((_, reject) => setTimeout(() => reject(new Error('no sync event')), 3000))]), /event: sync/);
+        controller.abort();
+
+        assert.equal((await call('PATCH', `/api/admin/tables/users/${key}`, { token: tokenC, body: { column: 'password_hash', value: 'x' } })).status, 400);
+        assert.equal((await call('PATCH', `/api/admin/tables/users/${key}`, { token: tokenC, body: { column: 'rank', value: 'Emperor' } })).status, 400);
+        assert.equal((await call('PATCH', `/api/admin/tables/xp_history/${key}`, { token: tokenC, body: { column: 'xp_amount', value: 1 } })).status, 404);
+        assert.equal((await call('DELETE', `/api/admin/tables/users/${(await call('GET', `/api/admin/tables/users?q=carol_${suffix}`, { token: tokenC })).json.rows[0].__key}`, { token: tokenC })).status, 400, 'cannot delete yourself');
+
+        // avatar storage
+        const aliceAvatar = (await call('GET', '/api/admin/storage', { token: tokenC })).json.avatars.find((entry) => entry.username === `alice_${suffix}`);
+        assert.ok(aliceAvatar && aliceAvatar.bytes > 0);
+        assert.equal((await call('DELETE', `/api/admin/storage/${aliceAvatar.userId}`, { token: tokenC })).status, 200);
+        assert.equal((await call('GET', `/api/users/alice_${suffix}`, { token: tokenA })).json.avatar, null);
+
+        // logs: compact, filterable, include the admin edit
+        const logs = (await call('GET', '/api/admin/logs?limit=100', { token: tokenC })).json.logs;
+        assert.ok(logs.length > 5 && logs.length <= 100);
+        assert.ok(logs.some((log) => log.action === 'task.complete' && /Completed task "Study" = \+\d+ XP/.test(log.message)));
+        assert.ok(logs.some((log) => log.action === 'admin.edit' && /Admin carol_/.test(log.message)));
+        const onlyAuth = (await call('GET', '/api/admin/logs?category=auth', { token: tokenC })).json.logs;
+        assert.ok(onlyAuth.length > 0 && onlyAuth.every((log) => log.action.startsWith('auth.')));
+        const searched = (await call('GET', `/api/admin/logs?q=${encodeURIComponent('Study')}&user=alice`, { token: tokenC })).json.logs;
+        assert.ok(searched.length > 0 && searched.every((log) => /alice/.test(log.username)));
+
+        // analytics shape
+        const analytics = (await call('GET', '/api/admin/analytics', { token: tokenC })).json;
+        assert.equal(analytics.uptime.length, 24);
+        assert.equal(analytics.users.length, 24);
+        assert.equal(analytics.groq.length, 24);
+        assert.ok(analytics.topUsers.length >= 1 && analytics.topUsers.length <= 5);
+        assert.ok(analytics.topUsers.every((entry, i, all) => i === 0 || all[i - 1].xp >= entry.xp));
+        assert.ok(analytics.totals.activeUsers24h >= 1);
+    });
+
+    await t.test('deleting a completed task removes exactly its XP', async () => {
+        const before = (await call('GET', '/api/auth/me', { token: tokenA })).json.xp;
         const del = await call('DELETE', `/api/tasks/${taskId}`, { token: tokenA });
         assert.equal(del.status, 200);
-        assert.equal(del.json.newXP, 0);
+        assert.equal(del.json.xpChange, -28);
+        assert.equal(del.json.newXP, before - 28);
         assert.equal((await call('DELETE', `/api/tasks/${taskId}`, { token: tokenA })).status, 404);
         assert.equal((await call('DELETE', '/api/tasks/not-a-uuid', { token: tokenA })).status, 400);
     });

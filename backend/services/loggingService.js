@@ -1,5 +1,6 @@
 const { query } = require('../utils/database');
 const { logger } = require('../utils/logger');
+const { publishAdmin } = require('../utils/events');
 
 function stringify(value) {
     try {
@@ -9,69 +10,63 @@ function stringify(value) {
     }
 }
 
-async function persist(level, message, metadata = {}) {
+// Which admin-visible tables an activity touches (drives the live refresh of the admin database page).
+const TABLES_BY_PREFIX = {
+    auth: ['users'],
+    task: ['tasks', 'xp_history', 'users'],
+    profile: ['users'],
+    friend: ['friends'],
+    template: ['quick_tasks'],
+    ai: ['groq_logs'],
+    admin: ['users', 'tasks', 'xp_history', 'friends', 'quick_tasks']
+};
+
+// Central activity log: one compact message per event plus the full context as metadata.
+// action is "<category>.<verb>", e.g. task.complete, profile.avatar, auth.login_failed.
+async function logActivity({ userId = null, username = null, action, message, level = 'info', meta = {} }) {
+    logger.log(level, message, { event: action, user_id: userId, username, ...meta });
     try {
-        await query(
-            `INSERT INTO system_logs (level, message, metadata, created_at)
-             VALUES ($1, $2, $3::jsonb, NOW())`,
-            [level, message, stringify(metadata)]
+        const result = await query(
+            `INSERT INTO system_logs (level, message, metadata, user_id, username, action, created_at)
+             VALUES ($1, $2, $3::jsonb, $4::uuid, COALESCE($5, (SELECT username FROM users WHERE id = $4::uuid)), $6, NOW())
+             RETURNING id, level, message, metadata, user_id, username, action, created_at`,
+            [level, message, stringify(meta), userId, username, action]
         );
+        const row = result.rows[0];
+        publishAdmin('log', row);
+        const category = action.split('.')[0];
+        publishAdmin('db', { tables: [...(TABLES_BY_PREFIX[category] || []), 'system_logs'] });
+        return row;
     } catch (error) {
-        logger.error('Failed to persist system log', { error: error.message, level, message });
+        logger.error('Failed to persist activity log', { error: error.message, action });
+        return null;
     }
 }
 
-async function logSystemEvent(level, message, metadata = {}) {
-    const entry = { event: metadata.event || 'system_event', ...metadata };
-    logger.log(level, message, entry);
-    await persist(level, message, entry);
-}
+const logSystemEvent = (level, message, metadata = {}) =>
+    logActivity({ action: metadata.event || 'system.event', message, level, meta: metadata });
 
-async function logAuthAttempt(username, success, ip) {
-    await logSystemEvent(success ? 'info' : 'warn', 'Authentication attempt', {
-        event: 'auth_attempt',
+const logAuthAttempt = (username, success, ip) =>
+    logActivity({
         username,
-        success,
-        ip
+        action: success ? 'auth.login' : 'auth.login_failed',
+        level: success ? 'info' : 'warn',
+        message: success ? 'Logged in' : 'Login failed',
+        meta: { ip }
     });
-}
 
-async function logTaskCreation(userId, task) {
-    await logSystemEvent('info', 'Task created', {
-        event: 'task_creation',
-        user_id: userId,
-        task_id: task.id
+const logError = (error, context = {}) =>
+    logActivity({
+        userId: context.userId || null,
+        action: 'system.error',
+        level: 'error',
+        message: error && error.message ? error.message : 'Application error',
+        meta: { ...context, stack: error && error.stack ? error.stack : undefined }
     });
-}
-
-async function logXpGeneration(userId, xpAmount, source) {
-    await logSystemEvent('info', 'XP changed', {
-        event: 'xp_generation',
-        user_id: userId,
-        xp_amount: xpAmount,
-        source
-    });
-}
-
-async function logError(error, context = {}) {
-    const metadata = {
-        event: 'error',
-        ...context,
-        stack: error && error.stack ? error.stack : undefined
-    };
-    logger.error(error && error.message ? error.message : 'Application error', metadata);
-    await persist('error', error && error.message ? error.message : 'Application error', metadata);
-}
 
 async function logGroqRequest(userId, username, requestPayload, model) {
     try {
-        logger.info('GROQ request', {
-            event: 'groq_request',
-            user_id: userId,
-            username,
-            model,
-            request_payload: requestPayload
-        });
+        logger.info('GROQ request', { event: 'groq_request', user_id: userId, username, model });
         const result = await query(
             `INSERT INTO groq_logs (user_id, username, request_payload, response_payload, response_time_ms, model, success, error_message, created_at)
              VALUES ($1, $2, $3::jsonb, NULL, NULL, $4, false, 'request_started', NOW())
@@ -88,20 +83,9 @@ async function logGroqRequest(userId, username, requestPayload, model) {
 async function logGroqResponse(logId, responsePayload, responseTimeMs, success, errorMessage = null) {
     if (!logId) return;
     try {
-        logger.info('GROQ response', {
-            event: 'groq_response',
-            log_id: logId,
-            response_time_ms: responseTimeMs,
-            success,
-            error_message: errorMessage,
-            response_payload: responsePayload
-        });
         await query(
             `UPDATE groq_logs
-             SET response_payload = $1::jsonb,
-                 response_time_ms = $2,
-                 success = $3,
-                 error_message = $4
+             SET response_payload = $1::jsonb, response_time_ms = $2, success = $3, error_message = $4
              WHERE id = $5`,
             [stringify(responsePayload), responseTimeMs, success, errorMessage, logId]
         );
@@ -110,12 +94,4 @@ async function logGroqResponse(logId, responsePayload, responseTimeMs, success, 
     }
 }
 
-module.exports = {
-    logSystemEvent,
-    logAuthAttempt,
-    logTaskCreation,
-    logXpGeneration,
-    logError,
-    logGroqRequest,
-    logGroqResponse
-};
+module.exports = { logActivity, logSystemEvent, logAuthAttempt, logError, logGroqRequest, logGroqResponse };

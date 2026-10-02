@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const { logActivity } = require('../services/loggingService');
 const { asyncHandler, notFound, badRequest, conflict } = require('../utils/errors');
 
 const getFriends = asyncHandler(async (req, res) => {
@@ -19,6 +20,7 @@ const addFriend = asyncHandler(async (req, res) => {
     if (await User.isFriend(req.user.id, friend.id)) throw conflict('Already friends');
     await User.addFriend(req.user.id, friend.id);
     await User.recalculateMultiplier(req.user.id, true);
+    await logActivity({ userId: req.user.id, action: 'friend.add', message: `Added friend ${friend.username}`, meta: { friendId: friend.id } });
     res.json({ success: true });
 });
 
@@ -26,6 +28,7 @@ const removeFriend = asyncHandler(async (req, res) => {
     const removed = await User.removeFriend(req.user.id, req.params.friendId);
     if (!removed) throw notFound('Friend not found');
     await User.recalculateMultiplier(req.user.id, true);
+    await logActivity({ userId: req.user.id, action: 'friend.remove', message: 'Removed a friend', meta: { friendId: req.params.friendId } });
     res.json({ success: true });
 });
 
@@ -33,15 +36,6 @@ const getLeaderboard = asyncHandler(async (req, res) => {
     const period = req.query.period === 'week' ? 'week' : 'all';
     User.monitorMultipliersThrottled();
     res.json(await User.getLeaderboard(req.user.id, period, req.tz));
-});
-
-const getProfile = asyncHandler(async (req, res) => {
-    const profile = await User.getUserProfile(req.user.id);
-    res.json(profile || { five_year_goal: '', productivity_preferences: {} });
-});
-
-const updateProfile = asyncHandler(async (req, res) => {
-    res.json(await User.upsertProfile(req.user.id, req.body));
 });
 
 const monitorMultipliers = asyncHandler(async (req, res) => {
@@ -53,7 +47,5 @@ module.exports = {
     addFriend,
     removeFriend,
     getLeaderboard,
-    getProfile,
-    updateProfile,
     monitorMultipliers
 };

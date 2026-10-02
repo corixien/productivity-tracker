@@ -22,12 +22,9 @@ router.post('/friends', friendRateLimiter, validateFriendAdd, userController.add
 router.delete('/friends/:friendId', userController.removeFriend);
 router.get('/leaderboard', userController.getLeaderboard);
 router.post('/monitor-multipliers', userController.monitorMultipliers);
-router.get('/profile', userController.getProfile);
-router.put('/profile', userController.updateProfile);
 
 router.get('/quick-tasks', quickTaskController.getQuickTasks);
 router.post('/quick-tasks', validateQuickTask, quickTaskController.createQuickTask);
-router.post('/quick-tasks/spawn-recurring', quickTaskController.spawnRecurring);
 router.put('/quick-tasks/:id', validateQuickTask, quickTaskController.updateQuickTask);
 router.delete('/quick-tasks/:id', quickTaskController.deleteQuickTask);
 router.post('/quick-tasks/:id/use', quickTaskController.useQuickTask);

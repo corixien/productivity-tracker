@@ -45,7 +45,7 @@ async function migrateUsers(sqliteDb, pgPool) {
 
         await pgPool.query(
             `INSERT INTO users (id, username, password_hash, xp, level, rank, language, avatar_url, goals, created_at, updated_at)
-             VALUES (uuid_generate_v4(), $1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+             VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
              ON CONFLICT (username) DO UPDATE SET
                  password_hash = EXCLUDED.password_hash,
                  xp = EXCLUDED.xp,
@@ -83,14 +83,12 @@ async function migrateTasks(sqliteDb, pgPool) {
         }
 
         await pgPool.query(
-            `INSERT INTO tasks (id, user_id, task_text, name, ai_score, xp_awarded, completed, duration, productivity, difficulty, category, bonus, created_at, completed_at)
-             VALUES (uuid_generate_v4(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            `INSERT INTO tasks (id, user_id, name, xp_awarded, completed, duration, productivity, difficulty, category, bonus, created_at, completed_at)
+             VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
              ON CONFLICT DO NOTHING`,
             [
                 owner.rows[0].id,
                 task.name,
-                task.name,
-                0,
                 task.xp || 0,
                 task.completed === 1 || task.completed === true,
                 task.duration || null,
@@ -99,7 +97,7 @@ async function migrateTasks(sqliteDb, pgPool) {
                 task.category || 'other',
                 task.offline_bonus || task.bonus || 0,
                 task.created_at || new Date().toISOString(),
-                task.completed_at || null
+                task.completed === 1 || task.completed === true ? (task.completed_at || task.created_at || new Date().toISOString()) : null
             ]
         );
     }

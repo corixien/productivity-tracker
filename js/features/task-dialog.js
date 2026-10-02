@@ -188,7 +188,7 @@ async function submit(event) {
             xpEarned = completion.xpEarned || 0;
         }
         if ($('#task-save-template').checked) {
-            await api.createTemplate({ ...values, recurrence: $('#task-recurrence').value });
+            await api.createTemplate(values);
             await loadTemplates();
         }
         closeDialog(el.dialog);
@@ -208,8 +208,6 @@ function reset() {
     $('#ai-input').value = '';
     $('#task-done').checked = false;
     $('#task-save-template').checked = false;
-    $('#task-recurrence').value = 'none';
-    $('#task-recurrence').disabled = true;
     setError('');
     showStep('describe');
 }
@@ -241,9 +239,6 @@ function initTaskDialog() {
     el.form.addEventListener('input', updatePreview);
     $('#ai-input').addEventListener('keydown', (event) => {
         if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) rateWithAi();
-    });
-    $('#task-save-template').addEventListener('change', (event) => {
-        $('#task-recurrence').disabled = !event.target.checked;
     });
     el.dialog.addEventListener('close', reset);
     onLanguageChange(() => { fillCategories(); if (el.dialog.open) updatePreview(); });

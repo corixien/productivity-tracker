@@ -5,23 +5,12 @@ import { t, onLanguageChange } from '../core/i18n.js';
 import { calculateXp } from '../core/ranks.js';
 import { loadTemplates, refreshCore } from '../core/data.js';
 import { toast, confirmDialog, emptyState, skeletonList, showError } from '../core/ui.js';
-import { categoryLabel, warnNonCritical } from './shared.js';
+import { categoryLabel } from './shared.js';
 
 let loaded = false;
 
 function templateCard(template) {
     const xp = calculateXp(template.duration, template.productivity, template.difficulty, template.bonus);
-    const recurrence = h('select', {
-        class: 'select-sm recur-select',
-        'aria-label': t('recurrenceFor', { name: template.name }),
-        onChange: (event) => updateRecurrence(template, event.target.value)
-    },
-        h('option', { value: 'none' }, t('recurNone')),
-        h('option', { value: 'daily' }, t('recurDaily')),
-        h('option', { value: 'weekly' }, t('recurWeekly'))
-    );
-    recurrence.value = template.recurrence || 'none';
-
     return h('li', { class: 'task-card template-card', dataset: { category: template.category } },
         icon('bookmark', 'template-icon'),
         h('div', { class: 'task-body' },
@@ -31,14 +20,10 @@ function templateCard(template) {
             ),
             h('div', { class: 'task-meta' },
                 h('span', { class: 'chip chip-cat' }, categoryLabel(template.category)),
-                h('span', { class: 'chip' }, icon('clock'), t('minutes', { n: template.duration })),
-                template.recurrence !== 'none'
-                    ? h('span', { class: 'chip chip-accent' }, icon('repeat'), t(template.recurrence === 'daily' ? 'recurDaily' : 'recurWeekly'))
-                    : null
+                h('span', { class: 'chip' }, icon('clock'), t('minutes', { n: template.duration }))
             )
         ),
         h('div', { class: 'task-actions' },
-            recurrence,
             h('button', { type: 'button', class: 'btn btn-secondary', onClick: () => useTemplate(template) }, icon('plus'), t('useTemplate')),
             h('button', {
                 type: 'button', class: 'icon-btn is-danger',
@@ -60,25 +45,6 @@ function renderTemplates() {
         return;
     }
     list.replaceChildren(...state.templates.map(templateCard));
-}
-
-async function updateRecurrence(template, recurrence) {
-    try {
-        await api.updateTemplate(template.id, { recurrence });
-        await loadTemplates();
-        if (recurrence !== 'none') {
-            // Due templates become tasks right away instead of waiting for the next app start.
-            const { tasks } = await api.spawnRecurring();
-            if (tasks.length > 0) {
-                await refreshCore();
-                toast(t('recurringAdded', { n: tasks.length }), { type: 'success' });
-            }
-            await loadTemplates();
-        }
-    } catch (error) {
-        showError(error);
-        await loadTemplates().catch(warnNonCritical('templates.reload'));
-    }
 }
 
 async function useTemplate(template) {

@@ -11,8 +11,6 @@ body {
     line-height: 1.5;
     color: var(--text);
     background-color: var(--bg);
-    background-image: var(--bg-image);
-    background-attachment: fixed;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     overflow-x: hidden;
@@ -61,21 +59,13 @@ strong, output, .num { font-variant-numeric: tabular-nums; }
 .hint { color: var(--text-faint); font-size: 0.82rem; margin-top: 6px; }
 .noscript { padding: 24px; text-align: center; }
 
-/* Ambient background */
-.bg-orbs { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
-.bg-orbs span {
-    position: absolute; width: 46vmax; height: 46vmax; border-radius: 50%;
-    filter: blur(110px); opacity: 0.95;
-    animation: drift 26s ease-in-out infinite alternate;
-}
-.bg-orbs span:nth-child(1) { top: -18vmax; left: -12vmax; background: radial-gradient(circle, var(--orb-1), transparent 65%); }
-.bg-orbs span:nth-child(2) { bottom: -22vmax; right: -14vmax; background: radial-gradient(circle, var(--orb-2), transparent 65%); animation-delay: -9s; }
-.bg-orbs span:nth-child(3) { top: 30%; left: 45%; width: 30vmax; height: 30vmax; background: radial-gradient(circle, var(--orb-3), transparent 65%); animation-delay: -16s; }
-
-@keyframes drift {
-    from { transform: translate3d(0, 0, 0) scale(1); }
-    to { transform: translate3d(4vmax, 3vmax, 0) scale(1.12); }
-}
+/* Ambient background: one fixed, static layer (no blur filter, no animation) so nothing behind
+   the glass surfaces ever has to be repainted or re-blurred while scrolling. */
+.bg-orbs { position: fixed; inset: 0; z-index: -1; pointer-events: none; background-image: var(--bg-image); }
+.bg-orbs span { position: absolute; border-radius: 50%; }
+.bg-orbs span:nth-child(1) { top: -18vmax; left: -12vmax; width: 46vmax; height: 46vmax; background: radial-gradient(circle, var(--orb-1), transparent 65%); }
+.bg-orbs span:nth-child(2) { bottom: -22vmax; right: -14vmax; width: 46vmax; height: 46vmax; background: radial-gradient(circle, var(--orb-2), transparent 65%); }
+.bg-orbs span:nth-child(3) { top: 30%; left: 45%; width: 30vmax; height: 30vmax; background: radial-gradient(circle, var(--orb-3), transparent 65%); }
 
 * { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
 

@@ -5,12 +5,21 @@ const TARGETS = '.btn, .icon-btn, .segment, .nav-link, .fab, .check-btn, button.
 function initGlass() {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
+    // At most one style write per frame, and only for the element under the pointer.
+    let pending = null;
     document.addEventListener('pointermove', (event) => {
         const el = event.target.closest && event.target.closest(TARGETS);
         if (!el) return;
-        const rect = el.getBoundingClientRect();
-        el.style.setProperty('--mx', `${event.clientX - rect.left}px`);
-        el.style.setProperty('--my', `${event.clientY - rect.top}px`);
+        const schedule = pending === null;
+        pending = { el, x: event.clientX, y: event.clientY };
+        if (!schedule) return;
+        requestAnimationFrame(() => {
+            const { el: target, x, y } = pending;
+            pending = null;
+            const rect = target.getBoundingClientRect();
+            target.style.setProperty('--mx', `${x - rect.left}px`);
+            target.style.setProperty('--my', `${y - rect.top}px`);
+        });
     }, { passive: true });
 
     document.addEventListener('pointerdown', (event) => {

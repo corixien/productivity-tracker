@@ -1,17 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#86deff"/>
-      <stop offset="0.42" stop-color="#2f9dff"/>
-      <stop offset="0.8" stop-color="#0b5fe3"/>
-      <stop offset="1" stop-color="#2b3fc8"/>
+      <stop offset="0" stop-color="#4f95e8"/>
+      <stop offset="0.42" stop-color="#1f66d3"/>
+      <stop offset="0.8" stop-color="#103fa8"/>
+      <stop offset="1" stop-color="#16277c"/>
     </linearGradient>
     <radialGradient id="glow" cx="0.5" cy="1.05" r="0.75">
-      <stop offset="0" stop-color="#a5ebff" stop-opacity="0.75"/>
-      <stop offset="1" stop-color="#a5ebff" stop-opacity="0"/>
+      <stop offset="0" stop-color="#6fb4f5" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#6fb4f5" stop-opacity="0"/>
     </radialGradient>
     <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.62"/>
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.45"/>
       <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
     </linearGradient>
     <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">

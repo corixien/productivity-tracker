@@ -2,7 +2,7 @@
 
 A web app for competing with friends on productivity. Log tasks (describe them and an AI rates them, or enter them manually), complete them to earn XP, keep a daily streak, climb ranks and compare on an all-time or weekly leaderboard. English and German, dark and light theme, installable as a PWA.
 
-Backend: Express, PostgreSQL (Neon), bcrypt, JWT, Winston, Helmet. Frontend: vanilla JS modules and CSS, no build step.
+Backend: Express, PostgreSQL (Neon), bcrypt, JWT, Winston, Helmet. Frontend: vanilla JS modules and CSS (Lexend Deca font, self-hosted), no build step.
 
 ## Setup
 
@@ -21,6 +21,7 @@ Backend: Express, PostgreSQL (Neon), bcrypt, JWT, Winston, Helmet. Frontend: van
 | `DATABASE_SSL_REJECT_UNAUTHORIZED` | `false` for Neon in production / on Render |
 | `JWT_EXPIRES_IN` | token lifetime, default `7d` |
 | `GROQ_API_KEY`, `GROQ_MODEL`, `GROQ_BASE_URL` | optional AI task rating (without a key the app falls back to manual entry) |
+| `ADMIN_USERNAMES` | comma-separated usernames of existing accounts that get admin access at startup (these names cannot be registered by anyone else) |
 | `LOG_LEVEL`, `LOG_DIR`, `LOG_RETENTION_DAYS` | logging; DB logs older than 30 days (default) are purged |
 | `CLIENT_ORIGIN`, `DATABASE_POOL_MAX`, `PORT`, `NODE_ENV` | optional |
 
@@ -59,8 +60,10 @@ The free tier spins down when idle, which also keeps Neon compute usage low. The
 - **Multiplier**: a catch-up mechanic among friends: the friend with the least XP earns up to 1.5x, the leader 0.7x, further reduced by rank.
 - **Streaks and ice streaks**: consecutive days with a completed task. Every 7 streak days earns an ice streak (max 3 stored); each one automatically saves the streak when a day is missed, so up to 3 missed days in a row can be bridged. The Activity page shows a Duolingo-style streak card, week strip, 14-day XP chart and a 5-week calendar. A configurable daily XP goal is shown as a progress ring.
 - **Leaderboard**: you and your friends, all-time or this week, with a podium for the top three.
-- **Templates and recurring tasks**: save tasks as templates, add them with one click, or let daily/weekly templates add themselves.
+- **Templates**: save tasks as templates and add them with one click.
 - **Activity**: full XP history with day grouping and pagination.
+- **Admin area** (`/#/admin-4321`, admin accounts only): Database (every table editable in place plus avatar object storage), Logs (compact terminal-style feed with search and filters, live), Analytics (uptime, users and Groq calls for 24 hours, top 5 users). Edits reach the affected user instantly through a server-sent-events channel, and user activity shows up live in the admin pages. The URL only hides the entry; every admin API call is checked against the account.
+- **Consistent data**: rank and level follow XP inside the database, changing a rank moves XP into that rank, lowering a user's task count deletes their oldest completed tasks and takes the XP back, and any direct XP change is booked as an adjustment in `xp_history`.
 - **PWA**: installable, app shell works offline, completing a task offline is queued and synced when you are back.
 - **Security**: strict CSP (Helmet), per-route rate limits, tokens revoked on password change, current password required to change it, avatars resized client-side and capped server-side.
 - **Accessibility**: semantic landmarks, native `<dialog>` focus handling, keyboard support, `prefers-reduced-motion`, audited with axe in both themes.
@@ -77,12 +80,13 @@ All routes except register, login, `/api/meta`, `/api/health` and `/api/ai/statu
 | `POST /api/users/:username/password` | change password (needs `currentPassword`, returns a new token) |
 | `POST /api/users/:username/avatar`, `POST /api/users/:username/change-username` | avatar (max 512 KB), username |
 | `GET/POST/DELETE /api/users/friends` | friends |
-| `GET /api/users/quick-tasks`, `POST`, `PUT /:id`, `DELETE /:id`, `POST /:id/use`, `POST /spawn-recurring` | templates and recurring tasks |
+| `GET /api/users/quick-tasks`, `POST`, `PUT /:id`, `DELETE /:id`, `POST /:id/use` | templates |
 | `GET/POST /api/tasks`, `PUT/DELETE /api/tasks/:id`, `POST /api/tasks/:id/complete` | tasks (`PUT` edits fields and/or toggles `completed`) |
 | `GET /api/xp`, `GET /api/xp/stats` | XP history (paginated), streak / today / week / daily goal |
 | `GET /api/leaderboard?period=all\|week` | leaderboard |
-| `GET/PUT /api/settings` | language, goals, daily XP goal |
-| `GET/POST/PUT/DELETE /api/goals` | long-term goals |
+| `GET/PUT /api/settings` | language, goals text, daily XP goal |
+| `GET /api/events` | live channel (server-sent events) for sync and the admin feed |
+| `/api/admin/*` | admin only: tables, rows, storage, logs, analytics (404 for everyone else) |
 | `POST /api/groq/rate`, `GET /api/groq/status` | AI task rating (legacy `/api/ai/*` kept) |
 | `GET /api/meta` | rank thresholds and multipliers |
 | `GET /api/health` | health check |
@@ -91,8 +95,9 @@ All routes except register, login, `/api/meta`, `/api/health` and `/api/ai/statu
 
 ```
 index.html, sw.js, offline.html, manifest.json
-css/        tokens (themes), base, components, layout, views
-js/         app.js, core/ (api, auth, state, i18n, dom, ui, ranks, theme, pwa, data), features/ (one module per view)
+css/        fonts, tokens (themes), base, components, layout, views
+fonts/      Lexend Deca (variable, SIL OFL)
+js/         app.js, core/ (api, auth, state, i18n, dom, ui, ranks, theme, pwa, data, glass, live), features/ (one module per view, admin/ for the admin pages)
 backend/    index.js, routes/, controllers/, models/, services/, middleware/, utils/
 database/   migrate.js, migrations/, migrate-data.js (one-time SQLite import)
 scripts/    check.js
@@ -107,6 +112,7 @@ Badges/     rank badge images
 - Rate limits and the multiplier audit are per process (in memory); fine for a single instance.
 - Avatars live in the database as small JPEG data URLs; use object storage if the user base grows large.
 - Only completing an existing task is queued offline; creating or editing tasks needs a connection.
+- The live channel is single-instance (in memory) and only open while a tab is visible.
 - No push notifications (they would need a push service and VAPID keys); feedback is in-app.
 
 ## Credits

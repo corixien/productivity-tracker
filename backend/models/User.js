@@ -1,21 +1,13 @@
-const { query, transaction } = require('../utils/database');
+const { query } = require('../utils/database');
 const { hashPassword, verifyPassword, isLegacyPasswordHash } = require('../utils/password');
-const { logSystemEvent, logError } = require('../services/loggingService');
+const { logActivity } = require('../services/loggingService');
 const { getRankMultiplier, computePositionMultiplier } = require('../services/rankService');
 const { warnOnError } = require('../utils/errors');
 
 // Any object with .query(text, params): the pool wrapper by default, or a transaction client.
 const defaultDb = { query };
 
-const USER_WITH_PROFILE = `
-    SELECT
-        u.*,
-        p.five_year_goal AS goals,
-        p.productivity_preferences,
-        u.avatar_url AS avatar
-    FROM users u
-    LEFT JOIN profiles p ON p.user_id = u.id
-`;
+const USER_SELECT = 'SELECT u.*, u.avatar_url AS avatar FROM users u';
 
 function normalizeUser(user) {
     if (!user) return null;
@@ -26,18 +18,18 @@ function normalizeUser(user) {
 }
 
 async function findByUsername(username) {
-    const result = await query(`${USER_WITH_PROFILE} WHERE LOWER(u.username) = LOWER($1)`, [username]);
+    const result = await query(`${USER_SELECT} WHERE LOWER(u.username) = LOWER($1)`, [username]);
     return normalizeUser(result.rows[0]);
 }
 
 async function findById(id) {
-    const result = await query(`${USER_WITH_PROFILE} WHERE u.id = $1`, [id]);
+    const result = await query(`${USER_SELECT} WHERE u.id = $1`, [id]);
     return normalizeUser(result.rows[0]);
 }
 
 // Lightweight lookup for per-request authentication (no avatar blob, no profile join).
 async function findAuthById(id) {
-    const result = await query('SELECT id, username, token_version FROM users WHERE id = $1', [id]);
+    const result = await query('SELECT id, username, token_version, is_admin FROM users WHERE id = $1', [id]);
     return result.rows[0] || null;
 }
 
@@ -50,54 +42,31 @@ async function findByUsernameOrId(identifier) {
 
 async function create(username, password) {
     const passwordHash = await hashPassword(password);
-    const user = await transaction(async (client) => {
-        const userResult = await client.query(
-            `INSERT INTO users (username, password_hash, xp, level, rank, language, avatar_url, goals, created_at, updated_at)
-             VALUES ($1, $2, 0, 0, 'Newcomer', 'en', NULL, '', NOW(), NOW())
-             RETURNING *`,
-            [username, passwordHash]
-        );
-        const created = userResult.rows[0];
-        await client.query(
-            `INSERT INTO profiles (user_id, five_year_goal, productivity_preferences, created_at, updated_at)
-             VALUES ($1, '', '{}'::jsonb, NOW(), NOW())`,
-            [created.id]
-        );
-        return created;
-    });
-    await logSystemEvent('info', 'User registered', {
-        event: 'user_registered',
-        user_id: user.id,
-        username
-    });
+    const result = await query(
+        'INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING *',
+        [username, passwordHash]
+    );
+    const user = result.rows[0];
+    await logActivity({ userId: user.id, username, action: 'auth.register', message: 'Registered' });
     return normalizeUser(user);
 }
 
 async function update(id, updates) {
-    if (updates.goals !== undefined) {
-        await updateGoals(id, updates.goals);
-        updates = { ...updates };
-        delete updates.goals;
-    }
-
-    const allowedFields = ['language', 'daily_goal_xp'];
+    const allowedFields = ['language', 'daily_goal_xp', 'goals'];
     const setClause = [];
     const values = [];
-    let paramIndex = 1;
 
     for (const field of allowedFields) {
         if (updates[field] !== undefined) {
-            setClause.push(`${field} = $${paramIndex}`);
             values.push(updates[field]);
-            paramIndex += 1;
+            setClause.push(`${field} = $${values.length}`);
         }
     }
-
     if (setClause.length === 0) return findById(id);
 
     values.push(id);
     const result = await query(
-        `UPDATE users SET ${setClause.join(', ')}, updated_at = NOW() WHERE id = $${paramIndex} RETURNING *`,
+        `UPDATE users SET ${setClause.join(', ')}, updated_at = NOW() WHERE id = $${values.length} RETURNING *`,
         values
     );
     return normalizeUser(result.rows[0]);
@@ -117,40 +86,6 @@ async function changeUsername(id, newUsername) {
         [newUsername, id]
     );
     return normalizeUser(result.rows[0]);
-}
-
-async function updateGoals(id, goals) {
-    return transaction(async (client) => {
-        const result = await client.query(
-            `INSERT INTO profiles (user_id, five_year_goal, productivity_preferences, created_at, updated_at)
-             VALUES ($1, $2, '{}'::jsonb, NOW(), NOW())
-             ON CONFLICT (user_id) DO UPDATE SET
-                 five_year_goal = EXCLUDED.five_year_goal,
-                 updated_at = NOW()
-             RETURNING five_year_goal`,
-            [id, goals]
-        );
-        await client.query('UPDATE users SET goals = $1, updated_at = NOW() WHERE id = $2', [goals, id]);
-        return result.rows[0].five_year_goal;
-    });
-}
-
-async function updateSettings(id, settings) {
-    const productivityPreferences = settings.productivityPreferences || {};
-    const result = await query(
-        `INSERT INTO profiles (user_id, five_year_goal, productivity_preferences, created_at, updated_at)
-         VALUES ($1, COALESCE((SELECT five_year_goal FROM profiles WHERE user_id = $1), ''), $2::jsonb, NOW(), NOW())
-         ON CONFLICT (user_id) DO UPDATE SET
-             productivity_preferences = EXCLUDED.productivity_preferences,
-             updated_at = NOW()
-         RETURNING *`,
-        [id, JSON.stringify(productivityPreferences)]
-    );
-    const userUpdates = {};
-    if (settings.language) userUpdates.language = settings.language;
-    if (settings.dailyGoalXp !== undefined) userUpdates.daily_goal_xp = settings.dailyGoalXp;
-    if (Object.keys(userUpdates).length > 0) await update(id, userUpdates);
-    return result.rows[0];
 }
 
 // Changing the password bumps token_version, which invalidates every previously issued JWT.
@@ -214,33 +149,6 @@ async function isFriend(userId, friendId) {
     return result.rows.length > 0;
 }
 
-async function getUserProfile(userId) {
-    const result = await query('SELECT * FROM profiles WHERE user_id = $1', [userId]);
-    return result.rows[0] || null;
-}
-
-async function upsertProfile(userId, profileData) {
-    const current = await getUserProfile(userId);
-    const fiveYearGoal = profileData.fiveYearGoal !== undefined
-        ? profileData.fiveYearGoal
-        : profileData.goals !== undefined
-            ? profileData.goals
-            : current?.five_year_goal || current?.goals || '';
-    const productivityPreferences = profileData.productivityPreferences || {};
-    const result = await query(
-        `INSERT INTO profiles (user_id, five_year_goal, productivity_preferences, created_at, updated_at)
-         VALUES ($1, $2, $3::jsonb, NOW(), NOW())
-         ON CONFLICT (user_id) DO UPDATE SET
-             five_year_goal = EXCLUDED.five_year_goal,
-             productivity_preferences = EXCLUDED.productivity_preferences,
-             updated_at = NOW()
-         RETURNING *`,
-        [userId, fiveYearGoal, JSON.stringify(productivityPreferences)]
-    );
-    await query('UPDATE users SET goals = $1, updated_at = NOW() WHERE id = $2', [fiveYearGoal, userId]);
-    return result.rows[0];
-}
-
 // Rank among the user and their friends, computed in SQL.
 async function getPositionMultiplier(userId, xp, db = defaultDb) {
     const userXp = xp || 0;
@@ -275,18 +183,18 @@ async function recalculateMultiplier(userId, force = false, db = defaultDb) {
     const combined = combineMultipliers(positionMultiplier, rankMultiplier);
 
     await db.query(
-        `UPDATE users SET multiplier = $1, position_based_multiplier = $2, rank_based_multiplier = $3,
-             tasks_completed = (SELECT COUNT(*) FROM tasks WHERE user_id = $5 AND completed = true),
+        `UPDATE users SET multiplier = $1,
+             tasks_completed = (SELECT COUNT(*) FROM tasks WHERE user_id = $2 AND completed = true),
              last_multiplier_check = NOW(), updated_at = NOW()
-         WHERE id = $4`,
-        [combined, positionMultiplier, rankMultiplier, userId, userId]
+         WHERE id = $2`,
+        [combined, userId]
     );
     return combined;
 }
 
 async function monitorMultipliers(maxAgeMinutes = 5) {
     const staleUsers = await query(
-        `SELECT id, username, multiplier, position_based_multiplier, rank_based_multiplier, xp, rank, last_multiplier_check
+        `SELECT id, username, multiplier, xp, rank, last_multiplier_check
          FROM users WHERE last_multiplier_check < NOW() - make_interval(mins => $1) LIMIT 200`,
         [maxAgeMinutes]
     );
@@ -303,9 +211,7 @@ async function monitorMultipliers(maxAgeMinutes = 5) {
                 username: user.username,
                 storedMultiplier: user.multiplier,
                 expectedMultiplier: expectedCombined,
-                storedPosition: user.position_based_multiplier,
                 expectedPosition: currentPositionMultiplier,
-                storedRank: user.rank_based_multiplier,
                 expectedRank: currentRankMultiplier,
                 lastCheck: user.last_multiplier_check,
                 severity: Math.abs((user.multiplier || 0) - expectedCombined) > 0.5 ? 'high' : 'medium'
@@ -316,10 +222,10 @@ async function monitorMultipliers(maxAgeMinutes = 5) {
     }
 
     if (discrepancies.length > 0) {
-        await logError(new Error('Multiplier discrepancies detected'), {
-            context: 'monitorMultipliers',
-            count: discrepancies.length,
-            discrepancies
+        await logActivity({
+            action: 'system.audit', level: 'warn',
+            message: `Multiplier audit corrected ${discrepancies.length} user(s)`,
+            meta: { discrepancies }
         });
     }
 
@@ -384,16 +290,12 @@ module.exports = {
     update,
     updateAvatar,
     changeUsername,
-    updateGoals,
-    updateSettings,
     updatePassword,
     verifyCredentials,
     getFriends,
     addFriend,
     removeFriend,
     isFriend,
-    getUserProfile,
-    upsertProfile,
     normalizeUser,
     getPositionMultiplier,
     combineMultipliers,

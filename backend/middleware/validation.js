@@ -177,81 +177,6 @@ function validateFriendAdd(req, res, next) {
     next();
 }
 
-function validateGoalCreate(req, res, next) {
-    if (!req.body.title || typeof req.body.title !== 'string') {
-        return res.status(400).json({ success: false, error: 'Goal title is required' });
-    }
-    
-    const title = req.body.title.trim();
-    if (title.length === 0) {
-        return res.status(400).json({ success: false, error: 'Goal title cannot be empty' });
-    }
-    
-    if (title.length > 200) {
-        return res.status(400).json({ success: false, error: 'Goal title is too long' });
-    }
-    
-    req.body.title = title;
-    
-    if (req.body.description !== undefined) {
-        req.body.description = sanitizeString(req.body.description, 5000);
-    }
-    
-    if (req.body.target_date !== undefined && req.body.target_date !== null) {
-        const date = new Date(req.body.target_date);
-        if (isNaN(date.getTime())) {
-            return res.status(400).json({ success: false, error: 'Invalid target date' });
-        }
-        req.body.target_date = date.toISOString().split('T')[0];
-    }
-    
-    const validCategories = ['personal', 'career', 'health', 'learning', 'finance', 'other'];
-    if (req.body.category !== undefined && !validCategories.includes(req.body.category)) {
-        return res.status(400).json({ success: false, error: 'Invalid category' });
-    }
-    
-    req.body.category = req.body.category || 'personal';
-    next();
-}
-
-function validateGoalUpdate(req, res, next) {
-    if (req.body.title !== undefined) {
-        const title = req.body.title.trim();
-        if (title.length === 0) {
-            return res.status(400).json({ success: false, error: 'Goal title cannot be empty' });
-        }
-        if (title.length > 200) {
-            return res.status(400).json({ success: false, error: 'Goal title is too long' });
-        }
-        req.body.title = title;
-    }
-    
-    if (req.body.description !== undefined) {
-        req.body.description = sanitizeString(req.body.description, 5000);
-    }
-    
-    if (req.body.target_date !== undefined && req.body.target_date !== null) {
-        const date = new Date(req.body.target_date);
-        if (isNaN(date.getTime())) {
-            return res.status(400).json({ success: false, error: 'Invalid target date' });
-        }
-        req.body.target_date = date.toISOString().split('T')[0];
-    }
-    
-    if (req.body.category !== undefined) {
-        const validCategories = ['personal', 'career', 'health', 'learning', 'finance', 'other'];
-        if (!validCategories.includes(req.body.category)) {
-            return res.status(400).json({ success: false, error: 'Invalid category' });
-        }
-    }
-    
-    if (req.body.completed !== undefined) {
-        req.body.completed = Boolean(req.body.completed);
-    }
-    
-    next();
-}
-
 function validateAiRate(req, res, next) {
     if (!req.body.description || typeof req.body.description !== 'string') {
         return res.status(400).json({ success: false, error: 'Description is required' });
@@ -311,11 +236,6 @@ function validateQuickTask(req, res, next) {
         if (isNaN(bonus) || bonus < 0) return fail('Bonus must be a non-negative number');
         out.bonus = bonus;
     }
-    if (!partial || body.recurrence !== undefined) {
-        const recurrence = body.recurrence === undefined ? 'none' : body.recurrence;
-        if (!['none', 'daily', 'weekly'].includes(recurrence)) return fail('Invalid recurrence');
-        out.recurrence = recurrence;
-    }
     req.body = out;
     next();
 }
@@ -348,10 +268,8 @@ function validateSettings(req, res, next) {
         const v = validateLanguage(req.body.language);
         if (!v.valid) return res.status(400).json({ success: false, error: v.error, code: 'validation_error' });
     }
-    const goalsInput = req.body.fiveYearGoal ?? req.body.goals;
-    if (goalsInput !== undefined) {
-        req.body.goals = sanitizeString(String(goalsInput), 5000);
-        delete req.body.fiveYearGoal;
+    if (req.body.goals !== undefined) {
+        req.body.goals = sanitizeString(String(req.body.goals), 5000);
     }
     if (req.body.dailyGoalXp !== undefined) {
         const goal = parseInt(req.body.dailyGoalXp, 10);
@@ -374,7 +292,5 @@ module.exports = {
     validateTaskUpdate,
     validateUserUpdate,
     validateFriendAdd,
-    validateGoalCreate,
-    validateGoalUpdate,
     validateAiRate
 };
