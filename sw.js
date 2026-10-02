@@ -1,5 +1,5 @@
 // Service worker: makes the app shell load offline. API calls are never cached.
-const VERSION = 'v4';
+const VERSION = 'v5';
 const SHELL_CACHE = `pt-shell-${VERSION}`;
 const RUNTIME_CACHE = `pt-runtime-${VERSION}`;
 
@@ -23,6 +23,7 @@ const SHELL = [
     '/js/core/dom.js',
     '/js/core/glass.js',
     '/js/core/live.js',
+    '/js/core/segmented.js',
     '/js/core/i18n.js',
     '/js/core/pwa.js',
     '/js/core/ranks.js',

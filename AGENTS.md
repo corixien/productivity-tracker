@@ -8,7 +8,7 @@ Web app for friend groups competing on productivity. Users register/login (usern
 
 ## Stack
 
-- Frontend: vanilla JS ES modules, single `index.html`, plain CSS split by concern, Lexend Deca font self-hosted in `fonts/`. Visual style: calm blue "liquid glass" with bright blue only as accent (translucent gradients, heavy backdrop blur, bright top edge, spring hover/press animations, a gliding glass lens behind the active nav item) driven by `--glass-*` and `--blur` tokens in `css/tokens.css`. No framework, no bundler, no build step.
+- Frontend: vanilla JS ES modules, single `index.html`, plain CSS split by concern, Lexend Deca font self-hosted in `fonts/`. Visual style: calm blue "liquid glass" with bright blue only as accent (translucent gradients, heavy backdrop blur, bright top edge, spring hover/press animations, a gliding glass lens behind the active nav item and the active option of every segmented control/tab strip via `core/segmented.js`) driven by `--glass-*` and `--blur` tokens in `css/tokens.css`. No framework, no bundler, no build step.
 - Backend: Node >=18 (CI uses 22), Express 4, `pg` pool, bcrypt, JWT, Winston, Helmet.
 - DB: PostgreSQL on Neon. Deploy: Render free tier (`render.yaml`). The service is allowed to spin down; do not add keep-alive pings.
 - AI: Groq API proxied via backend (key never reaches the browser).

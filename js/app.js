@@ -9,6 +9,7 @@ import { initDialogs, toast, closeDialog, showError } from './core/ui.js';
 import { initPwa, syncQueue } from './core/pwa.js';
 import { initGlass } from './core/glass.js';
 import { startLive, stopLive } from './core/live.js';
+import { initSegmented } from './core/segmented.js';
 import { initNav, registerView, startNav, refreshCurrentView } from './features/nav.js';
 import { initAuthView, resetAuthView } from './features/auth-view.js';
 import { initDashboard } from './features/dashboard.js';
@@ -73,6 +74,7 @@ async function init() {
     initDialogs();
     initPwa();
     initGlass();
+    initSegmented();
     initNav();
     initAuthView();
     initDashboard();
