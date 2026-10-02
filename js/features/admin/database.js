@@ -125,8 +125,6 @@ function renderTabs() {
             onClick: () => select(tab.id)
         }, tab.label, tab.count !== null ? h('span', { class: 'count' }, formatCount(tab.count)) : null)
     ));
-    const active = container.querySelector('[aria-pressed="true"]');
-    if (active && container.scrollWidth > container.clientWidth) container.scrollLeft = Math.max(0, active.offsetLeft - 24);
 }
 
 const formatCount = (n) => new Intl.NumberFormat(locale(), { notation: n >= 10000 ? 'compact' : 'standard' }).format(n);
