@@ -1,6 +1,6 @@
 # Features
 
-Reference of every feature of the Productivity Tracker, for future agents: what it does, how it works, where the code lives and what must not break. `AGENTS.md` has the conventions and commands, `README.md` has setup and the API table. Verified against the code at commit `ed42a3b`; if code and this file disagree, the code wins, then fix this file.
+Reference of every feature of the Productivity Tracker, for future agents: what it does, how it works, where the code lives and what must not break. `AGENTS.md` has the conventions and commands, `README.md` has setup and the API table. Verified against the code at commit `1a2655e`; if code and this file disagree, the code wins, then fix this file.
 
 Contents: [1 Accounts](#1-accounts-and-sessions) · [2 Tasks](#2-tasks) · [3 XP](#3-xp-ranks-and-levels) · [4 Multiplier](#4-multiplier-catch-up-mechanic) · [5 Streaks](#5-streaks-and-ice-streaks) · [6 Daily goal](#6-daily-goal) · [7 Templates](#7-templates) · [8 Activity](#8-activity-page) · [9 Friends and leaderboard](#9-friends-and-leaderboard) · [10 AI rating](#10-ai-task-rating-groq) · [11 Settings](#11-settings-and-profile) · [12 Admin](#12-admin-area) · [13 Live channel](#13-live-channel-sse) · [14 Database integrity](#14-database-integrity) · [15 Logging](#15-logging-and-retention) · [16 PWA](#16-pwa-and-offline) · [17 UI system](#17-ui-system) · [18 i18n](#18-internationalization) · [19 Security](#19-security) · [20 Tests and CI](#20-tests-tooling-and-ci) · [21 Deployment](#21-deployment) · [22 Removed](#22-removed-features-do-not-resurrect)
 
@@ -22,7 +22,7 @@ Contents: [1 Accounts](#1-accounts-and-sessions) · [2 Tasks](#2-tasks) · [3 XP
 Files: `models/Task.js`, `controllers/taskController.js`, `features/dashboard.js` (list), `features/task-dialog.js` (add/edit).
 
 - **Fields**: `name`, `duration` (1-1440 min), `productivity` (0-5), `difficulty` (1-5, default 3), `category` (`learning, exercise, creative, admin, social, deep-work, other`), `bonus` (0 or 3 from the UI checkbox; stored values are kept on edit), `xp_awarded` (the base XP), `completed`, `completed_at`.
-- **Tasks page**: rank hero (badge, level, rank, XP bar, multiplier chip, daily-goal ring), stat tiles (streak, today, this week), Pending/Completed tabs with counts, task cards (check button, name, XP badge, category/duration/productivity/difficulty/bonus chips, edit, bookmark-as-template, delete). Empty states and skeleton loaders. The list only re-renders when its data signature changes (avoids replaying the entry animation).
+- **Tasks page**: rank hero (badge, level, rank, glowing XP bar, multiplier chip, daily-goal ring), stat tiles (streak, today, this week), Pending/Completed tabs with counts, task cards (check button, name, XP badge, category/duration/productivity/difficulty/bonus chips, edit, bookmark-as-template, delete). Empty states and skeleton loaders. The list only re-renders when its data signature changes (avoids replaying the entry animation).
 - **Add button**: the round plus button (lower right, Tasks page only, `#fab-add-task`) is the only way to add a task. Hover plays a full turn while growing; leaving reverses it.
 - **Add dialog is a 3-step flow** (`task-dialog.js`): (1) *describe*: free text, either "Rate with AI" (Ctrl/Cmd+Enter) or "Enter manually"; the strip below offers up to 8 templates for one-click prefill; (2) *loading*: spinner, AI call aborts after 25 s; (3) *form*: name, duration, category, productivity and difficulty sliders, bonus checkbox, live XP preview (including the multiplier), "Already done" checkbox (completes right after creating), "Save as template" checkbox. Edit mode opens straight on the form.
 - **Complete**: `POST /api/tasks/:id/complete` (or `PUT` with `completed: true`). Awards `round(xp_awarded x multiplier)`; the multiplier is recalculated inside the transaction from current standings. Toasts show the XP and celebrate rank-ups, level-ups and earned ice streaks (`shared.announceProgress`).
@@ -60,7 +60,7 @@ Files: `Task.computeStreaks` (pure, unit-tested), `Task.getStats`, `features/str
 
 ## 6. Daily goal
 
-`users.daily_goal_xp` (10-5000, default 50), edited in Settings. Shown on the Tasks hero as a ring on desktop and a rounded box on mobile whose outline fills from the bottom centre up both sides (same `--p` variable), turning "done" when reached; on the Activity chart as a goal line and in the calendar heat levels.
+`users.daily_goal_xp` (10-5000, default 50), edited in Settings. Shown on the Tasks hero as a ring on desktop and, at 640 px and below, as a rounded box whose outline starts at the bottom centre, runs left once around and is done when it is back at the start (same `--p` variable; the SVG path is laid out by `layoutOutline` in `dashboard.js` and re-laid on resize), turning "done" when reached; on the Activity chart as a goal line and in the calendar heat levels.
 
 ## 7. Templates
 

@@ -81,7 +81,7 @@ Links enforced in the database (`users_sync_progress`, `users_audit_xp` triggers
 ## Invariants and gotchas
 
 - Never write `users.xp` directly from app code: do it inside a transaction via `Task.syncUserTotals` (insert `xp_history`, re-sum, update `xp` only; rank and level come from the trigger, then recalc the multiplier).
-- Auth: JWT carries `tv` (= `users.token_version`). Changing the password bumps it, revoking all older tokens; the response returns the new token. `authenticate` only loads `id, username, token_version`.
+- Auth: JWT carries `tv` (= `users.token_version`). Changing the password bumps it, revoking all older tokens; the response returns the new token. `authenticate` only loads `id, username, token_version, is_admin`.
 - Password change requires the current password. `PUT /api/users/:username` only accepts `language` and `goals`; other users get public fields only from `GET /api/users/:username`.
 - In `routes/users.js`, fixed paths must stay above `/:username`.
 - CSP is strict (`script-src 'self'`, `style-src 'self'`): no inline scripts, `style=` attributes, `on*=` handlers. Set styles through CSSOM (`el.style.x`, `--var`). `test/frontend.test.js` enforces this.
