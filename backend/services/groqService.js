@@ -66,8 +66,7 @@ Return ONLY the JSON.` },
             { role: 'user', content: userMessage }
         ],
         temperature: 0,
-        max_tokens: 300,
-        response_format: { type: 'json_object' }
+        max_tokens: 300
     };
 
     let groqResponse = null;
@@ -114,7 +113,9 @@ Return ONLY the JSON.` },
 
     if (!groqResponse || !groqResponse.ok) {
         const errorText = groqResponse ? await groqResponse.text().catch(() => '') : lastError?.message || 'Unknown error';
-        let errorMessage = `GROQ API error (HTTP ${groqResponse?.status || 'N/A'})`;
+        let upstream = '';
+        try { upstream = JSON.parse(errorText).error.message || ''; } catch (parseError) { upstream = String(errorText).slice(0, 160); }
+        let errorMessage = `GROQ API error (HTTP ${groqResponse?.status || 'N/A'})${upstream ? `: ${upstream.slice(0, 160)}` : ''}`;
 
         if (groqResponse?.status === 401) {
             errorMessage = 'GROQ authentication failed - invalid API key';

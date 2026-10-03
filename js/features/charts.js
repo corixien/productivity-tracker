@@ -10,12 +10,13 @@ function el(name, attributes = {}, ...children) {
 }
 
 const W = 600;
-const H = 220;
+const DEFAULT_H = 220;
 const PAD = { left: 44, right: 10, top: 14, bottom: 32 };
 const plotW = W - PAD.left - PAD.right;
-const plotH = H - PAD.top - PAD.bottom;
 
-function frame(max, unit, points, labelEvery) {
+// `height` is in viewBox units (width is always 600), so a taller chart keeps text size and fills a taller box.
+function frame(max, unit, points, labelEvery, H) {
+    const plotH = H - PAD.top - PAD.bottom;
     const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, class: 'chart-svg', role: 'img' });
     [0, 0.5, 1].forEach((fraction) => {
         const y = PAD.top + plotH * (1 - fraction);
@@ -33,8 +34,9 @@ function frame(max, unit, points, labelEvery) {
 }
 
 // Area/line chart, values 0..max.
-function areaChart(points, { max = 100, unit = '%', label }) {
-    const svg = frame(max, unit, points, 4);
+function areaChart(points, { max = 100, unit = '%', label, height = DEFAULT_H }) {
+    const plotH = height - PAD.top - PAD.bottom;
+    const svg = frame(max, unit, points, 4, height);
     svg.setAttribute('aria-label', label);
     const id = `area-grad-${gradientCounter += 1}`;
     const x = (i) => PAD.left + plotW * (points.length === 1 ? 0.5 : i / (points.length - 1));
@@ -53,9 +55,10 @@ function areaChart(points, { max = 100, unit = '%', label }) {
 }
 
 // Bar chart; each point may carry `errors` drawn as a red part of the bar.
-function barChart(points, { max, label }) {
+function barChart(points, { max, label, height = DEFAULT_H }) {
+    const plotH = height - PAD.top - PAD.bottom;
     const top = Math.max(max || 0, ...points.map((p) => p.value), 1);
-    const svg = frame(top, '', points, 4);
+    const svg = frame(top, '', points, 4, height);
     svg.setAttribute('aria-label', label);
     const slot = plotW / points.length;
     const barW = Math.max(4, slot * 0.62);

@@ -79,24 +79,23 @@ function barChart(stats) {
     );
 }
 
-function heatLevel(day, goal) {
-    if (day.tasks === 0) return 0;
-    if (day.xp >= goal) return 4;
-    if (day.xp >= goal * 0.66) return 3;
-    return day.xp >= goal * 0.33 ? 2 : 1;
+// Today without a task is not missed yet, so it stays empty.
+function dayIcon(day) {
+    if (day.status === 'done') return icon('check');
+    if (day.status === 'frozen') return icon('snowflake');
+    return day.today ? null : icon('close');
 }
 
 function calendar(stats) {
     const days = stats.days;
-    const goal = stats.today.goal;
     const lead = (parseDay(days[0].date).getDay() + 6) % 7;      // weeks start on Monday
     const cells = [
         ...Array.from({ length: lead }, () => h('li', { class: 'heat-cell is-empty', 'aria-hidden': 'true' })),
         ...days.map((day) => h('li', {
-            class: `heat-cell level-${heatLevel(day, goal)}${day.status === 'frozen' ? ' is-frozen' : ''}${day.today ? ' is-today' : ''}`,
+            class: `heat-cell is-${day.status}${day.today ? ' is-today' : ''}`,
             title: `${dayLong(day.date)}: ${day.xp} ${t('xpUnit')}`,
             'aria-label': `${dayLong(day.date)}: ${statusText(day.status)}, ${day.xp} ${t('xpUnit')}`
-        }, day.status === 'frozen' ? icon('snowflake') : null))
+        }, dayIcon(day)))
     ];
     const mondayLabels = Array.from({ length: 7 }, (_, i) => weekdayShort(`2024-01-0${i + 1}`));
     return h('section', { class: 'card chart-card', 'aria-labelledby': 'calendar-title' },
@@ -106,11 +105,8 @@ function calendar(stats) {
             h('ol', { class: 'heat-grid' }, ...cells)
         ),
         h('div', { class: 'heat-legend', 'aria-hidden': 'true' },
-            t('legendLess'),
-            ...[0, 1, 2, 3, 4].map((level) => h('span', { class: `heat-cell level-${level}` })),
-            t('legendMore'),
-            h('span', { class: 'heat-cell is-frozen' }, icon('snowflake')),
-            t('statusFrozen'))
+            ...[['done', 'check'], ['none', 'close'], ['frozen', 'snowflake']].map(([status, name]) =>
+                h('span', { class: 'legend-item' }, h('span', { class: `heat-cell is-${status}` }, icon(name)), statusText(status))))
     );
 }
 

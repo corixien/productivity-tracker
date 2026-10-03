@@ -90,48 +90,46 @@ function openAccountDialog() {
     openDialog($('#account-dialog'));
 }
 
-async function submitUsername(event) {
+async function submitAccount(event) {
     event.preventDefault();
+    const usernameError = $('#username-error');
+    const passwordError = $('#password-error');
+    usernameError.textContent = '';
+    passwordError.textContent = '';
     const newUsername = $('#new-username').value.trim();
-    const error = $('#username-error');
-    error.textContent = '';
-    if (newUsername.toLowerCase() === state.user.username.toLowerCase() && newUsername === state.user.username) {
-        closeDialog($('#account-dialog'));
-        return;
-    }
-    setBusy(event.submitter, true);
-    try {
-        const result = await api.changeUsername(state.user.username, newUsername);
-        replaceAuthToken(result.token);
-        await refreshUser();
-        closeDialog($('#account-dialog'));
-        toast(t('usernameChanged'), { type: 'success' });
-    } catch (failure) {
-        error.textContent = failure.network ? t('networkError') : failure.message;
-    } finally {
-        setBusy(event.submitter, false);
-    }
-}
-
-async function submitPassword(event) {
-    event.preventDefault();
-    const error = $('#password-error');
-    error.textContent = '';
     const current = $('#current-password').value;
     const next = $('#new-password').value;
-    if (!current || next.length < 4) {
-        error.textContent = next.length < 4 ? t('passwordHint') : t('currentPassword');
+    const usernameChanged = newUsername !== state.user.username;
+    const passwordChanged = Boolean(current || next);
+    if (!usernameChanged && !passwordChanged) {
+        closeDialog($('#account-dialog'));
+        return;
+    }
+    if (passwordChanged && (!current || next.length < 4)) {
+        passwordError.textContent = next.length < 4 ? t('passwordHint') : t('currentPassword');
         return;
     }
     setBusy(event.submitter, true);
+    let failed = passwordError;
     try {
-        // The server revokes every older token and returns the only valid one for this device.
-        const result = await api.changePassword(state.user.username, current, next);
-        replaceAuthToken(result.token);
+        if (passwordChanged) {
+            // The server revokes every older token and returns the only valid one for this device.
+            const result = await api.changePassword(state.user.username, current, next);
+            replaceAuthToken(result.token);
+            $('#current-password').value = '';
+            $('#new-password').value = '';
+            toast(t('passwordChanged'), { type: 'success' });
+        }
+        if (usernameChanged) {
+            failed = usernameError;
+            const result = await api.changeUsername(state.user.username, newUsername);
+            replaceAuthToken(result.token);
+            await refreshUser();
+            toast(t('usernameChanged'), { type: 'success' });
+        }
         closeDialog($('#account-dialog'));
-        toast(t('passwordChanged'), { type: 'success' });
     } catch (failure) {
-        error.textContent = failure.network ? t('networkError') : failure.message;
+        failed.textContent = failure.network ? t('networkError') : failure.message;
     } finally {
         setBusy(event.submitter, false);
     }
@@ -144,8 +142,7 @@ function initSettings() {
     $('#avatar-input').addEventListener('change', uploadAvatar);
     $('#goals-form').addEventListener('submit', saveGoals);
     $('#account-btn').addEventListener('click', openAccountDialog);
-    $('#username-form').addEventListener('submit', submitUsername);
-    $('#password-form').addEventListener('submit', submitPassword);
+    $('#account-form').addEventListener('submit', submitAccount);
     $('#sign-out-btn').addEventListener('click', signOut);
 
     $('#language-select').addEventListener('change', (event) => {

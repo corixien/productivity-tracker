@@ -255,8 +255,8 @@
 .chart-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 18px; align-items: stretch; }
 .chart-card { padding: 22px; display: grid; grid-template-rows: auto 1fr auto; gap: 16px; align-content: start; }
 
-.bar-chart { position: relative; display: flex; align-items: flex-end; gap: 6px; min-height: 220px; height: 100%; padding-top: 6px; }
-.bar-col { flex: 1; min-width: 0; display: grid; grid-template-rows: 16px 1fr 18px; justify-items: center; height: 100%; }
+.bar-chart { --vh: 16px; position: relative; display: flex; align-items: flex-end; gap: 6px; min-height: 220px; height: 100%; padding-top: 6px; }
+.bar-col { flex: 1; min-width: 0; display: grid; grid-template-rows: var(--vh) 1fr 18px; justify-items: center; height: 100%; }
 .bar-value { font-size: 0.62rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .bar-track { display: flex; align-items: flex-end; width: 100%; max-width: 26px; height: 100%; }
 .bar { width: 100%; height: calc(var(--h, 0) * 100%); min-height: 3px; border-radius: 8px 8px 4px 4px; background: color-mix(in srgb, var(--accent) 45%, transparent); transition: height 0.9s var(--spring); }
@@ -265,7 +265,7 @@
 .bar-label { font-size: 0.68rem; color: var(--text-faint); }
 .bar-col.is-today .bar-label { color: var(--accent-text); font-weight: 800; }
 .goal-line {
-    position: absolute; left: 0; right: 0; bottom: calc(18px + (100% - 34px) * var(--g, 0)); border-top: 1px dashed var(--accent); opacity: 0.7; pointer-events: none;
+    position: absolute; left: 0; right: 0; bottom: calc(18px + (100% - 24px - var(--vh)) * var(--g, 0)); border-top: 1px dashed var(--accent); opacity: 0.7; pointer-events: none;
 }
 .goal-line::after { content: attr(data-label); position: absolute; right: 0; bottom: 3px; font-size: 0.64rem; color: var(--accent-text); }
 
@@ -274,15 +274,15 @@
 .heat-head li { text-align: center; font-size: 0.68rem; color: var(--text-faint); font-weight: 700; }
 .heat-cell { display: grid; place-items: center; aspect-ratio: 1; border-radius: 9px; background: var(--surface); border: 1px solid var(--border); }
 .heat-cell.is-empty { visibility: hidden; }
-.heat-cell.level-1 { background: color-mix(in srgb, var(--accent) 24%, transparent); border-color: transparent; }
-.heat-cell.level-2 { background: color-mix(in srgb, var(--accent) 44%, transparent); border-color: transparent; }
-.heat-cell.level-3 { background: color-mix(in srgb, var(--accent) 68%, transparent); border-color: transparent; }
-.heat-cell.level-4 { background: var(--accent); border-color: transparent; }
+.heat-cell.is-done { background: color-mix(in srgb, var(--success) 22%, transparent); border-color: transparent; color: var(--success); }
+.heat-cell.is-none { background: color-mix(in srgb, var(--danger) 14%, transparent); border-color: transparent; color: var(--danger); }
+.heat-cell.is-none:empty { background: var(--surface); border-color: var(--border); }
 .heat-cell.is-frozen { background: linear-gradient(145deg, #c9eeff, #5db8f2); border-color: transparent; color: #05304f; }
 .heat-cell svg { width: 55%; height: 55%; }
 .heat-cell.is-today { outline: 2px solid var(--accent-text); outline-offset: 1px; }
-.heat-legend { display: flex; align-items: center; gap: 6px; font-size: 0.72rem; color: var(--text-faint); flex-wrap: wrap; }
-.heat-legend .heat-cell { width: 16px; height: 16px; aspect-ratio: auto; border-radius: 5px; }
+.heat-legend { display: flex; align-items: center; gap: 6px 16px; font-size: 0.72rem; color: var(--text-faint); flex-wrap: wrap; }
+.legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.heat-legend .heat-cell { width: 18px; height: 18px; aspect-ratio: auto; border-radius: 6px; }
 
 @media (max-width: 960px) {
     .chart-grid { grid-template-columns: 1fr; }
@@ -295,6 +295,7 @@
     .streak-flame svg { width: 38px; height: 38px; }
     .streak-number strong { font-size: 2.5rem; }
     .day-circle { width: 38px; height: 38px; }
+    .bar-chart { --vh: 0px; }
     .bar-value { display: none; }
 }
 
@@ -389,7 +390,9 @@
 
 /* Analytics */
 .analytics-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: stretch; }
-.analytics-card { align-content: start; }
+.analytics-card { align-content: stretch; }
+.chart-fill { position: relative; min-height: 200px; }
+.chart-fill .chart-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .analytics-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .analytics-number { font-size: 2rem; line-height: 1; letter-spacing: -0.02em; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .chart-svg { width: 100%; height: auto; overflow: visible; }

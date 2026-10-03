@@ -13,6 +13,23 @@ let timer = null;
 
 const hourLabel = (iso) => new Intl.DateTimeFormat(locale(), { hour: 'numeric' }).format(new Date(iso));
 
+// Rebuilds the chart to the box it is given: viewBox width stays 600, the height follows the box aspect, so the chart fills the card.
+function fillChart(build) {
+    const box = h('div', { class: 'chart-fill' });
+    let last = 0;
+    const fit = () => {
+        const { width, height } = box.getBoundingClientRect();
+        if (!width || !height) return;
+        const next = Math.max(160, Math.min(700, Math.round(600 * height / width)));
+        if (Math.abs(next - last) < 3) return;
+        last = next;
+        box.replaceChildren(build(next));
+    };
+    box.append(build(220));
+    new ResizeObserver(fit).observe(box);
+    return box;
+}
+
 function chartCard(title, headline, subline, chart, note) {
     return h('section', { class: 'card chart-card analytics-card', 'aria-label': title },
         h('div', { class: 'analytics-head' },
@@ -59,12 +76,12 @@ function render() {
 
     grid.replaceChildren(
         chartCard(t('uptimeTitle'), `${data.uptimePercent24h}%`, t('uptimeNote'),
-            areaChart(uptimePoints, { max: 100, unit: '%', label: t('uptimeTitle') })),
+            fillChart((height) => areaChart(uptimePoints, { max: 100, unit: '%', label: t('uptimeTitle'), height }))),
         chartCard(t('usersTitle'), String(data.totals.activeUsers24h), t('usersTotal', { n: data.totals.users }),
-            barChart(userPoints, { label: t('usersTitle') })),
+            fillChart((height) => barChart(userPoints, { label: t('usersTitle'), height }))),
         chartCard(t('groqTitle'), String(callsTotal),
             [errorsTotal ? t('groqErrors', { n: errorsTotal }) : t('groqNoErrors'), avgMs ? t('groqAvg', { ms: avgMs }) : null].filter(Boolean).join(' · '),
-            barChart(groqPoints, { label: t('groqTitle') })),
+            fillChart((height) => barChart(groqPoints, { label: t('groqTitle'), height }))),
         topUsers(data.topUsers)
     );
 }

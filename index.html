@@ -446,31 +446,30 @@
             <h2 id="account-dialog-title" data-i18n="changeCredentials">Change username or password</h2>
             <button type="button" class="icon-btn" data-close data-i18n-aria="close" aria-label="Close"></button>
         </header>
-        <div class="dialog-body stack-lg">
-            <form id="username-form" class="stack" novalidate>
+        <form id="account-form" class="dialog-body stack-lg" novalidate>
+            <section class="stack">
                 <h3 data-i18n="changeUsername">Change username</h3>
                 <div class="field">
                     <label for="new-username" data-i18n="newUsername">New username</label>
                     <input type="text" id="new-username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="30" required>
                 </div>
                 <p id="username-error" class="form-error" role="alert"></p>
-                <button type="submit" class="btn btn-secondary" data-i18n="saveChanges">Save changes</button>
-            </form>
-            <form id="password-form" class="stack" novalidate>
+            </section>
+            <section class="stack">
                 <h3 data-i18n="changePassword">Change password</h3>
                 <div class="field">
                     <label for="current-password" data-i18n="currentPassword">Current password</label>
-                    <input type="password" id="current-password" autocomplete="current-password" maxlength="128" required>
+                    <input type="password" id="current-password" autocomplete="current-password" maxlength="128">
                 </div>
                 <div class="field">
                     <label for="new-password" data-i18n="newPassword">New password</label>
-                    <input type="password" id="new-password" autocomplete="new-password" maxlength="128" required>
+                    <input type="password" id="new-password" autocomplete="new-password" maxlength="128">
                     <p class="hint" data-i18n="passwordHint">At least 4 characters.</p>
                 </div>
                 <p id="password-error" class="form-error" role="alert"></p>
-                <button type="submit" class="btn btn-secondary" data-i18n="saveChanges">Save changes</button>
-            </form>
-        </div>
+            </section>
+            <button type="submit" class="btn btn-primary" data-i18n="saveChanges">Save changes</button>
+        </form>
     </dialog>
 
     <!-- Cell viewer/editor (admin database) -->
