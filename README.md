@@ -49,7 +49,8 @@ CI (`.github/workflows/ci.yml`) runs check, migrate and the full test suite agai
 ## Deploying to Render
 
 1. Connect the repo as a **Web Service** (free tier). `render.yaml` sets build `npm install`, start `npm start`, health check `/api/health`.
-2. Set `DATABASE_URL`, `DATABASE_SSL_REJECT_UNAUTHORIZED=false`, `JWT_SECRET` and `NODE_ENV=production` in the Render dashboard. Never commit secrets.
+2. Set `DATABASE_URL`, `DATABASE_SSL_REJECT_UNAUTHORIZED=false`, `JWT_SECRET`, `NODE_ENV=production` and `ADMIN_USERNAMES` (your username, for the admin area) in the Render dashboard. Never commit secrets.
+3. Migrations run on every start (`npm start`). Some of them drop or rename tables and columns, so create a Neon backup branch first.
 
 The free tier spins down when idle, which also keeps Neon compute usage low. The first request afterwards can take up to a minute; the client retries automatically and shows a "server is waking up" banner.
 
@@ -60,6 +61,7 @@ The free tier spins down when idle, which also keeps Neon compute usage low. The
 - **Multiplier**: a catch-up mechanic among friends: the friend with the least XP earns up to 1.5x, the leader 0.7x, further reduced by rank.
 - **Streaks and ice streaks**: consecutive days with a completed task. Every 7 streak days earns an ice streak (max 3 stored); each one automatically saves the streak when a day is missed, so up to 3 missed days in a row can be bridged. The Activity page shows a Duolingo-style streak card, week strip, 14-day XP chart and a 5-week calendar. A configurable daily XP goal is shown as a progress ring.
 - **Leaderboard**: you and your friends, all-time or this week, with a podium for the top three.
+- **Look and feel**: blue liquid-glass design (dark, light or system), spring hover animations on buttons and boxes, a gliding glass highlight behind the active navigation item and tab, Lexend Deca font, tuned for smooth scrolling.
 - **Templates**: save tasks as templates and add them with one click.
 - **Activity**: full XP history with day grouping and pagination.
 - **Admin area** (`/#/admin`, admin accounts only): Database (every table, Neon-style filters and sorting, click a cell for the full value in a multi-line editor), Logs (compact terminal-style feed with search and filters, live), Analytics (uptime, users and Groq calls for 24 hours, top 5 users). Edits reach the affected user instantly through a server-sent-events channel, and user activity shows up live in the admin pages. Every admin API call is checked against the account.
@@ -97,7 +99,7 @@ All routes except register, login, `/api/meta`, `/api/health` and `/api/ai/statu
 index.html, sw.js, offline.html, manifest.json
 css/        fonts, tokens (themes), base, components, layout, views
 fonts/      Lexend Deca (variable, SIL OFL)
-js/         app.js, core/ (api, auth, state, i18n, dom, ui, ranks, theme, pwa, data, glass, live), features/ (one module per view, admin/ for the admin pages)
+js/         app.js, core/ (api, auth, state, i18n, dom, ui, ranks, theme, pwa, data, glass, live, segmented), features/ (one module per view, admin/ for the admin pages)
 backend/    index.js, routes/, controllers/, models/, services/, middleware/, utils/
 database/   migrate.js, migrations/, migrate-data.js (one-time SQLite import)
 scripts/    check.js
@@ -105,7 +107,7 @@ test/       unit, frontend static checks, integration
 Badges/     rank badge images
 ```
 
-`AGENTS.md` has the detailed architecture, invariants and conventions.
+`AGENTS.md` has the detailed architecture, invariants and conventions. `WhatIveDone.md` is a log of the large redesign and hardening session.
 
 ## Known limitations
 

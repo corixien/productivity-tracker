@@ -24,7 +24,7 @@ js/
   app.js                    bootstrap and wiring
   theme-boot.js             classic script in <head>: applies saved theme before first paint
   core/                     api (fetch, retry, offline queue), auth, state (store + event bus), data (loaders), live (SSE client),
-                            i18n (EN/DE), dom (h(), icons, formatters), ui (toasts, banners, dialogs), ranks, theme, pwa, glass (pointer highlight + ripple for the liquid-glass buttons)
+                            i18n (EN/DE), dom (h(), icons, formatters), ui (toasts, banners, dialogs), ranks, theme, pwa, glass (pointer highlight + ripple for the liquid-glass buttons), segmented (gliding lens for tab strips)
   features/                 nav (hash routing), auth-view, dashboard (hero + task list), task-dialog (add/edit),
                             templates, activity, streak (streak card, charts, calendar), leaderboard, settings, stats, charts (SVG), shared, admin/ (database, logs, analytics)
 backend/
@@ -51,6 +51,8 @@ Badges/ icons/ LOGO.png     static assets (Badges: one PNG per rank, Platinum re
 - Integration tests: start a throwaway Postgres (`podman run -d -e POSTGRES_PASSWORD=test -e POSTGRES_DB=pt -p 54329:5432 docker.io/library/postgres:16-alpine`), then `DATABASE_URL=<url> npm run migrate` and `TEST_DATABASE_URL=<url> npm run test:integration`. The suite refuses non-localhost URLs. Never point tests or migrations at the Neon production DB (`.env` holds it; shell-provided `DATABASE_URL` takes precedence over `.env`).
 - `npm run dev` / `npm start` (migrate + server, what Render runs) / `npm run migrate` / `npm run migrate:data`.
 - CI: `.github/workflows/ci.yml` (Postgres service, check, migrate, test).
+- Git: the owner wants every change committed and pushed to `main` right away (pushing deploys to Render and runs migrations). `origin` has an expired token embedded; push through the `gh` login: `git -c credential.helper= -c credential.helper='!gh auth git-credential' push https://github.com/corixien/productivity-tracker.git main`.
+- `WhatIveDone.md` documents the big redesign session (what changed and why).
 
 ## Request flow
 
@@ -60,7 +62,7 @@ Public: `GET /api/health`, `GET /api/meta` (rank thresholds/multipliers), `GET /
 
 ## API surface
 
-`/api/auth` (register, login, me) · `/api/users` (me, friends, leaderboard, quick-tasks incl. `:id/use`, then `:username` get/put/password/avatar/change-username) · `/api/tasks` (CRUD, `PUT` edits fields and/or toggles `completed`, `:id/complete`) · `/api/xp` (history, paginated) and `/api/xp/stats` (streak, today, week, daily goal) · `/api/leaderboard?period=all|week` · `/api/settings` · `/api/events` (SSE) · `/api/admin/*` (tables with filters/sort/cell values, logs, analytics) · `/api/groq` (`/`, `/rate`, `/status`) · legacy `/api/ai/rate`, `/api/ai/status` (kept on purpose) · `/api/meta` · `/api/health`. Full list: README.md.
+`/api/auth` (register, login, me) · `/api/users` (me, friends, leaderboard, quick-tasks incl. `:id/use`, then `:username` get/put/password/avatar/change-username) · `/api/tasks` (CRUD, `PUT` edits fields and/or toggles `completed`, `:id/complete`) · `/api/xp` (history, paginated) and `/api/xp/stats` (streak, today, week, daily goal) · `/api/leaderboard?period=all|week` · `/api/settings` · `/api/events` (SSE) · `/api/admin/*` (tables with filters/sort/cell values, logs, analytics) · `/api/groq` (`/`, `/rate`, `/status`) · legacy `/api/ai/rate`, `/api/ai/status` (kept on purpose) · `/api/meta` · `/api/health`. Templates keep the API path `/api/users/quick-tasks` although the table is `templates`. Full list: README.md.
 
 ## Database
 
@@ -91,6 +93,8 @@ Links enforced in the database (`users_sync_progress`, `users_audit_xp` triggers
 - Log every user-visible action through `logActivity({ userId, action: 'category.verb', message })` with a compact human message (`Completed task "X" = +21 XP`); put full context in `meta`. Categories feed the admin log filters: auth, task, profile, friend, template, ai, admin, system.
 - Performance rules for the glass UI: real `backdrop-filter` only on large persistent surfaces (card, sidebar, dock, toast, dialog), never on list rows or buttons; no infinite animations; the ambient background is one static layer. Refraction is faked with gradients and a chromatic inset rim (`--glass-*` tokens).
 - Render free tier cold start: first request may 502/503; `core/api.js` retries and shows a "server waking up" banner. Only completing an existing task is queued offline.
+- Admin database page: the server returns up to 5000 rows per request (filters, sort and search run in SQL, long cell values are cut at 200 characters and fetched in full on click); the browser renders them in chunks of 200 while scrolling. Table and column names come from the catalog, never from the request.
+- Cards that zoom on hover must not use an animation with `fill-mode: both/forwards` on `transform` (it overrides the hover transform); `.view` and `.admin-db-body` use `grid-template-columns: minmax(0, 1fr)` so wide children cannot stretch the page.
 - `logs/` and `.env` are gitignored; the test server logs to `LOG_DIR`.
 
 ## Conventions
