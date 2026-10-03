@@ -9,6 +9,24 @@ const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
 const MAX_RETRIES = 3;
 const REQUEST_TIMEOUT = 30000;
 
+// Models in order of preference when the configured one answers 404 (retired, or not enabled for this key's project).
+const PREFERRED_MODELS = ['llama-3.3-70b-versatile', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'llama-3.1-8b-instant', 'qwen/qwen3-32b'];
+const NOT_CHAT = /whisper|guard|safeguard|tts|orpheus|embed|rerank|transcri/i;
+let workingModel = null;
+
+// Asks Groq which models this key can use and picks the best chat model not yet tried.
+async function pickAvailableModel(baseUrl, apiKey, tried) {
+    try {
+        const response = await fetch(`${baseUrl}/models`, { headers: { Authorization: `Bearer ${apiKey}` }, signal: AbortSignal.timeout(10000) });
+        if (!response.ok) return null;
+        const ids = ((await response.json()).data || []).map((model) => model.id).filter((id) => !NOT_CHAT.test(id) && !/compound/i.test(id) && !tried.has(id));
+        return PREFERRED_MODELS.find((id) => ids.includes(id)) || ids[0] || null;
+    } catch (error) {
+        logger.warn('GROQ model list failed', { error: error.message });
+        return null;
+    }
+}
+
 function extractJsonFromResponse(content) {
     let jsonStr = content;
     const codeBlockMatch = content.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
@@ -30,7 +48,8 @@ function calculateXp(productivity, difficulty, duration, bonus = 0) {
 async function rateTask(description, goals, userId, username) {
     const config = getGroqConfig();
     const apiKey = config.apiKey;
-    let model = config.model || DEFAULT_GROQ_MODEL;
+    let model = workingModel || config.model || DEFAULT_GROQ_MODEL;
+    const triedModels = new Set([model]);
     const baseUrl = config.baseUrl;
 
     if (!apiKey) {
@@ -90,12 +109,16 @@ Return ONLY the JSON.` },
 
             clearTimeout(timeoutId);
 
-            // A configured model Groq no longer serves answers 404: retry once with the default model.
-            if (groqResponse.status === 404 && model !== DEFAULT_GROQ_MODEL) {
-                logger.warn(`GROQ model ${model} not found, falling back to ${DEFAULT_GROQ_MODEL}`);
-                model = DEFAULT_GROQ_MODEL;
-                requestPayload.model = model;
-                continue;
+            // 404 = this model is retired or not enabled for the key: ask Groq for one that works and retry.
+            if (groqResponse.status === 404) {
+                const next = await pickAvailableModel(baseUrl, apiKey, triedModels);
+                if (next) {
+                    logger.warn(`GROQ model ${model} not found, switching to ${next}`);
+                    triedModels.add(next);
+                    model = next;
+                    requestPayload.model = next;
+                    continue;
+                }
             }
 
             if (groqResponse.status === 429 && attempt < MAX_RETRIES) {
@@ -128,7 +151,7 @@ Return ONLY the JSON.` },
         if (groqResponse?.status === 401) {
             errorMessage = 'GROQ authentication failed - invalid API key';
         } else if (groqResponse?.status === 404) {
-            errorMessage = 'GROQ model not found';
+            errorMessage = `GROQ model not found (${model})${upstream ? `: ${upstream.slice(0, 160)}` : ''}`;
         } else if (groqResponse?.status === 429) {
             errorMessage = 'GROQ rate limit exceeded';
         }
@@ -185,6 +208,7 @@ Return ONLY the JSON.` },
         reasoning: taskData.reasoning || ''
     };
 
+    if (model !== (config.model || DEFAULT_GROQ_MODEL)) workingModel = model;
     const logId = await logGroqRequest(userId, username, requestPayload, model).catch(warnOnError('groqService.log'));
     await logGroqResponse(logId, responseData, responseTimeMs, true).catch(warnOnError('groqService.log'));
 
@@ -201,7 +225,8 @@ async function checkGroqStatus() {
 
 async function logGroqInteraction(userId, username, requestPayload, responsePayload, responseTimeMs, success, errorMessage = null, model) {
     try {
-        const logId = await logGroqRequest(userId, username, requestPayload, model);
+        if (model !== (config.model || DEFAULT_GROQ_MODEL)) workingModel = model;
+    const logId = await logGroqRequest(userId, username, requestPayload, model);
         await logGroqResponse(logId, responsePayload, responseTimeMs, success, errorMessage);
     } catch (error) {
         logger.error('Failed to log GROQ interaction', { error: error.message });

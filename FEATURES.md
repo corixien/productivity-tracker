@@ -85,7 +85,7 @@ Files: `controllers/userController.js`, `User.getLeaderboard`, `features/leaderb
 
 Files: `services/groqService.js`, `controllers/groqController.js`, `routes/groq.js`. Routes: `POST /api/groq` and `/api/groq/rate`, `GET /api/groq/status`, plus legacy `/api/ai/rate` and `/api/ai/status` (kept on purpose).
 
-- The browser never sees the key. The description (max 2000 chars) plus the user's goals text goes to the Groq chat-completions API (`GROQ_MODEL`, default `llama-3.3-70b-versatile`; a 404 on a configured model retries once with the default, `GROQ_BASE_URL`); the model must return JSON `{name, duration, productivity, difficulty, category}`. The server clamps the values, sets `bonus: 0` and computes XP itself.
+- The browser never sees the key. The description (max 2000 chars) plus the user's goals text goes to the Groq chat-completions API (`GROQ_MODEL`, default `llama-3.3-70b-versatile`; on a 404 the server asks Groq `/models` for a usable chat model (preferring llama-3.3-70b-versatile) and retries, remembering the one that worked, `GROQ_BASE_URL`); the model must return JSON `{name, duration, productivity, difficulty, category}`. The server clamps the values, sets `bonus: 0` and computes XP itself.
 - Rate limit 10/min per user. Without `GROQ_API_KEY` the endpoint answers `ai_not_configured` and the UI says so; manual entry always works. `/status` is public and returns `{ configured, keyLength, model }` (no key value, but it does reveal the key length).
 - Every call is written to `groq_logs` (payload, response, time, success) and appears in admin Analytics; failures log `ai.error`.
 
