@@ -60,6 +60,7 @@ function renderGoal() {
     ring.style.setProperty('--p', fraction);   // the mobile bar reads it from the ring itself
     $('#goal-xp').textContent = formatNumber(earned);
     $('#goal-label').textContent = done ? t('goalDone') : t('goalLabel', { n: formatNumber(goal) });
+    ring.dataset.text = `${formatNumber(earned)} ${$('#goal-label').textContent}`;   // light copy of the text for the mobile bar
     ring.setAttribute('role', 'img');
     ring.setAttribute('aria-label', `${t('dailyGoal')}: ${formatNumber(earned)} / ${formatNumber(goal)} ${t('xpUnit')}`);
 }

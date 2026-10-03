@@ -41,27 +41,33 @@
 @media (max-width: 640px) {
     .hero-row { grid-template-columns: minmax(0, 1fr); }
     .hero { padding: 20px; gap: 18px; }
-    /* Daily goal: a rounded bar with "23 of 50 XP" inside instead of the ring */
+    /* Daily goal: the ring as a rounded loading bar. Solid glowing fill like the ring stroke, text inside.
+       The text exists twice: dark on the track (real element) and light on the fill (::after, clipped to the fill). */
     .goal-card { justify-items: stretch; padding: 12px 16px 14px; gap: 8px; }
     .goal-title { font-size: 0.7rem; }
-    .goal-ring {
-        width: 100%; height: 46px; border-radius: 16px; overflow: hidden;
-        background: var(--border); border: 1px solid var(--glass-border);
-    }
+    .goal-ring { width: 100%; height: 46px; border-radius: 16px; background: var(--border-strong); }
     .goal-ring svg { display: none; }
     .goal-ring::before {
         content: ""; position: absolute; inset: 0 auto 0 0; width: calc(var(--p, 0) * 100%); border-radius: inherit;
-        background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 30%, transparent), color-mix(in srgb, var(--accent) 62%, transparent));
-        box-shadow: inset -2px 0 0 color-mix(in srgb, var(--accent) 80%, white);
+        background: linear-gradient(to bottom, rgba(255, 255, 255, 0.3), transparent 55%), var(--grad);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 0 12px color-mix(in srgb, var(--accent) 55%, transparent);
         transition: width 1s var(--ease);
     }
     .goal-ring.is-done::before {
-        background: linear-gradient(90deg, color-mix(in srgb, var(--success) 30%, transparent), color-mix(in srgb, var(--success) 55%, transparent));
-        box-shadow: inset -2px 0 0 var(--success);
+        background: linear-gradient(to bottom, rgba(255, 255, 255, 0.3), transparent 55%), var(--success);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 0 12px color-mix(in srgb, var(--success) 55%, transparent);
     }
-    .goal-ring-text { position: relative; inset: auto; height: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; }
-    .goal-ring-text strong { font-size: 1.1rem; }
-    .goal-ring-text span { max-width: none; margin: 0; font-size: 0.85rem; color: var(--text); text-transform: none; letter-spacing: 0; }
+    .goal-ring::after {
+        content: attr(data-text); position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center;
+        font-size: 0.95rem; font-weight: 700; color: var(--on-accent); pointer-events: none;
+        clip-path: inset(0 calc((1 - var(--p, 0)) * 100%) 0 0 round 16px 0 0 16px); transition: clip-path 1s var(--ease);
+    }
+    .goal-ring.is-done::after { display: none; }
+    .goal-ring.is-done .goal-ring-text strong, .goal-ring.is-done .goal-ring-text span { color: #fff; text-shadow: 0 1px 2px rgba(0, 40, 20, 0.45); }
+    .goal-ring-text { position: relative; inset: auto; height: 100%; display: flex; align-items: center; justify-content: center; }
+    .goal-ring-text strong, .goal-ring-text span { font-size: 0.95rem; font-weight: 700; color: var(--text); }
+    .goal-ring-text strong { margin-right: 0.27em; }
+    .goal-ring-text span { max-width: none; margin: 0; text-transform: none; letter-spacing: 0; line-height: inherit; }
     .hero-badge, .hero-badge img { width: 84px; height: 84px; }
 }
 
