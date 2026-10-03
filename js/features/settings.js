@@ -1,7 +1,7 @@
 import { api, replaceAuthToken } from '../core/api.js';
 import { state, on } from '../core/state.js';
 import { $, fillAvatar, setBusy } from '../core/dom.js';
-import { t, setLanguage, getCurrentLang } from '../core/i18n.js';
+import { t, setLanguage, getCurrentLang, onLanguageChange } from '../core/i18n.js';
 import { setTheme, getTheme } from '../core/theme.js';
 import { refreshUser, signOut } from '../core/auth.js';
 import { loadStats } from '../core/data.js';
@@ -29,7 +29,7 @@ async function resizeImage(file) {
 function render() {
     const user = state.user;
     if (!user) return;
-    $('#settings-username').textContent = user.username;
+    $('#settings-username').textContent = t('settingsSubtitle', { name: user.username });
     $('#sidebar-username').textContent = user.username;
     fillAvatar($('#settings-avatar'), user);
     fillAvatar($('#sidebar-avatar'), user);
@@ -139,6 +139,7 @@ async function submitPassword(event) {
 
 function initSettings() {
     on('user', render);
+    onLanguageChange(render);
     $('#upload-avatar-btn').addEventListener('click', () => $('#avatar-input').click());
     $('#avatar-input').addEventListener('change', uploadAvatar);
     $('#goals-form').addEventListener('submit', saveGoals);

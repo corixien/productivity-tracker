@@ -140,8 +140,8 @@ const translations = {
         durationInvalid: 'Duration must be between 1 and 1440 minutes.',
 
         templatesSubtitle: 'Your saved tasks, ready to add with one click.',
-        tasksOpenOne: '1 task left to do',
-        tasksOpenMany: '{n} tasks left to do',
+        tasksOpenOne: '1 task left to do.',
+        tasksOpenMany: '{n} tasks left to do.',
         tasksNone: 'No tasks yet. Add your first one.',
         tasksAllDone: 'All done. Nothing left to do.',
         removeTemplate: 'Remove {name} from templates',
@@ -158,7 +158,8 @@ const translations = {
         confirmDeleteTemplateTitle: 'Delete this template?',
         templateDeleted: 'Template deleted',
 
-        activitySubtitle: 'Your latest XP activity, newest first.',
+        settingsSubtitle: 'Customize your Experience, {name}.',
+        activitySubtitle: 'Your latest activity.',
         historyTask: 'Completed {name}',
         historyUncomplete: 'Undid {name}',
         historyDelete: 'Deleted {name}',
@@ -444,8 +445,8 @@ const translations = {
         durationInvalid: 'Die Dauer muss zwischen 1 und 1440 Minuten liegen.',
 
         templatesSubtitle: 'Deine gespeicherten Aufgaben, mit einem Klick hinzugefügt.',
-        tasksOpenOne: 'Noch 1 Aufgabe offen',
-        tasksOpenMany: 'Noch {n} Aufgaben offen',
+        tasksOpenOne: 'Noch 1 Aufgabe offen.',
+        tasksOpenMany: 'Noch {n} Aufgaben offen.',
         tasksNone: 'Noch keine Aufgaben. Füge deine erste hinzu.',
         tasksAllDone: 'Alles erledigt. Nichts mehr offen.',
         removeTemplate: '{name} aus den Vorlagen entfernen',
@@ -462,7 +463,8 @@ const translations = {
         confirmDeleteTemplateTitle: 'Vorlage löschen?',
         templateDeleted: 'Vorlage gelöscht',
 
-        activitySubtitle: 'Deine letzte XP-Aktivität, neueste zuerst.',
+        settingsSubtitle: 'Passe dein Erlebnis an, {name}.',
+        activitySubtitle: 'Deine letzte Aktivität.',
         historyTask: '{name} erledigt',
         historyUncomplete: '{name} rückgängig gemacht',
         historyDelete: '{name} gelöscht',
