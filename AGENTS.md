@@ -11,7 +11,7 @@ Web app for friend groups competing on productivity. Users register/login (usern
 - Frontend: vanilla JS ES modules, single `index.html`, plain CSS split by concern, Lexend Deca font self-hosted in `fonts/`. Visual style: calm blue "liquid glass" with bright blue only as accent (translucent gradients, heavy backdrop blur, bright top edge, spring hover/press animations (buttons and boxes zoom slightly on hover; tab buttons do not), a gliding glass lens behind the active nav item and the active option of every segmented control/tab strip via `core/segmented.js`) driven by `--glass-*` and `--blur` tokens in `css/tokens.css`. No framework, no bundler, no build step.
 - Backend: Node >=18 (CI uses 22), Express 4, `pg` pool, bcrypt, JWT, Winston, Helmet.
 - DB: PostgreSQL on Neon. Deploy: Render free tier (`render.yaml`). The service is allowed to spin down; do not add keep-alive pings.
-- AI: Groq API proxied via backend (key never reaches the browser).
+- AI: Groq API proxied via backend (key never reaches the browser). A 404 on the model makes `groqService` pick a usable chat model from Groq's `/models` and remember it. Env values must not contain `<>` placeholders.
 
 ## Layout
 
@@ -108,4 +108,4 @@ Links enforced in the database (`users_sync_progress`, `users_audit_xp` triggers
 - Parameterized SQL only. Build DOM with `h()` (text nodes only); never `innerHTML` with data.
 - Log through `utils/logger`/`loggingService`; swallowed errors use `warnOnError(context)` so they stay visible.
 - New DB change = new migration (next number 015); never edit applied migrations (003 was made idempotent for fresh DBs, 010 and 011 reshaped the schema).
-- Config via env only: `DATABASE_URL`, `JWT_SECRET` required; optional `DATABASE_SSL_REJECT_UNAUTHORIZED`, `JWT_EXPIRES_IN`, `GROQ_API_KEY`, `GROQ_MODEL`, `GROQ_BASE_URL`, `LOG_LEVEL`, `LOG_DIR`, `LOG_RETENTION_DAYS` (default 30), `ADMIN_USERNAMES`, `PORT`, `NODE_ENV`, `CLIENT_ORIGIN`, `DATABASE_POOL_MAX`.
+- Config via env only: `DATABASE_URL`, `JWT_SECRET` required; optional `DATABASE_SSL_REJECT_UNAUTHORIZED`, `JWT_EXPIRES_IN`, `GROQ_API_KEY`, `GROQ_MODEL` (leave unset: default `llama-3.3-70b-versatile`), `GROQ_BASE_URL`, `LOG_LEVEL`, `LOG_DIR`, `LOG_RETENTION_DAYS` (default 30), `ADMIN_USERNAMES`, `PORT`, `NODE_ENV`, `CLIENT_ORIGIN`, `DATABASE_POOL_MAX`.

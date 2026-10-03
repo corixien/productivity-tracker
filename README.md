@@ -20,7 +20,7 @@ Backend: Express, PostgreSQL (Neon), bcrypt, JWT, Winston, Helmet. Frontend: van
 | `JWT_SECRET` | JWT signing secret (required) |
 | `DATABASE_SSL_REJECT_UNAUTHORIZED` | `false` for Neon in production / on Render |
 | `JWT_EXPIRES_IN` | token lifetime, default `7d` |
-| `GROQ_API_KEY`, `GROQ_MODEL`, `GROQ_BASE_URL` | optional AI task rating (without a key the app falls back to manual entry) |
+| `GROQ_API_KEY`, `GROQ_MODEL`, `GROQ_BASE_URL` | optional AI task rating (without a key the app falls back to manual entry); leave `GROQ_MODEL` unset to use `llama-3.3-70b-versatile`; if Groq answers 404 the server picks a model your key can use; do not wrap values in `<>` | |
 | `ADMIN_USERNAMES` | comma-separated usernames of existing accounts that get admin access at startup (these names cannot be registered by anyone else) |
 | `LOG_LEVEL`, `LOG_DIR`, `LOG_RETENTION_DAYS` | logging; DB logs older than 30 days (default) are purged |
 | `CLIENT_ORIGIN`, `DATABASE_POOL_MAX`, `PORT`, `NODE_ENV` | optional |
@@ -60,9 +60,9 @@ The free tier spins down when idle, which also keeps Neon compute usage low. The
 - **Tasks and XP**: XP is computed on the server (`productivity x difficulty + duration/5 + bonus`) and recorded in the immutable `xp_history` table. Tasks can be completed, un-completed, edited (XP is re-priced) and deleted.
 - **Ranks**: Newcomer, Bronze, Silver, Gold, Platinum, Diamond, Master, with badge artwork.
 - **Multiplier**: a catch-up mechanic among friends: the friend with the least XP earns up to 1.5x, the leader 0.7x, further reduced by rank.
-- **Streaks and ice streaks**: consecutive days with a completed task. Every 7 streak days earns an ice streak (max 3 stored); each one automatically saves the streak when a day is missed, so up to 3 missed days in a row can be bridged. The Activity page shows a Duolingo-style streak card, week strip, 14-day XP chart and a 5-week calendar. A configurable daily XP goal is shown as a progress ring.
+- **Streaks and ice streaks**: consecutive days with a completed task. Every 7 streak days earns an ice streak (max 3 stored); each one automatically saves the streak when a day is missed, so up to 3 missed days in a row can be bridged. The Activity page shows a Duolingo-style streak card, week strip, 14-day XP chart (daily goal shown top right) and a 5-week calendar (red cross = no activity, green check = done, blue snowflake = saved by ice). A configurable daily XP goal is shown as a progress ring.
 - **Leaderboard**: you and your friends, all-time or this week, with a podium for the top three.
-- **Look and feel**: blue liquid-glass design (dark, light or system), spring hover zoom on boxes and buttons (one shared amount), slow fade-and-rise when switching tabs, filters and steps, a gliding glass highlight behind the active navigation item and tab, glowing XP bars, a daily-goal ring (filling rounded outline on mobile), Lexend Deca font, tuned for smooth scrolling.
+- **Look and feel**: blue liquid-glass design (dark, light or system), spring hover zoom on boxes and buttons (one shared amount), slow fade-and-rise when switching tabs, filters and steps, a gliding glass highlight behind the active navigation item and tab, a solid-color glowing XP bar, a daily-goal ring (filling rounded outline on mobile), Lexend Deca font, tuned for smooth scrolling.
 - **Templates**: save tasks as templates (identical ones are rejected with 409; the bookmark on a task is filled when it is one and toggles it in place) and add them with one click; searchable.
 - **Activity**: full XP history with day grouping and pagination.
 - **Admin area** (`/#/admin`, admin accounts only): Database (every table, Neon-style filters and sorting, click a cell for the full value in a multi-line editor), Logs (compact terminal-style feed, newest at the top, with search and filters, live), Analytics (uptime, users and Groq calls for 24 hours, top 5 users). Edits reach the affected user instantly through a server-sent-events channel, and user activity shows up live in the admin pages. Every admin API call is checked against the account.
