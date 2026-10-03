@@ -47,6 +47,8 @@
 }
 .icon-btn svg { width: 20px; height: 20px; }
 .icon-btn:hover { background: var(--surface-hover); color: var(--text); }
+.icon-btn.is-saved { color: var(--accent); }
+.icon-btn.is-saved svg { fill: currentColor; }
 .icon-btn.is-danger:hover { color: var(--danger); background: var(--danger-bg); }
 
 /* Chips */

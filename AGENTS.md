@@ -38,7 +38,7 @@ backend/
                             activityTracker (user_activity/last_seen), uptimeService (minute samples)
   middleware/               auth, validation, rateLimiter (factory + presets), security (Helmet CSP), timezone, errorHandler
   utils/                    database, jwt, password, logger, validation, errors (AppError, asyncHandler, warnOnError), events (SSE hub)
-database/                   migrate.js, migrations/NNN_*.sql (next = 013), migrate-data.js (one-time SQLite import)
+database/                   migrate.js, migrations/NNN_*.sql (next = 014), migrate-data.js (one-time SQLite import)
 scripts/check.js            syntax-checks every first-party JS file
 test/                       node:test suites (unit, frontend static checks, integration)
 Badges/ icons/ LOGO.png     static assets (Badges: one PNG per rank, Platinum reuses silver with a tint; icons/logo.svg is the logo source, PNG icons and LOGO.png are rendered from it)
@@ -102,5 +102,5 @@ Links enforced in the database (`users_sync_progress`, `users_audit_xp` triggers
 - CommonJS in backend, ES modules in `js/`. 4-space indent, single quotes, semicolons.
 - Parameterized SQL only. Build DOM with `h()` (text nodes only); never `innerHTML` with data.
 - Log through `utils/logger`/`loggingService`; swallowed errors use `warnOnError(context)` so they stay visible.
-- New DB change = new migration (next number 013); never edit applied migrations (003 was made idempotent for fresh DBs, 010 and 011 reshaped the schema).
+- New DB change = new migration (next number 014); never edit applied migrations (003 was made idempotent for fresh DBs, 010 and 011 reshaped the schema).
 - Config via env only: `DATABASE_URL`, `JWT_SECRET` required; optional `DATABASE_SSL_REJECT_UNAUTHORIZED`, `JWT_EXPIRES_IN`, `GROQ_API_KEY`, `GROQ_MODEL`, `GROQ_BASE_URL`, `LOG_LEVEL`, `LOG_DIR`, `LOG_RETENTION_DAYS` (default 30), `ADMIN_USERNAMES`, `PORT`, `NODE_ENV`, `CLIENT_ORIGIN`, `DATABASE_POOL_MAX`.

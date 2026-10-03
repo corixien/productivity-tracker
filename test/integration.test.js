@@ -139,6 +139,8 @@ test('API integration', { skip }, async (t) => {
     await t.test('templates', async () => {
         const created = await call('POST', '/api/users/quick-tasks', { token: tokenA, body: { name: 'Daily reading', duration: 20, productivity: 3 } });
         assert.equal(created.status, 201);
+        const dupe = await call('POST', '/api/users/quick-tasks', { token: tokenA, body: { name: ' daily READING ', duration: 20, productivity: 3 } });
+        assert.equal(dupe.status, 409);
         const list = await call('GET', '/api/users/quick-tasks', { token: tokenA });
         assert.equal(list.json.length, 1);
         const used = await call('POST', `/api/users/quick-tasks/${created.json.id}/use`, { token: tokenA });

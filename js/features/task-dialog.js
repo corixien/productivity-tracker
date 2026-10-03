@@ -6,7 +6,7 @@ import { calculateXp } from '../core/ranks.js';
 import { refreshCore, loadTemplates } from '../core/data.js';
 import { refreshUser } from '../core/auth.js';
 import { toast, openDialog, closeDialog, showError } from '../core/ui.js';
-import { CATEGORY_KEYS, categoryLabel, announceProgress, warnNonCritical } from './shared.js';
+import { CATEGORY_KEYS, categoryLabel, announceProgress, warnNonCritical, findTemplate } from './shared.js';
 
 const AI_TIMEOUT_MS = 25000;
 const BONUS_VALUE = 3;
@@ -187,7 +187,7 @@ async function submit(event) {
             const completion = await api.completeTask(created.id);
             xpEarned = completion.xpEarned || 0;
         }
-        if ($('#task-save-template').checked) {
+        if ($('#task-save-template').checked && !findTemplate(values)) {
             await api.createTemplate(values);
             await loadTemplates();
         }

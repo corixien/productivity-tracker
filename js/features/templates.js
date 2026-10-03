@@ -5,9 +5,10 @@ import { t, onLanguageChange } from '../core/i18n.js';
 import { calculateXp } from '../core/ranks.js';
 import { loadTemplates, refreshCore } from '../core/data.js';
 import { toast, confirmDialog, emptyState, skeletonList, showError } from '../core/ui.js';
-import { categoryLabel } from './shared.js';
+import { categoryLabel, initSearch } from './shared.js';
 
 let loaded = false;
+let query = '';
 
 function templateCard(template) {
     const xp = calculateXp(template.duration, template.productivity, template.difficulty, template.bonus);
@@ -44,7 +45,14 @@ function renderTemplates() {
         list.replaceChildren(emptyState('bookmark', t('noTemplatesTitle'), t('noTemplatesText')));
         return;
     }
-    list.replaceChildren(...state.templates.map(templateCard));
+    const visible = query
+        ? state.templates.filter((template) => `${template.name} ${categoryLabel(template.category)}`.toLowerCase().includes(query))
+        : state.templates;
+    if (visible.length === 0) {
+        list.replaceChildren(emptyState('search', t('noResultsTitle'), t('noResultsText')));
+        return;
+    }
+    list.replaceChildren(...visible.map(templateCard));
 }
 
 async function useTemplate(template) {
@@ -84,6 +92,7 @@ async function showTemplates() {
 }
 
 function initTemplates() {
+    initSearch($('#template-search'), (next) => { query = next; renderTemplates(); });
     on('templates', () => { loaded = true; renderTemplates(); });
     on('auth:logout', () => { loaded = false; });
     onLanguageChange(renderTemplates);

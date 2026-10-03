@@ -7,14 +7,15 @@ import { refreshCore, loadTemplates, loadTasks } from '../core/data.js';
 import { toast, xpToast, confirmDialog, emptyState, skeletonList, showError } from '../core/ui.js';
 import { statTiles } from './stats.js';
 import { openTaskDialog } from './task-dialog.js';
-import { categoryLabel, announceProgress } from './shared.js';
+import { categoryLabel, announceProgress, findTemplate } from './shared.js';
 
 let filter = 'pending';
 
-function greeting() {
-    const hour = new Date().getHours();
-    const key = hour < 12 ? 'greetingMorning' : hour < 18 ? 'greetingAfternoon' : 'greetingEvening';
-    return t(key, { name: state.user ? state.user.username : '' });
+function taskSubtitle() {
+    if (!state.tasksLoaded) return '';
+    const pending = state.tasks.filter((task) => !task.completed).length;
+    if (pending > 0) return t(pending === 1 ? 'tasksOpenOne' : 'tasksOpenMany', { n: pending });
+    return t(state.tasks.length === 0 ? 'tasksNone' : 'tasksAllDone');
 }
 
 function renderHero() {
@@ -24,7 +25,6 @@ function renderHero() {
     const rank = user.rank || getRankInfo(xp).name;
     const next = getNextRank(xp);
 
-    $('#greeting').textContent = greeting();
     $('#hero').dataset.rank = rank;
     const badge = $('#hero-badge');
     badge.classList.toggle('is-platinum', rank === 'Platinum');
@@ -73,6 +73,7 @@ function metaChip(iconName, text, extra = '') {
 function taskCard(task, index) {
     const done = task.completed;
     const syncing = state.pendingSync.has(task.id);
+    const savedTemplate = findTemplate(task);
     const checkButton = h('button', {
         type: 'button',
         class: `check-btn${done ? ' is-checked' : ''}`,
@@ -104,7 +105,9 @@ function taskCard(task, index) {
         ),
         h('div', { class: 'task-actions' },
             iconButton('edit', t('editTaskLabel', { name: task.name }), () => openTaskDialog({ mode: 'edit', task })),
-            iconButton('bookmark', t('saveAsTemplate', { name: task.name }), () => saveAsTemplate(task)),
+            savedTemplate
+                ? iconButton('bookmark', t('removeTemplate', { name: task.name }), () => removeTemplate(savedTemplate), 'is-saved')
+                : iconButton('bookmark', t('saveAsTemplate', { name: task.name }), () => saveAsTemplate(task)),
             iconButton('trash', t('deleteTaskLabel', { name: task.name }), () => deleteTask(task), 'is-danger')
         )
     );
@@ -126,6 +129,8 @@ function renderTasks() {
     $('#tab-completed').replaceChildren(t('tabCompleted'), h('span', { class: 'count' }, String(completed.length)));
     $('#tab-pending').setAttribute('aria-pressed', String(filter === 'pending'));
     $('#tab-completed').setAttribute('aria-pressed', String(filter === 'completed'));
+
+    $('#task-subtitle').textContent = taskSubtitle();
 
     const list = $('#task-list');
     if (!state.tasksLoaded) {
@@ -218,6 +223,16 @@ async function saveAsTemplate(task) {
     }
 }
 
+async function removeTemplate(template) {
+    try {
+        await api.deleteTemplate(template.id);
+        await loadTemplates();
+        toast(t('templateDeleted'), { type: 'success' });
+    } catch (error) {
+        showError(error);
+    }
+}
+
 function setFilter(next) {
     filter = next;
     renderTasks();
@@ -231,6 +246,7 @@ function initDashboard() {
 
     on('user', renderHero);
     on('tasks', renderTasks);
+    on('templates', renderTasks);
     on('stats', renderStats);
     onLanguageChange(() => { renderHero(); renderStats(); renderTasks(); });
     renderStats();

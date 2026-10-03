@@ -6,7 +6,7 @@ import { loadStats } from '../core/data.js';
 import { emptyState, skeletonList, showError } from '../core/ui.js';
 import { statTiles } from './stats.js';
 import { renderStreakHero, renderCharts } from './streak.js';
-import { warnNonCritical } from './shared.js';
+import { warnNonCritical, initSearch } from './shared.js';
 
 const PAGE_SIZE = 30;
 const SOURCES = {
@@ -20,6 +20,7 @@ let rows = [];
 let hasMore = false;
 let loaded = false;
 let loading = false;
+let query = '';
 
 function historyItem(row) {
     const source = SOURCES[row.source] || SOURCES.task;
@@ -36,6 +37,13 @@ function historyItem(row) {
     );
 }
 
+function matchesQuery(row) {
+    const source = SOURCES[row.source] || SOURCES.task;
+    const name = row.task_name || t('historyDeletedTask');
+    const text = `${t(source.key, { name })} ${row.xp_amount} ${dayLabel(new Date(row.created_at))} ${timeLabel(new Date(row.created_at))}`;
+    return text.toLowerCase().includes(query);
+}
+
 function renderHistory() {
     const container = $('#history-list');
     $('#history-more').hidden = !hasMore;
@@ -48,8 +56,14 @@ function renderHistory() {
         return;
     }
 
+    const visible = query ? rows.filter(matchesQuery) : rows;
+    if (visible.length === 0) {
+        container.replaceChildren(h('ul', {}, emptyState('search', t('noResultsTitle'), t('noResultsText'))));
+        return;
+    }
+
     const groups = [];
-    for (const row of rows) {
+    for (const row of visible) {
         const label = dayLabel(new Date(row.created_at));
         const last = groups[groups.length - 1];
         if (last && last.label === label) last.rows.push(row);
@@ -92,7 +106,19 @@ function showActivity() {
     loadHistory(true);
 }
 
+// Searching runs over the loaded rows, so pull in the rest of the history first.
+async function search(next) {
+    query = next;
+    renderHistory();
+    while (query && hasMore && loaded) {
+        const before = rows.length;
+        await loadHistory(false);
+        if (rows.length === before) break;
+    }
+}
+
 function initActivity() {
+    initSearch($('#history-search'), search);
     $('#history-more').addEventListener('click', () => loadHistory(false));
     on('stats', renderStats);
     // Any XP change makes the cached history stale: reload on next visit.

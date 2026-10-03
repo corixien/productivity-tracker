@@ -100,33 +100,38 @@
                 <header class="view-header">
                     <div>
                         <h1 id="h-tasks" data-i18n="navTasks">Tasks</h1>
-                        <p class="subtitle" id="greeting"></p>
+                        <p class="subtitle" id="task-subtitle"></p>
                     </div>
                 </header>
 
-                <div class="hero card" id="hero">
-                    <div class="hero-badge" id="hero-badge">
-                        <img id="hero-badge-img" alt="" width="104" height="104">
-                        <span class="level-pill" id="hero-level"></span>
-                    </div>
-                    <div class="hero-main">
-                        <div class="hero-top">
-                            <h2 id="hero-rank"></h2>
-                            <span class="chip chip-accent" id="hero-multiplier" hidden></span>
+                <div class="hero-row">
+                    <div class="hero card" id="hero">
+                        <div class="hero-badge" id="hero-badge">
+                            <img id="hero-badge-img" alt="" width="104" height="104">
+                            <span class="level-pill" id="hero-level"></span>
                         </div>
-                        <div class="xp-line"><strong id="hero-xp"></strong><span id="hero-next"></span></div>
-                        <div class="progress" id="hero-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-i18n-aria="xpProgress" aria-label="XP progress">
-                            <div class="progress-fill" id="hero-fill"></div>
+                        <div class="hero-main">
+                            <div class="hero-top">
+                                <h2 id="hero-rank"></h2>
+                                <span class="chip chip-accent" id="hero-multiplier" hidden></span>
+                            </div>
+                            <div class="xp-line"><strong id="hero-xp"></strong><span id="hero-next"></span></div>
+                            <div class="progress" id="hero-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-i18n-aria="xpProgress" aria-label="XP progress">
+                                <div class="progress-fill" id="hero-fill"></div>
+                            </div>
                         </div>
                     </div>
-                    <div class="goal-ring" id="goal-ring">
-                        <svg viewBox="0 0 80 80" aria-hidden="true">
-                            <circle class="ring-track" cx="40" cy="40" r="34"></circle>
-                            <circle class="ring-fill" cx="40" cy="40" r="34"></circle>
-                        </svg>
-                        <div class="goal-ring-text">
-                            <strong id="goal-xp">0</strong>
-                            <span id="goal-label"></span>
+                    <div class="goal-card card" id="goal-card">
+                        <h2 class="goal-title" data-i18n="dailyGoal">Daily XP goal</h2>
+                        <div class="goal-ring" id="goal-ring">
+                            <svg viewBox="0 0 80 80" aria-hidden="true">
+                                <circle class="ring-track" cx="40" cy="40" r="34"></circle>
+                                <circle class="ring-fill" cx="40" cy="40" r="34"></circle>
+                            </svg>
+                            <div class="goal-ring-text">
+                                <strong id="goal-xp">0</strong>
+                                <span id="goal-label"></span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -150,6 +155,10 @@
                         <p class="subtitle" data-i18n="templatesSubtitle">Save tasks you repeat and add them with one click.</p>
                     </div>
                 </header>
+                <div class="search-field">
+                    <label class="sr-only" for="template-search" data-i18n="templateSearchLabel">Search templates</label>
+                    <input type="text" id="template-search" data-i18n-placeholder="templateSearch" autocomplete="off" spellcheck="false">
+                </div>
                 <ul id="template-list" class="task-list"></ul>
             </section>
 
@@ -164,6 +173,10 @@
                 <div id="streak-panel"></div>
                 <div class="stat-row" id="activity-stats"></div>
                 <div id="activity-charts" class="chart-grid"></div>
+                <div class="search-field">
+                    <label class="sr-only" for="history-search" data-i18n="historySearchLabel">Search XP history</label>
+                    <input type="text" id="history-search" data-i18n-placeholder="historySearch" autocomplete="off" spellcheck="false">
+                </div>
                 <div id="history-list" class="history"></div>
                 <div class="load-more">
                     <button type="button" class="btn btn-secondary" id="history-more" hidden data-i18n="loadMore">Load more</button>
