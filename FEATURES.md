@@ -56,7 +56,7 @@ Files: `Task.computeStreaks` (pure, unit-tested), `Task.getStats`, `features/str
 - A streak day is a local day (client timezone via `X-Timezone`) with at least one completed task. Today never counts as missed.
 - **Ice streaks**: +1 on every 7th streak day (max 3 stored); one is spent automatically per missed day, so up to 3 missed days in a row can be bridged; with none left the streak resets.
 - **Nothing is stored**: everything is derived from completion dates on each `GET /api/xp/stats` (looks back 1500 days). Response: `streak {current, longest, activeToday, freezes, maxFreezes, nextFreezeIn}`, `today {xp, tasks, goal}`, `week {xp, tasks}` (week starts Monday), `days` (35 entries with `date, xp, tasks, status done|frozen|none, today`).
-- **Activity page visuals**: flame hero with streak number and ice slots, week strip, 14-day XP bar chart with the daily goal line, 5-week calendar (weeks start Monday; red cross = no activity, green check = done, blue snowflake = saved by ice; today stays empty until done), three stat tiles.
+- **Activity page visuals**: flame hero with streak number and ice slots, week strip, 14-day XP bar chart with the daily goal line (the goal value is shown bold in the card header, top right), 5-week calendar (weeks start Monday; red cross = no activity, green check = done, blue snowflake = saved by ice; today stays empty until done), three stat tiles.
 
 ## 6. Daily goal
 

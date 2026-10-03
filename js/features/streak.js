@@ -61,10 +61,12 @@ function barChart(stats) {
     const days = stats.days.slice(-CHART_DAYS);
     const goal = stats.today.goal;
     const max = Math.max(goal, ...days.map((day) => day.xp), 1);
-    const goalLine = h('span', { class: 'goal-line', 'aria-hidden': 'true', dataset: { label: `${t('dailyGoal')}: ${formatNumber(goal)}` } });
+    const goalLine = h('span', { class: 'goal-line', 'aria-hidden': 'true' });
     goalLine.style.setProperty('--g', (goal / max).toFixed(4));
     return h('section', { class: 'card chart-card', 'aria-labelledby': 'chart-title' },
-        h('h2', { id: 'chart-title' }, t('chartTitle')),
+        h('div', { class: 'chart-head' },
+            h('h2', { id: 'chart-title' }, t('chartTitle')),
+            h('strong', { class: 'chart-goal' }, `${t('dailyGoal')}: ${formatNumber(goal)}`)),
         h('div', { class: 'bar-chart', role: 'img', 'aria-label': days.map((day) => `${dayLong(day.date)}: ${day.xp} ${t('xpUnit')}`).join('; ') },
             goalLine,
             ...days.map((day) => {

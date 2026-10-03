@@ -257,17 +257,18 @@
 
 .bar-chart { --vh: 16px; position: relative; display: flex; align-items: flex-end; gap: 6px; min-height: 220px; height: 100%; padding-top: 6px; }
 .bar-col { flex: 1; min-width: 0; display: grid; grid-template-rows: var(--vh) 1fr 18px; justify-items: center; height: 100%; }
-.bar-value { font-size: 0.62rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
-.bar-track { display: flex; align-items: flex-end; width: 100%; max-width: 26px; height: 100%; }
+.bar-value { grid-row: 1; font-size: 0.62rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.bar-track { grid-row: 2; display: flex; align-items: flex-end; width: 100%; max-width: 26px; height: 100%; }
 .bar { width: 100%; height: calc(var(--h, 0) * 100%); min-height: 3px; border-radius: 8px 8px 4px 4px; background: color-mix(in srgb, var(--accent) 45%, transparent); transition: height 0.9s var(--spring); }
 .bar.is-goal { background: var(--grad); box-shadow: 0 0 16px -4px var(--accent); }
 .bar.is-frozen { background: linear-gradient(#c9eeff, #5db8f2); }
-.bar-label { font-size: 0.68rem; color: var(--text-faint); }
+.bar-label { grid-row: 3; font-size: 0.68rem; color: var(--text-faint); }
 .bar-col.is-today .bar-label { color: var(--accent-text); font-weight: 800; }
 .goal-line {
     position: absolute; left: 0; right: 0; bottom: calc(18px + (100% - 24px - var(--vh)) * var(--g, 0)); border-top: 1px dashed var(--accent); opacity: 0.7; pointer-events: none;
 }
-.goal-line::after { content: attr(data-label); position: absolute; right: 0; bottom: 3px; font-size: 0.64rem; color: var(--accent-text); }
+.chart-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.chart-goal { font-size: 0.95rem; font-weight: 800; color: var(--accent-text); white-space: nowrap; }
 
 .heatmap { display: grid; gap: 6px; align-content: center; max-width: 380px; width: 100%; margin: 0 auto; }
 .heat-head, .heat-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
