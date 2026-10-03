@@ -5,7 +5,7 @@ const { logger } = require('../utils/logger');
 const { calculateXpFromTask } = require('./rankService');
 const { warnOnError } = require('../utils/errors');
 
-const DEFAULT_GROQ_MODEL = 'groq/compound';
+const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
 const MAX_RETRIES = 3;
 const REQUEST_TIMEOUT = 30000;
 
@@ -30,7 +30,7 @@ function calculateXp(productivity, difficulty, duration, bonus = 0) {
 async function rateTask(description, goals, userId, username) {
     const config = getGroqConfig();
     const apiKey = config.apiKey;
-    const model = config.model || DEFAULT_GROQ_MODEL;
+    let model = config.model || DEFAULT_GROQ_MODEL;
     const baseUrl = config.baseUrl;
 
     if (!apiKey) {
@@ -89,6 +89,14 @@ Return ONLY the JSON.` },
             });
 
             clearTimeout(timeoutId);
+
+            // A configured model Groq no longer serves answers 404: retry once with the default model.
+            if (groqResponse.status === 404 && model !== DEFAULT_GROQ_MODEL) {
+                logger.warn(`GROQ model ${model} not found, falling back to ${DEFAULT_GROQ_MODEL}`);
+                model = DEFAULT_GROQ_MODEL;
+                requestPayload.model = model;
+                continue;
+            }
 
             if (groqResponse.status === 429 && attempt < MAX_RETRIES) {
                 const waitTime = Math.pow(2, attempt) * 2000;

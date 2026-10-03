@@ -3,8 +3,11 @@ import { t } from './i18n.js';
 
 /* ---- toasts ---- */
 const TOAST_MS = 4200;
+const TOAST_MS_PHONE = 2500;
+const onPhone = () => window.matchMedia('(max-width: 960px)').matches;
 
-function toast(message, { type = 'info', title, duration = TOAST_MS } = {}) {
+function toast(message, { type = 'info', title, duration } = {}) {
+    if (duration === undefined) duration = onPhone() ? TOAST_MS_PHONE : TOAST_MS;
     const region = document.getElementById('toast-region');
     if (!region) return;
     const iconName = { success: 'check', error: 'close', xp: 'sparkles', info: 'sparkles' }[type] || 'sparkles';
@@ -33,7 +36,7 @@ function xpToast(amount) {
             h('span', { class: positive ? 'xp-gain' : '' }, positive ? t('xpGained', { n: amount }) : t('xpLost', { n: amount })))
     );
     region.append(el);
-    setTimeout(() => { el.classList.add('is-leaving'); setTimeout(() => el.remove(), 300); }, 2600);
+    setTimeout(() => { el.classList.add('is-leaving'); setTimeout(() => el.remove(), 300); }, onPhone() ? TOAST_MS_PHONE : 2600);
 }
 
 /* ---- banners (offline / waking) ---- */

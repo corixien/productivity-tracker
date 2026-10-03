@@ -1,4 +1,4 @@
-const DEFAULT_GROQ_MODEL = 'groq/compound';
+const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
 
 function requireEnvironment(name) {
     const value = process.env[name];
