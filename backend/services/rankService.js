@@ -40,44 +40,52 @@ function getXpForNextRank(xp) {
     return current.next;
 }
 
+// Task XP = (baseRate + productivity x difficulty) XP per hour of effective time.
+// Effective time: full up to 120 min, half weight for minutes 120-360, a quarter after that, so splitting
+// work into tiny tasks gains nothing and very long entries have diminishing returns. The bonus is capped
+// at 10% of the base so it cannot be farmed with tiny tasks. 0 productivity = 0 XP. Tasks under 10 minutes round
+// down (no rounding gain from spamming 1-minute tasks); longer productive tasks give at least 1 XP.
+const XP_FORMULA = { baseRate: 12, fullMinutes: 120, halfUntilMinutes: 360, bonusCap: 0.1, shortMinutes: 10 };
+
+function effectiveMinutes(duration) {
+    const { fullMinutes, halfUntilMinutes } = XP_FORMULA;
+    return Math.min(duration, fullMinutes)
+        + 0.5 * Math.min(Math.max(duration - fullMinutes, 0), halfUntilMinutes - fullMinutes)
+        + 0.25 * Math.max(duration - halfUntilMinutes, 0);
+}
+
 function calculateXpFromTask(duration, productivity, difficulty, bonus = 0) {
-    if (productivity === 0) return 0;
-    return Math.round((productivity * difficulty) + (duration / 5) + bonus);
+    if (!productivity) return 0;
+    const base = (XP_FORMULA.baseRate + productivity * difficulty) * effectiveMinutes(duration) / 60;
+    const total = base + Math.min(bonus, base * XP_FORMULA.bonusCap);
+    return duration < XP_FORMULA.shortMinutes ? Math.floor(total) : Math.max(1, Math.round(total));
 }
 
-const RANK_MULTIPLIERS = {
-    Newcomer: 1.0,
-    Bronze: 0.95,
-    Silver: 0.9,
-    Gold: 0.85,
-    Platinum: 0.8,
-    Diamond: 0.75,
-    Master: 0.7
-};
+// Catch-up multiplier (position among you and your friends), a smooth function of the XP gap:
+// ((average friend XP + s) / (own XP + s)) ^ exponent, clamped to [min, max]. Equal XP = 1.0, behind > 1, ahead < 1.
+// Alone, or no friends: 1.0. The smoothing keeps brand-new accounts from jumping to the extremes.
+const MULTIPLIER = { smoothing: 150, exponent: 0.4, min: 0.85, max: 1.3 };
 
-function getRankMultiplier(rank) {
-    return RANK_MULTIPLIERS[rank] || 1.0;
-}
-
-// Position multiplier (catch-up mechanic): the member with the least XP in the friend group gets 1.5,
-// the leader gets 0.7.
-// lowerCount = group members with less XP than the user, total = group size including the user.
-function computePositionMultiplier(lowerCount, total) {
-    if (total <= 1) return 1.0;
-    return 1.5 - (lowerCount / (total - 1)) * 0.8;
+function computePositionMultiplier(ownXp, friendXpTotal, friendCount) {
+    if (!friendCount) return 1.0;
+    const ratio = ((friendXpTotal / friendCount) + MULTIPLIER.smoothing) / (ownXp + MULTIPLIER.smoothing);
+    const value = Math.pow(ratio, MULTIPLIER.exponent);
+    return Math.round(Math.min(MULTIPLIER.max, Math.max(MULTIPLIER.min, value)) * 100) / 100;
 }
 
 function getMeta() {
     return {
-        ranks: RANK_THRESHOLDS.map((rank) => ({ ...rank, multiplier: RANK_MULTIPLIERS[rank.name] })),
+        ranks: RANK_THRESHOLDS.map((rank) => ({ ...rank })),
         xpPerLevel: 100,
-        xpFormula: { durationDivisor: 5 }
+        xpFormula: { ...XP_FORMULA },
+        multiplier: { ...MULTIPLIER }
     };
 }
 
 module.exports = {
     RANK_THRESHOLDS,
-    RANK_MULTIPLIERS,
+    XP_FORMULA,
+    MULTIPLIER,
     getRankInfo,
     getRankName,
     getProgressPercent,
@@ -85,6 +93,5 @@ module.exports = {
     getXpForNextRank,
     calculateXpFromTask,
     computePositionMultiplier,
-    getMeta,
-    getRankMultiplier
+    getMeta
 };

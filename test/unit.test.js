@@ -32,23 +32,47 @@ test('rank thresholds and levels', () => {
     assert.equal(rank.getProgressPercent(9999), 100);
 });
 
-test('task XP formula', () => {
-    assert.equal(rank.calculateXpFromTask(30, 4, 3, 0), 18);
+test('task XP formula: (12 + productivity x difficulty) per hour, diminishing for long tasks', () => {
+    assert.equal(rank.calculateXpFromTask(60, 4, 3, 0), 24);
+    assert.equal(rank.calculateXpFromTask(30, 4, 3, 0), 12);
     assert.equal(rank.calculateXpFromTask(30, 0, 3, 0), 0);
-    assert.equal(rank.calculateXpFromTask(60, 5, 4, 3), 35);
+    assert.equal(rank.calculateXpFromTask(60, 5, 5, 0), 37);
+    assert.equal(rank.calculateXpFromTask(10, 1, 1, 0), 2);
+    assert.equal(rank.calculateXpFromTask(15, 1, 1, 0), 3);
+    assert.equal(rank.calculateXpFromTask(1, 5, 5, 0), 0, 'under 10 minutes rounds down');
+    // 3 h: 120 full + 60 min at half weight = 150 effective minutes
+    assert.equal(rank.calculateXpFromTask(180, 5, 4, 0), 80);
 });
 
-test('position multiplier: leader gets least, last place gets most', () => {
-    assert.equal(rank.computePositionMultiplier(0, 1), 1.0);
-    assert.equal(rank.computePositionMultiplier(0, 3), 1.5);
-    assert.equal(rank.computePositionMultiplier(2, 3), 0.7);
-    assert.ok(Math.abs(rank.computePositionMultiplier(1, 3) - 1.1) < 1e-9);
+test('task XP cannot be farmed by splitting or padding', () => {
+    const whole = rank.calculateXpFromTask(60, 5, 5, 3);
+    const split = 12 * rank.calculateXpFromTask(5, 5, 5, 3);
+    assert.ok(split <= whole + 6, `12 five-minute tasks (${split}) must not beat one hour (${whole})`);
+    assert.ok(rank.calculateXpFromTask(1440, 1, 1, 0) < 150, 'a 24 h low-value entry stays small');
+    assert.ok(60 * rank.calculateXpFromTask(1, 5, 5, 3) <= whole, 'sixty one-minute tasks must not beat one hour');
+    // the bonus is capped at 10% of the base
+    assert.equal(rank.calculateXpFromTask(60, 4, 3, 3), 26);
+    assert.equal(rank.calculateXpFromTask(5, 4, 3, 3), 2);
 });
 
-test('meta exposes ranks with multipliers', () => {
+test('catch-up multiplier: smooth in the XP gap, clamped to 0.85-1.3', () => {
+    const m = rank.computePositionMultiplier;
+    assert.equal(m(500, 0, 0), 1.0, 'no friends');
+    assert.equal(m(500, 500, 1), 1.0, 'equal XP');
+    assert.equal(m(0, 0, 3), 1.0, 'everyone at zero');
+    assert.equal(m(0, 3000, 1), 1.3, 'far behind hits the cap');
+    assert.equal(m(3000, 0, 1), 0.85, 'far ahead hits the floor');
+    assert.ok(m(500, 600, 1) > 1 && m(500, 400, 1) < 1);
+    assert.ok(Math.abs(m(500, 501, 1) - m(501, 500, 1)) < 0.02, 'one XP changes almost nothing (no rank-flip cliff)');
+    // average of several friends
+    assert.equal(m(100, 300, 3), m(100, 100, 1));
+});
+
+test('meta exposes ranks and the formula constants', () => {
     const meta = rank.getMeta();
     assert.equal(meta.ranks.length, 7);
-    assert.equal(meta.ranks[6].multiplier, 0.7);
+    assert.equal(meta.xpFormula.baseRate, 12);
+    assert.equal(meta.multiplier.max, 1.3);
 });
 
 function days(start, count) {

@@ -72,10 +72,10 @@ Links enforced in the database (`users_sync_progress`, `users_audit_xp` triggers
 
 ## Game mechanics
 
-- Task XP: `round(productivity * difficulty + duration/5 + bonus)`, 0 if productivity is 0 (`rankService.calculateXpFromTask`; the frontend mirrors it for previews in `core/ranks.js`, server wins).
+- Task XP: `(12 + productivity * difficulty) * effectiveMinutes / 60` + bonus capped at 10%; effective minutes = 120 full, next 240 at half weight, rest at a quarter; under 10 min rounds down; 0 if productivity is 0 (`rankService.calculateXpFromTask`, constants `XP_FORMULA` also served via `/api/meta`; the frontend mirrors it for previews in `core/ranks.js`, server wins). Do not reintroduce a duration-independent term (it made tiny tasks farmable).
 - Completing: awards `round(xp_awarded * multiplier)` as an `xp_history` row (`task`). Uncomplete (`task_uncomplete`) and deleting a completed task (`task_delete`) subtract what was actually awarded (`SUM(xp_history)` for that task). Editing a completed task books the difference as `task_edit`, keeping the multiplier used at completion.
 - `users.xp = SUM(xp_history.xp_amount)`; `level = floor(xp/100)`; rank from thresholds 0/100/300/600/1200/2400/5000.
-- Multiplier (catch-up mechanic) = position multiplier minus rank penalty. Position: least XP among you and your friends gets 1.5, the leader 0.7. Rank penalty: Newcomer 1.0 down to Master 0.7. Recomputed inside every XP transaction; `User.monitorMultipliersThrottled` audits stale users opportunistically (leaderboard requests, at most every 5 min) because the server sleeps.
+- Multiplier (catch-up mechanic) = `clamp(((avg friend XP + 150) / (own XP + 150)) ^ 0.4, 0.85, 1.3)`, no friends = 1.0, no rank penalty (`rankService.computePositionMultiplier`, constants `MULTIPLIER`). Recomputed inside every XP transaction; `User.monitorMultipliersThrottled` audits stale users opportunistically (leaderboard requests, at most every 5 min) because the server sleeps. Existing completed tasks keep their stored `xp_awarded`; only new and edited tasks use the formula.
 - Streak: consecutive local days (client timezone) with at least one completed task; today never counts as missed. Ice streaks (`Task.computeStreaks`): +1 on every 7th streak day (max 3), one is spent per missed day, no ice left resets the streak. Derived from completion history on every `/api/xp/stats` call (no stored state); the response also carries `days` (last 35 days) for the charts.
 
 ## Invariants and gotchas

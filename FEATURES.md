@@ -1,6 +1,6 @@
 # Features
 
-Reference of every feature of the Productivity Tracker, for future agents: what it does, how it works, where the code lives and what must not break. `AGENTS.md` has the conventions and commands, `README.md` has setup and the API table. Verified against the code at commit `72ab580`; if code and this file disagree, the code wins, then fix this file.
+Reference of every feature of the Productivity Tracker, for future agents: what it does, how it works, where the code lives and what must not break. `AGENTS.md` has the conventions and commands, `README.md` has setup and the API table. Verified against the code at commit `a3fba6c` plus the formula rework; if code and this file disagree, the code wins, then fix this file.
 
 Contents: [1 Accounts](#1-accounts-and-sessions) · [2 Tasks](#2-tasks) · [3 XP](#3-xp-ranks-and-levels) · [4 Multiplier](#4-multiplier-catch-up-mechanic) · [5 Streaks](#5-streaks-and-ice-streaks) · [6 Daily goal](#6-daily-goal) · [7 Templates](#7-templates) · [8 Activity](#8-activity-page) · [9 Friends and leaderboard](#9-friends-and-leaderboard) · [10 AI rating](#10-ai-task-rating-groq) · [11 Settings](#11-settings-and-profile) · [12 Admin](#12-admin-area) · [13 Live channel](#13-live-channel-sse) · [14 Database integrity](#14-database-integrity) · [15 Logging](#15-logging-and-retention) · [16 PWA](#16-pwa-and-offline) · [17 UI system](#17-ui-system) · [18 i18n](#18-internationalization) · [19 Security](#19-security) · [20 Tests and CI](#20-tests-tooling-and-ci) · [21 Deployment](#21-deployment) · [22 Removed](#22-removed-features-do-not-resurrect)
 
@@ -34,7 +34,7 @@ Files: `models/Task.js`, `controllers/taskController.js`, `features/dashboard.js
 
 Files: `services/rankService.js` (source of truth), `core/ranks.js` (frontend mirror), `database` function `rank_for_xp`.
 
-- **Task XP**: `round(productivity x difficulty + duration/5 + bonus)`, `0` when productivity is `0`. The frontend only previews; the server decides.
+- **Task XP**: `(12 + productivity x difficulty) x effectiveMinutes / 60`, plus a bonus capped at 10% of that. Effective minutes: full weight up to 120 min, half weight for minutes 120-360, quarter weight beyond, so splitting work into tiny tasks or padding durations gains nothing (12 five-minute p5d5 tasks = one hour p5d5). Tasks under 10 min round down, longer productive tasks give at least 1 XP, `0` when productivity is `0`. 1 h at p4 d3 = 24 XP; p1 d1 = 13; p5 d5 = 37 per hour. Constants live in `rankService.XP_FORMULA` and are served via `/api/meta` (`xpFormula`); the frontend mirror is `core/ranks.js calculateXp` (preview only, the server decides).
 - **Ranks** by total XP: Newcomer 0, Bronze 100, Silver 300, Gold 600, Platinum 1200, Diamond 2400, Master 5000. **Level** = `floor(xp / 100)`. Rank and level are derived from `xp` by a database trigger, never set by app code.
 - **`xp_history`** is the immutable ledger: `xp_amount`, `source` (`task`, `task_uncomplete`, `task_delete`, `task_edit`, `admin_adjust`), `source_id` (task id, deliberately no foreign key so history survives deletion). `users.xp = SUM(xp_amount)`. Write XP only through `Task.syncUserTotals` inside a transaction.
 - **Badges**: `Badges/*.png`, one per rank (256 px); Platinum reuses the silver badge with a CSS tint. `GET /api/meta` serves thresholds and multipliers so the frontend does not duplicate them (cached in `localStorage` as fallback when offline).
@@ -43,9 +43,8 @@ Files: `services/rankService.js` (source of truth), `core/ranks.js` (frontend mi
 
 Files: `models/User.js` (`recalculateMultiplier`, `getPositionMultiplier`, `monitorMultipliersThrottled`), `rankService.computePositionMultiplier`.
 
-- `multiplier = positionMultiplier - (1 - rankMultiplier)`, rounded to 2 decimals.
-- **Position**: among you and your friends, the one with the least XP gets 1.5, the leader 0.7, linear in between (`1.5 - lower/(n-1) x 0.8`); alone = 1.0. Computed in SQL.
-- **Rank penalty** multipliers: Newcomer 1.0, Bronze 0.95, Silver 0.9, Gold 0.85, Platinum 0.8, Diamond 0.75, Master 0.7.
+- `multiplier = clamp(((average friend XP + 150) / (own XP + 150)) ^ 0.4, 0.85, 1.3)`, rounded to 2 decimals (`rankService.computePositionMultiplier`, constants `MULTIPLIER`, served via `/api/meta`). A smooth function of the XP gap: equal XP = 1.0, behind > 1, ahead < 1; one XP of difference changes almost nothing (the old rank-order scheme jumped 1.4 <-> 0.6 on a single XP and invited sandbagging). No friends = 1.0. There is no rank penalty any more.
+- **Why this shape**: simulated over 180 days with four players of effort 60/40/25/10 per day, the old formula ended with a 2.3x top-to-bottom ratio and 19 rank swaps; this one gives about 3.6x (effort 6x), keeps the effort order and about 2 swaps. A newcomer at 0 XP joining two 3000 XP friends at equal effort closes to 90% in about 220 days (old: 128, none: never).
 - Recomputed in every XP transaction (also refreshes `tasks_completed` and `last_multiplier_check`). Because the free-tier server sleeps there is no timer: leaderboard requests trigger `monitorMultipliersThrottled` (at most every 5 min), which re-checks stale users (up to 200) and logs a `system.audit` entry when it corrected any. `POST /api/users/monitor-multipliers` runs it on demand.
 - The UI shows a chip on the hero and uses the multiplier in the task preview (refreshed when the dialog opens).
 

@@ -80,20 +80,20 @@ test('API integration', { skip }, async (t) => {
     await t.test('task lifecycle keeps XP consistent', async () => {
         const created = await call('POST', '/api/tasks', { token: tokenA, body: { name: 'Study', duration: 30, productivity: 4, difficulty: 3 } });
         assert.equal(created.status, 201);
-        assert.equal(created.json.xp, 18);
+        assert.equal(created.json.xp, 12);
         taskId = created.json.id;
 
         const done = await call('POST', `/api/tasks/${taskId}/complete`, { token: tokenA });
-        assert.equal(done.json.newXP, 18);
+        assert.equal(done.json.newXP, 12);
 
         const stats = (await call('GET', '/api/xp/stats', { token: tokenA })).json;
         assert.equal(stats.streak.current, 1);
         assert.equal(stats.streak.activeToday, true);
-        assert.equal(stats.today.xp, 18);
+        assert.equal(stats.today.xp, 12);
         assert.equal(stats.today.goal, 50);
 
         const history = (await call('GET', '/api/xp', { token: tokenA })).json;
-        assert.equal(history.total, 18);
+        assert.equal(history.total, 12);
         assert.equal(history.history[0].task_name, 'Study');
 
         const undone = await call('PUT', `/api/tasks/${taskId}`, { token: tokenA, body: { completed: false } });
@@ -107,7 +107,7 @@ test('API integration', { skip }, async (t) => {
         assert.equal(edited.json.xp, 28);
         assert.equal(edited.json.newXP, 28);
         const history = (await call('GET', '/api/xp', { token: tokenA })).json;
-        assert.ok(history.history.some((row) => row.source === 'task_edit' && row.xp_amount === 10));
+        assert.ok(history.history.some((row) => row.source === 'task_edit' && row.xp_amount === 16));
         assert.equal((await call('PUT', `/api/tasks/${taskId}`, { token: tokenB, body: { name: 'hijack' } })).status, 404);
     });
 
@@ -121,12 +121,12 @@ test('API integration', { skip }, async (t) => {
         assert.equal(week[0].score, 28);
         assert.equal(week[1].score, 0);
 
-        // Leader gets the lowest position multiplier: XP is now scaled by it.
+        // Leader (28 XP vs 0): the catch-up multiplier is below 1 and scales new XP.
         const me = (await call('GET', '/api/auth/me', { token: tokenA })).json;
-        assert.equal(Number(me.multiplier), 0.7);
+        assert.equal(Number(me.multiplier), 0.93);
         const second = await call('POST', '/api/tasks', { token: tokenA, body: { name: 'Second', duration: 30, productivity: 4, difficulty: 3 } });
         const done = await call('POST', `/api/tasks/${second.json.id}/complete`, { token: tokenA });
-        assert.equal(done.json.xpEarned, Math.round(18 * 0.7));
+        assert.equal(done.json.xpEarned, Math.round(12 * 0.93));
         const undone = await call('PUT', `/api/tasks/${second.json.id}`, { token: tokenA, body: { completed: false } });
         assert.equal(undone.json.newXP, 28, 'uncompleting removes exactly what was awarded');
     });

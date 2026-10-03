@@ -1,7 +1,7 @@
 const { query } = require('../utils/database');
 const { hashPassword, verifyPassword, isLegacyPasswordHash } = require('../utils/password');
 const { logActivity } = require('../services/loggingService');
-const { getRankMultiplier, computePositionMultiplier } = require('../services/rankService');
+const { computePositionMultiplier } = require('../services/rankService');
 const { warnOnError } = require('../utils/errors');
 
 // Any object with .query(text, params): the pool wrapper by default, or a transaction client.
@@ -149,25 +149,20 @@ async function isFriend(userId, friendId) {
     return result.rows.length > 0;
 }
 
-// Rank among the user and their friends, computed in SQL.
+// Catch-up multiplier from the XP gap to the user's friends (see rankService.computePositionMultiplier).
 async function getPositionMultiplier(userId, xp, db = defaultDb) {
-    const userXp = xp || 0;
     const result = await db.query(
-        `SELECT COUNT(*)::int AS friends, COUNT(*) FILTER (WHERE u.xp < $2)::int AS lower
+        `SELECT COUNT(*)::int AS friends, COALESCE(SUM(u.xp), 0)::float8 AS total
          FROM friends f JOIN users u ON u.id = f.friend_id
          WHERE f.user_id = $1`,
-        [userId, userXp]
+        [userId]
     );
-    const { friends, lower } = result.rows[0];
-    return computePositionMultiplier(lower, friends + 1);
-}
-
-function combineMultipliers(positionMultiplier, rankMultiplier) {
-    return Math.round((positionMultiplier - (1 - rankMultiplier)) * 100) / 100;
+    const { friends, total } = result.rows[0];
+    return computePositionMultiplier(xp || 0, total, friends);
 }
 
 async function recalculateMultiplier(userId, force = false, db = defaultDb) {
-    const userResult = await db.query('SELECT rank, xp, last_multiplier_check FROM users WHERE id = $1', [userId]);
+    const userResult = await db.query('SELECT xp, last_multiplier_check FROM users WHERE id = $1', [userId]);
     if (!userResult.rows[0]) return null;
 
     if (!force) {
@@ -177,10 +172,7 @@ async function recalculateMultiplier(userId, force = false, db = defaultDb) {
         }
     }
 
-    const { rank, xp } = userResult.rows[0];
-    const rankMultiplier = getRankMultiplier(rank);
-    const positionMultiplier = await getPositionMultiplier(userId, xp, db);
-    const combined = combineMultipliers(positionMultiplier, rankMultiplier);
+    const combined = await getPositionMultiplier(userId, userResult.rows[0].xp, db);
 
     await db.query(
         `UPDATE users SET multiplier = $1,
@@ -201,9 +193,7 @@ async function monitorMultipliers(maxAgeMinutes = 5) {
 
     const discrepancies = [];
     for (const user of staleUsers.rows) {
-        const currentRankMultiplier = getRankMultiplier(user.rank);
-        const currentPositionMultiplier = await getPositionMultiplier(user.id, user.xp);
-        const expectedCombined = combineMultipliers(currentPositionMultiplier, currentRankMultiplier);
+        const expectedCombined = await getPositionMultiplier(user.id, user.xp);
 
         if (Math.abs((user.multiplier || 0) - expectedCombined) > 0.01) {
             discrepancies.push({
@@ -211,8 +201,6 @@ async function monitorMultipliers(maxAgeMinutes = 5) {
                 username: user.username,
                 storedMultiplier: user.multiplier,
                 expectedMultiplier: expectedCombined,
-                expectedPosition: currentPositionMultiplier,
-                expectedRank: currentRankMultiplier,
                 lastCheck: user.last_multiplier_check,
                 severity: Math.abs((user.multiplier || 0) - expectedCombined) > 0.5 ? 'high' : 'medium'
             });
@@ -298,7 +286,6 @@ module.exports = {
     isFriend,
     normalizeUser,
     getPositionMultiplier,
-    combineMultipliers,
     recalculateMultiplier,
     monitorMultipliers,
     monitorMultipliersThrottled,

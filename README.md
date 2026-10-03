@@ -57,9 +57,9 @@ The free tier spins down when idle, which also keeps Neon compute usage low. The
 
 ## Features
 
-- **Tasks and XP**: XP is computed on the server (`productivity x difficulty + duration/5 + bonus`) and recorded in the immutable `xp_history` table. Tasks can be completed, un-completed, edited (XP is re-priced) and deleted.
+- **Tasks and XP**: XP is computed on the server (`(12 + productivity x difficulty) x effective hours`, diminishing for very long tasks, so tiny or padded tasks gain nothing) and recorded in the immutable `xp_history` table. Tasks can be completed, un-completed, edited (XP is re-priced) and deleted.
 - **Ranks**: Newcomer, Bronze, Silver, Gold, Platinum, Diamond, Master, with badge artwork.
-- **Multiplier**: a catch-up mechanic among friends: the friend with the least XP earns up to 1.5x, the leader 0.7x, further reduced by rank.
+- **Multiplier**: a smooth catch-up mechanic among friends: from 0.85x (far ahead of your friends' average XP) to 1.3x (far behind), 1.0x when level. No rank penalty.
 - **Streaks and ice streaks**: consecutive days with a completed task. Every 7 streak days earns an ice streak (max 3 stored); each one automatically saves the streak when a day is missed, so up to 3 missed days in a row can be bridged. The Activity page shows a Duolingo-style streak card, week strip, 14-day XP chart (daily goal shown top right) and a 5-week calendar (red cross = no activity, green check = done, blue snowflake = saved by ice). A configurable daily XP goal is shown as a progress ring.
 - **Leaderboard**: you and your friends, all-time or this week, with a podium for the top three.
 - **Look and feel**: blue liquid-glass design (dark, light or system), spring hover zoom on boxes and buttons (one shared amount), slow fade-and-rise when switching tabs, filters and steps, a gliding glass highlight behind the active navigation item and tab, a solid-color glowing XP bar, a daily-goal ring (filling rounded outline on mobile), Lexend Deca font, tuned for smooth scrolling.
