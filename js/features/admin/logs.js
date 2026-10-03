@@ -50,7 +50,9 @@ function render() {
     if (rows.length === 0) {
         list.replaceChildren(h('li', { class: 'log-empty' }, t('logEmpty')));
     } else {
-        list.replaceChildren(...rows.map(logLine));
+        // The server sends newest first; the terminal reads oldest at the top, newest at the bottom.
+        list.replaceChildren(...rows.slice().reverse().map(logLine));
+        list.scrollTop = list.scrollHeight;
     }
     $('#log-count').textContent = t('logCount', { n: rows.length });
 }
@@ -73,12 +75,14 @@ function onLiveLog(row) {
     row.metadata = row.metadata || {};
     rows = [row, ...rows].slice(0, LIMIT);
     const list = $('#log-list');
+    const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 40;
     const first = list.querySelector('.log-empty');
     if (first) first.remove();
     const item = logLine(row);
     item.classList.add('is-new');
-    list.prepend(item);
-    while (list.children.length > LIMIT) list.lastElementChild.remove();
+    list.append(item);
+    while (list.children.length > LIMIT) list.firstElementChild.remove();
+    if (atBottom) list.scrollTop = list.scrollHeight;
     $('#log-count').textContent = t('logCount', { n: rows.length });
 }
 

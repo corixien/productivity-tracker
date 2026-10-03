@@ -393,12 +393,12 @@
 /* ---- Hover zoom for boxes ----
    Every box grows by the same subtle amount (--hover-scale) with a spring and lifts a little; leaving plays
    the spring back. Transform only: cheap to animate. */
-.task-card, .stat, .board-row, .podium-spot, .hero, .goal-card, .streak-hero, .chart-card, .settings-card, .history-items, .day-circle {
+.task-card, .stat, .board-row, .podium-spot, .hero, .goal-card, .streak-hero, .chart-card, .settings-card, .history-items, .day-circle, .user-mini {
     transition: transform 0.5s var(--spring), box-shadow 0.35s var(--ease), background 0.25s, border-color 0.25s, opacity 0.3s;
 }
 @media (hover: hover) {
     .task-card:hover, .stat:hover, .board-row:hover, .podium-spot:hover, .hero:hover, .goal-card:hover, .streak-hero:hover,
-    .chart-card:hover, .settings-card:hover, .history-items:hover {
+    .chart-card:hover, .settings-card:hover, .history-items:hover, .user-mini:hover {
         position: relative; z-index: 2; transform: scale(var(--hover-scale));
         box-shadow: var(--glass-shadow), 0 26px 46px -22px rgba(0, 12, 48, 0.6);
     }
