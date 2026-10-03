@@ -208,20 +208,20 @@ test('API integration', { skip }, async (t) => {
         const rankOf = async (name) => (await query('SELECT xp, level, rank, tasks_completed FROM users WHERE username = $1', [name])).rows[0];
 
         // SQL thresholds match rankService
-        for (const xp of [0, 99, 100, 299, 300, 599, 600, 1199, 1200, 2399, 2400, 4999, 5000, 9000]) {
+        for (const xp of [0, 359, 360, 1079, 1080, 2159, 2160, 4319, 4320, 8639, 8640, 17999, 18000, 40000]) {
             const { rows } = await query('SELECT rank_for_xp($1) AS rank', [xp]);
             assert.equal(rows[0].rank, getRankName(xp), `rank_for_xp(${xp})`);
         }
 
-        await query('UPDATE users SET xp = 700 WHERE username = $1', [nameB]);
-        assert.deepEqual(await rankOf(nameB), { xp: 700, level: 7, rank: 'Gold', tasks_completed: 0 });
+        await query('UPDATE users SET xp = 5000 WHERE username = $1', [nameB]);
+        assert.deepEqual(await rankOf(nameB), { xp: 5000, level: 50, rank: 'Platinum', tasks_completed: 0 });
         const audit = await query("SELECT xp_amount FROM xp_history WHERE source = 'admin_adjust' AND user_id = (SELECT id FROM users WHERE username = $1)", [nameB]);
-        assert.equal(audit.rows[0].xp_amount, 700, 'direct xp edit is booked as an adjustment');
+        assert.equal(audit.rows[0].xp_amount, 5000, 'direct xp edit is booked as an adjustment');
 
         await query("UPDATE users SET rank = 'Silver' WHERE username = $1", [nameB]);
-        assert.deepEqual(await rankOf(nameB), { xp: 599, level: 5, rank: 'Silver', tasks_completed: 0 }, 'lowering the rank lowers xp');
+        assert.deepEqual(await rankOf(nameB), { xp: 2159, level: 21, rank: 'Silver', tasks_completed: 0 }, 'lowering the rank lowers xp');
         await query("UPDATE users SET rank = 'Diamond' WHERE username = $1", [nameB]);
-        assert.equal((await rankOf(nameB)).xp, 2400, 'raising the rank raises xp');
+        assert.equal((await rankOf(nameB)).xp, 8640, 'raising the rank raises xp');
 
         // task count: trim completed tasks, take their XP back, keep pending ones
         const ids = [];
@@ -280,9 +280,9 @@ test('API integration', { skip }, async (t) => {
         })();
         await new Promise((resolve) => setTimeout(resolve, 150));
 
-        const edited = await call('PATCH', `/api/admin/tables/users/${key}`, { token: tokenC, body: { column: 'xp', value: 750 } });
+        const edited = await call('PATCH', `/api/admin/tables/users/${key}`, { token: tokenC, body: { column: 'xp', value: 2500 } });
         assert.equal(edited.status, 200);
-        assert.equal(edited.json.row.xp, 750);
+        assert.equal(edited.json.row.xp, 2500);
         assert.equal(edited.json.row.rank, 'Gold');
         assert.match(await Promise.race([gotSync, new Promise((_, reject) => setTimeout(() => reject(new Error('no sync event')), 3000))]), /event: sync/);
         controller.abort();

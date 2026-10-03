@@ -58,7 +58,7 @@ The free tier spins down when idle, which also keeps Neon compute usage low. The
 ## Features
 
 - **Tasks and XP**: XP is computed on the server (`(12 + productivity x difficulty) x effective hours`, diminishing for very long tasks, so tiny or padded tasks gain nothing) and recorded in the immutable `xp_history` table. Tasks can be completed, un-completed, edited (XP is re-priced) and deleted.
-- **Ranks**: Newcomer, Bronze, Silver, Gold, Platinum, Diamond, Master, with badge artwork.
+- **Ranks**: Newcomer, Bronze, Silver, Gold, Platinum, Diamond, Master, with badge artwork. Thresholds (360 / 1,080 / 2,160 / 4,320 / 8,640 / 18,000 XP) are sized so Master takes about a year at the default 50 XP daily goal.
 - **Multiplier**: a smooth catch-up mechanic among friends: from 0.85x (far ahead of your friends' average XP) to 1.3x (far behind), 1.0x when level. No rank penalty.
 - **Streaks and ice streaks**: consecutive days with a completed task. Every 7 streak days earns an ice streak (max 3 stored); each one automatically saves the streak when a day is missed, so up to 3 missed days in a row can be bridged. The Activity page shows a Duolingo-style streak card, week strip, 14-day XP chart (daily goal shown top right) and a 5-week calendar (red cross = no activity, green check = done, blue snowflake = saved by ice). A configurable daily XP goal is shown as a progress ring.
 - **Leaderboard**: you and your friends, all-time or this week, with a podium for the top three.
@@ -103,7 +103,7 @@ css/        fonts, tokens (themes), base, components, layout, views
 fonts/      Lexend Deca (variable, SIL OFL)
 js/         app.js, core/ (api, auth, state, i18n, dom, ui, ranks, theme, pwa, data, glass, live, segmented), features/ (one module per view, admin/ for the admin pages)
 backend/    index.js, routes/, controllers/, models/, services/, middleware/, utils/
-database/   migrate.js, migrations/ (001-014), migrate-data.js (one-time SQLite import)
+database/   migrate.js, migrations/ (001-015), migrate-data.js (one-time SQLite import)
 scripts/    check.js
 test/       unit, frontend static checks, integration
 Badges/     rank badge images

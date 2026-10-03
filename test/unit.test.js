@@ -24,12 +24,16 @@ function run(middleware, req) {
 
 test('rank thresholds and levels', () => {
     assert.equal(rank.getRankName(0), 'Newcomer');
-    assert.equal(rank.getRankName(99), 'Newcomer');
-    assert.equal(rank.getRankName(100), 'Bronze');
-    assert.equal(rank.getRankName(5000), 'Master');
+    assert.equal(rank.getRankName(359), 'Newcomer');
+    assert.equal(rank.getRankName(360), 'Bronze');
+    assert.equal(rank.getRankName(17999), 'Diamond');
+    assert.equal(rank.getRankName(18000), 'Master');
     assert.equal(rank.getLevel(250), 2);
-    assert.equal(rank.getProgressPercent(150), 25);
-    assert.equal(rank.getProgressPercent(9999), 100);
+    assert.equal(rank.getProgressPercent(540), 25);
+    assert.equal(rank.getProgressPercent(99999), 100);
+    // proportional to the old 100/300/600/1200/2400/5000 ladder (x3.6): Master after about a year at 50 XP per day
+    assert.deepEqual(rank.RANK_THRESHOLDS.map((r) => r.min), [0, 360, 1080, 2160, 4320, 8640, 18000]);
+    assert.ok(Math.abs(18000 / 50 - 365) < 10);
 });
 
 test('task XP formula: (12 + productivity x difficulty) per hour, diminishing for long tasks', () => {

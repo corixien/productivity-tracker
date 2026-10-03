@@ -2,13 +2,13 @@ import { state } from './state.js';
 
 // Fallback mirrors backend/services/rankService.js; the server value from /api/meta wins.
 const FALLBACK_RANKS = [
-    { name: 'Newcomer', min: 0, next: 100 },
-    { name: 'Bronze', min: 100, next: 300 },
-    { name: 'Silver', min: 300, next: 600 },
-    { name: 'Gold', min: 600, next: 1200 },
-    { name: 'Platinum', min: 1200, next: 2400 },
-    { name: 'Diamond', min: 2400, next: 5000 },
-    { name: 'Master', min: 5000, next: null }
+    { name: 'Newcomer', min: 0, next: 360 },
+    { name: 'Bronze', min: 360, next: 1080 },
+    { name: 'Silver', min: 1080, next: 2160 },
+    { name: 'Gold', min: 2160, next: 4320 },
+    { name: 'Platinum', min: 4320, next: 8640 },
+    { name: 'Diamond', min: 8640, next: 18000 },
+    { name: 'Master', min: 18000, next: null }
 ];
 
 // Six badge images exist; Platinum reuses the silver one with a tint (see .is-platinum).
