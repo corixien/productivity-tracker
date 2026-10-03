@@ -60,7 +60,7 @@ Files: `Task.computeStreaks` (pure, unit-tested), `Task.getStats`, `features/str
 
 ## 6. Daily goal
 
-`users.daily_goal_xp` (10-5000, default 50), edited in Settings. Shown on the Tasks hero as a ring on desktop and a rounded box on mobile whose outline fills clockwise (same `--p` variable), turning "done" when reached; on the Activity chart as a goal line and in the calendar heat levels.
+`users.daily_goal_xp` (10-5000, default 50), edited in Settings. Shown on the Tasks hero as a ring on desktop and a rounded box on mobile whose outline fills from the bottom centre up both sides (same `--p` variable), turning "done" when reached; on the Activity chart as a goal line and in the calendar heat levels.
 
 ## 7. Templates
 
@@ -137,7 +137,7 @@ Migrations are the schema source of truth (`database/migrations`, run by `migrat
 
 `manifest.json`, `sw.js`, `offline.html`, `core/pwa.js`, `core/api.js`.
 
-- Service worker (`VERSION` constant, currently `v8`): app shell precached from the `SHELL` list, API never cached; `offline.html` fallback. Every new css/js/badge/font file must be in `SHELL` (test enforces it); bump `VERSION` when shell files change in a way that must invalidate caches.
+- Service worker (`VERSION` constant, currently `v9`): app shell precached from the `SHELL` list, API never cached; `offline.html` fallback. Every new css/js/badge/font file must be in `SHELL` (test enforces it); bump `VERSION` when shell files change in a way that must invalidate caches.
 - **Offline queue**: completing an existing task while offline is queued in `localStorage` and replayed in order when back online; the card shows "waiting to sync". Creating or editing tasks needs a connection.
 - **Cold-start handling**: requests that hang or fail with 502/503/504 are retried (1.5 s, 3 s, 6 s; POSTs only when safe) and a "server is waking up" banner shows. An offline banner shows when the browser is offline.
 - Install button (Settings, plus the sidebar when offered) uses `beforeinstallprompt`. Icons rendered from `icons/logo.svg`: favicons, `LOGO.png`, maskable PWA icon.

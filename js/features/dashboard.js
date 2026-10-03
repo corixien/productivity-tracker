@@ -49,10 +49,28 @@ function renderHero() {
     renderGoal();
 }
 
+// Mobile goal outline: two paths from the bottom centre up both sides to the top centre (needs the box size).
+function layoutOutline() {
+    const ring = $('#goal-ring');
+    const w = ring.clientWidth, hgt = ring.clientHeight;
+    if (!w || !hgt) return;
+    const r = Math.min(16, hgt / 2), m = w / 2;
+    const side = (dir) => {
+        const x = dir > 0 ? w : 0, near = dir > 0 ? w - r : r, sweep = dir > 0 ? 0 : 1;
+        return `M${m} ${hgt}L${near} ${hgt}A${r} ${r} 0 0 ${sweep} ${x} ${hgt - r}L${x} ${r}A${r} ${r} 0 0 ${sweep} ${near} 0L${m} 0`;
+    };
+    $('#goal-outline-left').setAttribute('d', side(-1));
+    $('#goal-outline-right').setAttribute('d', side(1));
+}
+
 function renderGoal() {
     const goal = (state.stats && state.stats.today.goal) || (state.user && state.user.daily_goal_xp) || 50;
     const earned = state.stats ? state.stats.today.xp : 0;
     const ring = $('#goal-ring');
+    if (!ring.dataset.observed) {
+        ring.dataset.observed = '1';
+        new ResizeObserver(layoutOutline).observe(ring);
+    }
     const done = earned >= goal;
     ring.classList.toggle('is-done', done);
     ring.classList.toggle('is-empty', earned <= 0);
