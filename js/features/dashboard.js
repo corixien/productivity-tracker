@@ -49,18 +49,15 @@ function renderHero() {
     renderGoal();
 }
 
-// Mobile goal outline: two paths from the bottom centre up both sides to the top centre (needs the box size).
+// Mobile goal outline: one path from the bottom centre to the left, once around the box, back to the start (needs the box size).
 function layoutOutline() {
     const ring = $('#goal-ring');
     const w = ring.clientWidth, hgt = ring.clientHeight;
     if (!w || !hgt) return;
     const r = Math.min(16, hgt / 2), m = w / 2;
-    const side = (dir) => {
-        const x = dir > 0 ? w : 0, near = dir > 0 ? w - r : r, sweep = dir > 0 ? 0 : 1;
-        return `M${m} ${hgt}L${near} ${hgt}A${r} ${r} 0 0 ${sweep} ${x} ${hgt - r}L${x} ${r}A${r} ${r} 0 0 ${sweep} ${near} 0L${m} 0`;
-    };
-    $('#goal-outline-left').setAttribute('d', side(-1));
-    $('#goal-outline-right').setAttribute('d', side(1));
+    $('#goal-outline').setAttribute('d',
+        `M${m} ${hgt}L${r} ${hgt}A${r} ${r} 0 0 1 0 ${hgt - r}L0 ${r}A${r} ${r} 0 0 1 ${r} 0`
+        + `L${w - r} 0A${r} ${r} 0 0 1 ${w} ${r}L${w} ${hgt - r}A${r} ${r} 0 0 1 ${w - r} ${hgt}L${m} ${hgt}`);
 }
 
 function renderGoal() {

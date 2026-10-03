@@ -7,7 +7,7 @@
     pointer-events: none;
 }
 .hero-badge { position: relative; width: 104px; height: 104px; display: grid; place-items: center; }
-.hero-badge img { width: 104px; height: 104px; object-fit: contain; filter: drop-shadow(0 0 14px var(--rank-color, var(--accent))); }
+.hero-badge img { width: 104px; height: 104px; object-fit: contain; transform: translateY(-10%); filter: drop-shadow(0 0 14px var(--rank-color, var(--accent))); }
 .hero-badge.is-platinum img { filter: drop-shadow(0 0 16px var(--rank-color)) hue-rotate(-12deg) saturate(1.35) brightness(1.08); }
 @keyframes float { 50% { transform: translateY(-5px); } }
 .level-pill {
@@ -42,8 +42,8 @@
 @media (max-width: 640px) {
     .hero-row { grid-template-columns: minmax(0, 1fr); }
     .hero { padding: 20px; gap: 18px; }
-    /* Daily goal: the ring as a rounded box whose outline fills like the ring stroke: two paths (left and right half, `d` set in dashboard.js `layoutOutline`)
-       start at the bottom centre and meet at the top centre. The text keeps its place in the middle. */
+    /* Daily goal: the ring as a rounded box whose outline fills like the ring stroke: one path (`d` set in dashboard.js `layoutOutline`)
+       starts at the bottom centre, runs left once around the box and is done when it is back at the start. The text keeps its place in the middle. */
     .goal-card { justify-items: stretch; padding: 14px 18px 16px; gap: 10px; }
     .goal-title { font-size: 0.7rem; }
     .goal-ring { width: 100%; height: 46px; border-radius: 16px; background: color-mix(in srgb, var(--border-strong) 35%, transparent); }
@@ -430,7 +430,7 @@
 }
 
 /* ---- Hover zoom for boxes ----
-   Every box grows by the same subtle amount (--hover-scale) with a spring and lifts a little; leaving plays
+   Every box grows by the same number of pixels (--hover-grow, per-element --sx/--sy from glass.js) with a spring and lifts a little; leaving plays
    the spring back. Transform only: cheap to animate. */
 .task-card, .stat, .board-row, .podium-spot, .hero, .goal-card, .streak-hero, .chart-card, .settings-card, .history-items, .day-circle, .user-mini {
     transition: transform 0.5s var(--spring), box-shadow 0.35s var(--ease), background 0.25s, border-color 0.25s, opacity 0.3s;
@@ -438,10 +438,10 @@
 @media (hover: hover) {
     .task-card:hover, .stat:hover, .board-row:hover, .podium-spot:hover, .hero:hover, .goal-card:hover, .streak-hero:hover,
     .chart-card:hover, .settings-card:hover, .history-items:hover, .user-mini:hover {
-        position: relative; z-index: 2; transform: scale(var(--hover-scale));
+        position: relative; z-index: 2; transform: scale(var(--sx, 1), var(--sy, 1));
         box-shadow: var(--glass-shadow), 0 26px 46px -22px rgba(0, 12, 48, 0.6);
     }
-    .day-dot:hover .day-circle { transform: scale(var(--hover-scale)); }
+    .day-dot:hover .day-circle { transform: scale(var(--sx, 1), var(--sy, 1)); }
 }
 
 /* ---- Search field (templates, activity history) ---- */

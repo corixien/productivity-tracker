@@ -2,8 +2,27 @@
 // All visuals live in CSS (components.css); this only feeds pointer coordinates to custom properties.
 const TARGETS = '.btn, .icon-btn, .segment, .nav-link, .fab, .check-btn, button.chip';
 
+// Hover zoom: every zooming element grows by the same number of pixels (--hover-grow), so the scale factor is
+// computed per element from its layout size. CSS reads it as scale(var(--sx), var(--sy)). Keep in sync with the
+// hover rules in components.css and views.css.
+const ZOOM = '.btn, .icon-btn, .nav-link, button.chip, .task-card, .stat, .board-row, .podium-spot, .hero, .goal-card, '
+    + '.streak-hero, .chart-card, .settings-card, .history-items, .day-circle, .user-mini';
+
+function setZoomFactors(start) {
+    const grow = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hover-grow')) || 6;
+    for (let el = start.closest(ZOOM); el; el = el.parentElement && el.parentElement.closest(ZOOM)) {
+        if (!el.offsetWidth || !el.offsetHeight) continue;
+        el.style.setProperty('--sx', (1 + grow / el.offsetWidth).toFixed(4));
+        el.style.setProperty('--sy', (1 + grow / el.offsetHeight).toFixed(4));
+    }
+}
+
 function initGlass() {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    document.addEventListener('pointerover', (event) => {
+        if (event.pointerType !== 'touch' && event.target.closest) setZoomFactors(event.target);
+    }, { passive: true });
 
     // At most one style write per frame, and only for the element under the pointer.
     let pending = null;

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><defs>
+<linearGradient id="silver" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".3" stop-color="#b9c3cd"/><stop offset=".55" stop-color="#f1f5f8"/><stop offset="1" stop-color="#6d7885"/></linearGradient>
+<linearGradient id="silver2" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8edf2"/><stop offset=".5" stop-color="#8c97a4"/><stop offset="1" stop-color="#d9e0e7"/></linearGradient>
+<linearGradient id="green" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8dff7f"/><stop offset=".45" stop-color="#2fbf45"/><stop offset="1" stop-color="#0a5f26"/></linearGradient>
+<radialGradient id="glow" cx=".5" cy=".35" r=".7"><stop offset="0" stop-color="#b6ffa8" stop-opacity=".9"/><stop offset="1" stop-color="#1c9a37" stop-opacity="0"/></radialGradient>
+<linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+<linearGradient id="white" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#c9f5c8"/></linearGradient>
+<filter id="sh" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="5" stdDeviation="4" flood-color="#021a0a" flood-opacity=".55"/></filter>
+</defs><g filter="url(#sh)">
+<path d="M128.0,20.0 L216.3,71.0 L216.3,173.0 L128.0,224.0 L39.7,173.0 L39.7,71.0Z" fill="url(#silver)" stroke="#59636f" stroke-width="2" stroke-linejoin="round"/>
+<path d="M128.0,36.0 L202.5,79.0 L202.5,165.0 L128.0,208.0 L53.5,165.0 L53.5,79.0Z" fill="url(#silver2)"/>
+<path d="M128.0,42.0 L197.3,82.0 L197.3,162.0 L128.0,202.0 L58.7,162.0 L58.7,82.0Z" fill="url(#green)"/>
+<path d="M128.0,42.0 L197.3,82.0 L197.3,162.0 L128.0,202.0 L58.7,162.0 L58.7,82.0Z" fill="url(#glow)"/>
+<path d="M128 62 L172 112 L148 112 L148 158 L108 158 L108 112 L84 112Z" fill="url(#white)" stroke="#0a5f26" stroke-width="3" stroke-linejoin="round"/>
+<path d="M128.0,173.0 L131.2,181.6 L140.4,182.0 L133.2,187.7 L135.6,196.5 L128.0,191.5 L120.4,196.5 L122.8,187.7 L115.6,182.0 L124.8,181.6Z" fill="url(#silver)" stroke="#59636f" stroke-width="1.5" stroke-linejoin="round"/></g></svg>
