@@ -149,6 +149,13 @@ test('API integration', { skip }, async (t) => {
         assert.equal((await call('DELETE', `/api/users/quick-tasks/${created.json.id}`, { token: tokenA })).status, 200);
     });
 
+    await t.test('database guards: case-insensitive usernames, closed value sets, integrity view', async () => {
+        const { query } = require('../backend/utils/database');
+        await assert.rejects(query("INSERT INTO users (username, password_hash) VALUES ($1, 'x')", [nameA.toUpperCase()]), /idx_users_username_lower/);
+        await assert.rejects(query("UPDATE users SET language = 'xx' WHERE username = $1", [nameA]), /users_language_known/);
+        assert.equal((await query('SELECT * FROM v_user_integrity')).rows.length, 0);
+    });
+
     await t.test('settings and daily goal', async () => {
         const res = await call('PUT', '/api/settings', { token: tokenA, body: { dailyGoalXp: 120, goals: 'ship it', language: 'de' } });
         assert.equal(res.status, 200);
