@@ -67,6 +67,8 @@
 #main-content { margin-left: var(--sidebar-w); padding: 36px clamp(16px, 4vw, 48px) 64px; max-width: calc(1100px + var(--sidebar-w)); outline: none; }
 .view { display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; animation: view-in 0.4s var(--ease); }
 @keyframes view-in { from { opacity: 0; transform: translateY(10px); } }
+.swap-in { animation: swap-in 0.32s var(--ease) backwards; }
+@keyframes swap-in { from { opacity: 0; transform: translateY(10px); } }
 .view-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 
 .tabbar { display: none; }

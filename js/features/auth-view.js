@@ -1,5 +1,5 @@
 import { signIn, register } from '../core/auth.js';
-import { $, $$, icon, setBusy } from '../core/dom.js';
+import { $, $$, icon, swapIn, setBusy } from '../core/dom.js';
 import { t, setLanguage, getCurrentLang, translateDom } from '../core/i18n.js';
 
 const USERNAME_PATTERN = /^[A-Za-z0-9_-]{3,30}$/;
@@ -7,6 +7,7 @@ let mode = 'signin';
 
 function setMode(next) {
     mode = next;
+    swapIn($('#auth-panel'));
     $$('#auth-screen [role="tab"]').forEach((tab) => {
         const selected = tab.dataset.mode === next;
         tab.setAttribute('aria-selected', String(selected));

@@ -1,6 +1,6 @@
 import { api } from '../core/api.js';
 import { state } from '../core/state.js';
-import { h, $, setBusy } from '../core/dom.js';
+import { h, $, swapIn, setBusy } from '../core/dom.js';
 import { t, onLanguageChange } from '../core/i18n.js';
 import { calculateXp } from '../core/ranks.js';
 import { refreshCore, loadTemplates } from '../core/data.js';
@@ -27,6 +27,7 @@ function showStep(step) {
     el.describe.hidden = step !== 'describe';
     el.loading.hidden = step !== 'loading';
     el.form.hidden = step !== 'form';
+    swapIn(el[step]);
 }
 
 function fillCategories() {

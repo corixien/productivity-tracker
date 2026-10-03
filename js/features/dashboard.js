@@ -1,6 +1,6 @@
 import { api } from '../core/api.js';
 import { state, on } from '../core/state.js';
-import { h, icon, $, formatNumber, timeLabel, setBusy } from '../core/dom.js';
+import { h, icon, $, swapIn, formatNumber, timeLabel, setBusy } from '../core/dom.js';
 import { t, onLanguageChange } from '../core/i18n.js';
 import { getRankInfo, getNextRank, getProgress, getLevel, badgeUrl, rankKey } from '../core/ranks.js';
 import { refreshCore, loadTemplates, loadTasks } from '../core/data.js';
@@ -236,6 +236,7 @@ async function removeTemplate(template) {
 function setFilter(next) {
     filter = next;
     renderTasks();
+    swapIn($('#task-list'));
 }
 
 function initDashboard() {

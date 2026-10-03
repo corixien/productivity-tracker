@@ -1,6 +1,6 @@
 import { api } from '../../core/api.js';
 import { on } from '../../core/state.js';
-import { h, $ } from '../../core/dom.js';
+import { h, $, swapIn } from '../../core/dom.js';
 import { t } from '../../core/i18n.js';
 import { showError } from '../../core/ui.js';
 
@@ -64,6 +64,7 @@ async function load() {
         if (token !== loadToken) return;
         rows = logs;
         render();
+        swapIn($('#log-list'));
     } catch (error) {
         showError(error);
     }

@@ -134,4 +134,13 @@ function setBusy(button, busy) {
     button.disabled = busy;
 }
 
-export { h, $, $$, icon, hydrateIcons, replaceChildren, fillAvatar, avatarEl, formatNumber, dayLabel, timeLabel, setBusy, startOfDay };
+// Replays a short fade-and-rise on an element whose content was just swapped by the user (tab, filter, step).
+function swapIn(element) {
+    if (!element) return;
+    element.classList.remove('swap-in');
+    void element.offsetWidth;
+    element.classList.add('swap-in');
+    element.addEventListener('animationend', () => element.classList.remove('swap-in'), { once: true });
+}
+
+export { h, $, $$, swapIn, icon, hydrateIcons, replaceChildren, fillAvatar, avatarEl, formatNumber, dayLabel, timeLabel, setBusy, startOfDay };

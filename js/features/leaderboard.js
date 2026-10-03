@@ -1,5 +1,5 @@
 import { api } from '../core/api.js';
-import { h, icon, $, $$, avatarEl, formatNumber } from '../core/dom.js';
+import { h, icon, $, $$, swapIn, avatarEl, formatNumber } from '../core/dom.js';
 import { t, onLanguageChange } from '../core/i18n.js';
 import { badgeUrl, rankKey } from '../core/ranks.js';
 import { toast, confirmDialog, openDialog, closeDialog, emptyState, skeletonList, showError } from '../core/ui.js';
@@ -73,9 +73,11 @@ function render() {
 
 async function load() {
     try {
+        const fresh = !loaded;
         entries = await api.getLeaderboard(period);
         loaded = true;
         render();
+        if (fresh) { swapIn($('#podium')); swapIn($('#leaderboard-list')); }
     } catch (error) {
         showError(error);
     }

@@ -1,6 +1,6 @@
 import { api } from '../../core/api.js';
 import { on } from '../../core/state.js';
-import { h, icon, $, replaceChildren } from '../../core/dom.js';
+import { h, icon, $, swapIn, replaceChildren } from '../../core/dom.js';
 import { t, onLanguageChange, locale } from '../../core/i18n.js';
 import { toast, confirmDialog, emptyState, skeletonList, showError, openDialog, closeDialog } from '../../core/ui.js';
 import { currentView } from '../nav.js';
@@ -351,6 +351,7 @@ function select(name) {
     view.rows = [];
     renderTabs();
     renderShell();
+    swapIn($('#admin-db-body'));
     reload();
 }
 
