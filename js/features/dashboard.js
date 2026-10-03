@@ -55,12 +55,12 @@ function renderGoal() {
     const ring = $('#goal-ring');
     const done = earned >= goal;
     ring.classList.toggle('is-done', done);
+    ring.classList.toggle('is-empty', earned <= 0);
     const fraction = Math.min(1, earned / goal).toFixed(4);
     ring.querySelector('.ring-fill').style.setProperty('--p', fraction);
-    ring.style.setProperty('--p', fraction);   // the mobile bar reads it from the ring itself
+    ring.style.setProperty('--p', fraction);   // the mobile outline reads it from the ring itself
     $('#goal-xp').textContent = formatNumber(earned);
     $('#goal-label').textContent = done ? t('goalDone') : t('goalLabel', { n: formatNumber(goal) });
-    ring.dataset.text = `${formatNumber(earned)} ${$('#goal-label').textContent}`;   // light copy of the text for the mobile bar
     ring.setAttribute('role', 'img');
     ring.setAttribute('aria-label', `${t('dailyGoal')}: ${formatNumber(earned)} / ${formatNumber(goal)} ${t('xpUnit')}`);
 }
