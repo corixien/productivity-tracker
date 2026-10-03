@@ -10,6 +10,7 @@ import { openTaskDialog } from './task-dialog.js';
 import { categoryLabel, announceProgress, findTemplate } from './shared.js';
 
 let filter = 'pending';
+let drawn = '';   // what the list shows now; an identical re-render would replay the entry animation
 
 function taskSubtitle() {
     if (!state.tasksLoaded) return '';
@@ -133,6 +134,9 @@ function renderTasks() {
     $('#task-subtitle').textContent = taskSubtitle();
 
     const list = $('#task-list');
+    const signature = JSON.stringify([filter, state.tasksLoaded, state.tasksError, state.tasks, [...state.pendingSync], state.templates.map((template) => template.id), t('tabPending')]);
+    if (signature === drawn) return;
+    drawn = signature;
     if (!state.tasksLoaded) {
         list.replaceChildren(...skeletonList(3));
         return;

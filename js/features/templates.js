@@ -9,6 +9,7 @@ import { categoryLabel, initSearch } from './shared.js';
 
 let loaded = false;
 let query = '';
+let drawn = '';   // what the list shows now; an identical re-render would replay the entry animation
 
 function templateCard(template) {
     const xp = calculateXp(template.duration, template.productivity, template.difficulty, template.bonus);
@@ -37,6 +38,9 @@ function templateCard(template) {
 
 function renderTemplates() {
     const list = $('#template-list');
+    const signature = JSON.stringify([loaded, query, t('useTemplate'), state.templates]);
+    if (signature === drawn) return;
+    drawn = signature;
     if (!loaded) {
         list.replaceChildren(...skeletonList(2));
         return;

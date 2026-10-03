@@ -301,7 +301,9 @@ function renderRows() {
 
 function renderTabs() {
     const container = $('#admin-table-tabs');
-    container.replaceChildren(...view.tables.map((table) =>
+    // Swap only the tab buttons: re-inserting the lens element would cancel its glide to the new tab.
+    container.querySelectorAll('.table-tab').forEach((tab) => tab.remove());
+    container.append(...view.tables.map((table) =>
         h('button', {
             type: 'button', class: 'segment table-tab', 'aria-pressed': String(table.name === view.current),
             onClick: () => select(table.name)

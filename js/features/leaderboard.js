@@ -32,6 +32,11 @@ function podiumSpot(entry, index) {
     );
 }
 
+// Same order as the server query: score descending, then name. Lets the period switch re-rank instantly.
+function sortEntries() {
+    entries.sort((a, b) => scoreOf(b) - scoreOf(a) || String(a.username).localeCompare(String(b.username)));
+}
+
 function boardRow(entry, index) {
     return h('li', { class: `board-row${entry.isSelf ? ' is-self' : ''}`, dataset: { rank: entry.rank } },
         h('span', { class: 'board-place' }, String(index + 1)),
@@ -75,6 +80,7 @@ async function load() {
     try {
         const fresh = !loaded;
         entries = await api.getLeaderboard(period);
+        sortEntries();
         loaded = true;
         render();
         if (fresh) { swapIn($('#podium')); swapIn($('#leaderboard-list')); }
@@ -132,8 +138,15 @@ function initLeaderboard() {
     $$('#period-tabs [data-period]').forEach((button) => {
         button.addEventListener('click', () => {
             period = button.dataset.period;
-            loaded = false;
-            render();
+            if (loaded) {
+                // Both scores are already here: re-rank right away so the content moves with the lens, then refresh quietly.
+                sortEntries();
+                render();
+                swapIn($('#podium'));
+                swapIn($('#leaderboard-list'));
+            } else {
+                render();
+            }
             load();
         });
     });
