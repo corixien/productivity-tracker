@@ -55,7 +55,9 @@ function renderGoal() {
     const ring = $('#goal-ring');
     const done = earned >= goal;
     ring.classList.toggle('is-done', done);
-    ring.querySelector('.ring-fill').style.setProperty('--p', Math.min(1, earned / goal).toFixed(4));
+    const fraction = Math.min(1, earned / goal).toFixed(4);
+    ring.querySelector('.ring-fill').style.setProperty('--p', fraction);
+    ring.style.setProperty('--p', fraction);   // the mobile bar reads it from the ring itself
     $('#goal-xp').textContent = formatNumber(earned);
     $('#goal-label').textContent = done ? t('goalDone') : t('goalLabel', { n: formatNumber(goal) });
     ring.setAttribute('role', 'img');
@@ -96,9 +98,9 @@ function taskCard(task, index) {
             h('div', { class: 'task-meta' },
                 h('span', { class: 'chip chip-cat' }, categoryLabel(task.category)),
                 metaChip('clock', t('minutes', { n: task.duration })),
-                metaChip('star', t('productivityChip', { n: task.productivity || 0 })),
-                metaChip('activity', t('difficultyChip', { n: task.difficulty || 3 })),
-                task.bonus ? metaChip('sparkles', t('bonusChip', { n: task.bonus }), 'chip-accent') : null,
+                metaChip('star', t('productivityChip', { n: task.productivity || 0 }), 'chip-detail'),
+                metaChip('activity', t('difficultyChip', { n: task.difficulty || 3 }), 'chip-detail'),
+                task.bonus ? metaChip('sparkles', t('bonusChip', { n: task.bonus }), 'chip-accent chip-detail') : null,
                 done && task.completedAt ? metaChip('check', timeLabel(new Date(task.completedAt))) : null,
                 syncing ? metaChip('wifiOff', t('waitingSync'), 'chip-warn') : null
             )

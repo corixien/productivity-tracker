@@ -26,7 +26,7 @@ function templateCard(template) {
             )
         ),
         h('div', { class: 'task-actions' },
-            h('button', { type: 'button', class: 'btn btn-secondary', onClick: () => useTemplate(template) }, icon('plus'), t('useTemplate')),
+            h('button', { type: 'button', class: 'btn btn-secondary', title: t('useTemplate'), 'aria-label': `${t('useTemplate')}: ${template.name}`, onClick: () => useTemplate(template) }, icon('plus'), h('span', { class: 'btn-label' }, t('useTemplate'))),
             h('button', {
                 type: 'button', class: 'icon-btn is-danger',
                 'aria-label': t('deleteTaskLabel', { name: template.name }), title: t('delete'),
