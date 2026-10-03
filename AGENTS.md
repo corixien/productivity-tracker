@@ -52,7 +52,7 @@ Badges/ icons/ LOGO.png     static assets (Badges: one PNG per rank, Platinum re
 - `npm run dev` / `npm start` (migrate + server, what Render runs) / `npm run migrate` / `npm run migrate:data`.
 - CI: `.github/workflows/ci.yml` (Postgres service, check, migrate, test).
 - Git: the owner wants every change committed and pushed to `main` right away (pushing deploys to Render and runs migrations). `origin` has an expired token embedded; push through the `gh` login: `git -c credential.helper= -c credential.helper='!gh auth git-credential' push https://github.com/corixien/productivity-tracker.git main`.
-- `features.md` lists and explains every feature (read it before changing behavior); keep it in sync when a feature changes.
+- `FEATURES.md` lists and explains every feature (read it before changing behavior); keep it in sync when a feature changes.
 
 ## Request flow
 
@@ -89,10 +89,10 @@ Links enforced in the database (`users_sync_progress`, `users_audit_xp` triggers
 - New UI text needs both `en` and `de` in `js/core/i18n.js` (test enforces key parity and usage).
 - Rate limiters are in-memory (per process, reset on restart).
 - Admin: `users.is_admin` (set from `ADMIN_USERNAMES` for existing accounts at boot, editable in the admin database page). `requireAdmin` answers 404 to everyone else. The route prefix is `ADMIN_PREFIX` in `features/nav.js` (`#/admin`); the URL is public, the server check is the protection.
-- Live channel: `GET /api/events` (SSE, `utils/events.js`, single instance). Users get `sync`/`revoked` after admin edits; admins get `log` and `db` events from `logActivity`. Client (`core/live.js`) keeps it open only while the tab is visible.
+- Live channel: `GET /api/events` (SSE, `utils/events.js`, single instance). Users get `sync` after admin edits and `revoked` when an admin deletes their row; admins get `log` and `db` events from `logActivity`. Client (`core/live.js`) keeps it open only while the tab is visible.
 - Templates are unique per user over name (case/outer spaces ignored), duration, productivity, difficulty, category, bonus (migration 013); duplicates answer `409 duplicate_template`. Frontend mirror: `shared.templateKey/findTemplate`.
 - Motion: `swapIn(el)` (`core/dom.js`) replays the fade-and-rise on tab/filter/step switches; lists re-render only when their data signature changes so entry animations do not replay. `.view`-level animations must not use `fill-mode: both/forwards` on `transform` (see hover note below).
-- Mobile (<= 640 px): dialogs are bottom sheets, the dock replaces the sidebar, the daily-goal ring becomes a rounded bar (shared `--p` variable on `#goal-ring`).
+- Responsive: at <= 960 px the dock (`#tabbar`) replaces the sidebar; at <= 640 px dialogs are bottom sheets and the daily-goal ring becomes a rounded bar (shared `--p` variable on `#goal-ring`). One hover zoom token, `--hover-scale`, in `css/tokens.css`.
 - Log every user-visible action through `logActivity({ userId, action: 'category.verb', message })` with a compact human message (`Completed task "X" = +21 XP`); put full context in `meta`. Categories feed the admin log filters: auth, task, profile, friend, template, ai, admin, system.
 - Performance rules for the glass UI: real `backdrop-filter` only on large persistent surfaces (card, sidebar, dock, toast, dialog), never on list rows or buttons; no infinite animations; the ambient background is one static layer. Refraction is faked with gradients and a chromatic inset rim (`--glass-*` tokens).
 - Render free tier cold start: first request may 502/503; `core/api.js` retries and shows a "server waking up" banner. Only completing an existing task is queued offline.

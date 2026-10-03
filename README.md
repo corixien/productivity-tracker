@@ -110,7 +110,7 @@ Badges/     rank badge images
 icons/      logo.svg (source) and rendered PWA icons
 ```
 
-`AGENTS.md` has the architecture, invariants and conventions. `features.md` lists and explains every feature in detail.
+`AGENTS.md` has the architecture, invariants and conventions. `FEATURES.md` lists and explains every feature in detail.
 
 ## Known limitations
 
