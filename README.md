@@ -31,7 +31,8 @@ Backend: Express, PostgreSQL (Neon), bcrypt, JWT, Winston, Helmet. Frontend: van
 |---|---|
 | `npm run dev` | server with `--watch` (does not migrate) |
 | `npm start` | migrate, then start (what Render runs) |
-| `npm run migrate` | apply new `database/migrations/*.sql` (idempotent) |
+| `npm run migrate` | apply new `database/migrations/*.sql` once each (idempotent; refuses to run if an applied file was edited) |
+| `npm run migrate:data` | one-time SQLite to Postgres import (`SQLITE_DB_PATH`) |
 | `npm run check` | syntax-check all first-party JS (backend, frontend, service worker, tests) |
 | `npm test` | unit and static frontend tests; integration tests run when `TEST_DATABASE_URL` is set |
 
@@ -50,7 +51,7 @@ CI (`.github/workflows/ci.yml`) runs check, migrate and the full test suite agai
 
 1. Connect the repo as a **Web Service** (free tier). `render.yaml` sets build `npm install`, start `npm start`, health check `/api/health`.
 2. Set `DATABASE_URL`, `DATABASE_SSL_REJECT_UNAUTHORIZED=false`, `JWT_SECRET`, `NODE_ENV=production` and `ADMIN_USERNAMES` (your username, for the admin area) in the Render dashboard. Never commit secrets.
-3. Migrations run on every start (`npm start`). Some of them drop or rename tables and columns, so create a Neon backup branch first.
+3. Migrations run on every start (`npm start`). Some of them drop or rename tables and columns (011, 012), so create a Neon backup branch before risky ones.
 
 The free tier spins down when idle, which also keeps Neon compute usage low. The first request afterwards can take up to a minute; the client retries automatically and shows a "server is waking up" banner.
 
@@ -61,11 +62,11 @@ The free tier spins down when idle, which also keeps Neon compute usage low. The
 - **Multiplier**: a catch-up mechanic among friends: the friend with the least XP earns up to 1.5x, the leader 0.7x, further reduced by rank.
 - **Streaks and ice streaks**: consecutive days with a completed task. Every 7 streak days earns an ice streak (max 3 stored); each one automatically saves the streak when a day is missed, so up to 3 missed days in a row can be bridged. The Activity page shows a Duolingo-style streak card, week strip, 14-day XP chart and a 5-week calendar. A configurable daily XP goal is shown as a progress ring.
 - **Leaderboard**: you and your friends, all-time or this week, with a podium for the top three.
-- **Look and feel**: blue liquid-glass design (dark, light or system), spring hover animations on buttons and boxes, a gliding glass highlight behind the active navigation item and tab, Lexend Deca font, tuned for smooth scrolling.
-- **Templates**: save tasks as templates (no duplicates; the bookmark on a task is filled when it is one) and add them with one click; searchable.
+- **Look and feel**: blue liquid-glass design (dark, light or system), spring hover zoom on boxes and buttons (one shared amount), slow fade-and-rise when switching tabs, filters and steps, a gliding glass highlight behind the active navigation item and tab, a daily-goal ring (loading bar on mobile), Lexend Deca font, tuned for smooth scrolling.
+- **Templates**: save tasks as templates (identical ones are rejected with 409; the bookmark on a task is filled when it is one and toggles it in place) and add them with one click; searchable.
 - **Activity**: full XP history with day grouping and pagination.
-- **Admin area** (`/#/admin`, admin accounts only): Database (every table, Neon-style filters and sorting, click a cell for the full value in a multi-line editor), Logs (compact terminal-style feed with search and filters, live), Analytics (uptime, users and Groq calls for 24 hours, top 5 users). Edits reach the affected user instantly through a server-sent-events channel, and user activity shows up live in the admin pages. Every admin API call is checked against the account.
-- **Consistent data**: rank and level follow XP inside the database, changing a rank moves XP into that rank, lowering a user's task count deletes their oldest completed tasks and takes the XP back, and any direct XP change is booked as an adjustment in `xp_history`.
+- **Admin area** (`/#/admin`, admin accounts only): Database (every table, Neon-style filters and sorting, click a cell for the full value in a multi-line editor), Logs (compact terminal-style feed, oldest to newest, with search and filters, live), Analytics (uptime, users and Groq calls for 24 hours, top 5 users). Edits reach the affected user instantly through a server-sent-events channel, and user activity shows up live in the admin pages. Every admin API call is checked against the account.
+- **Consistent data**: rank and level follow XP inside the database, changing a rank moves XP into that rank, lowering a user's task count deletes their oldest completed tasks and takes the XP back, and any direct XP change is booked as an adjustment in `xp_history`. Usernames are unique ignoring case, closed value sets are CHECK-constrained, and the view `v_user_integrity` lists any user whose stored totals drifted (should be empty).
 - **PWA**: installable, app shell works offline, completing a task offline is queued and synced when you are back.
 - **Security**: strict CSP (Helmet), per-route rate limits, tokens revoked on password change, current password required to change it, avatars resized client-side and capped server-side.
 - **Accessibility**: semantic landmarks, native `<dialog>` focus handling, keyboard support, `prefers-reduced-motion`, audited with axe in both themes.
@@ -81,11 +82,12 @@ All routes except register, login, `/api/meta`, `/api/health` and `/api/ai/statu
 | `PUT /api/users/:username` | update language and goals |
 | `POST /api/users/:username/password` | change password (needs `currentPassword`, returns a new token) |
 | `POST /api/users/:username/avatar`, `POST /api/users/:username/change-username` | avatar (max 512 KB), username |
-| `GET/POST/DELETE /api/users/friends` | friends |
+| `GET/POST/DELETE /api/users/friends` | friends (directional: you add by username) |
+| `POST /api/users/monitor-multipliers` | run the multiplier audit now |
 | `GET /api/users/quick-tasks`, `POST`, `PUT /:id`, `DELETE /:id`, `POST /:id/use` | templates |
 | `GET/POST /api/tasks`, `PUT/DELETE /api/tasks/:id`, `POST /api/tasks/:id/complete` | tasks (`PUT` edits fields and/or toggles `completed`) |
 | `GET /api/xp`, `GET /api/xp/stats` | XP history (paginated), streak / today / week / daily goal |
-| `GET /api/leaderboard?period=all\|week` | leaderboard |
+| `GET /api/leaderboard?period=all\|week` | leaderboard (`GET /api/users/leaderboard` is an alias) |
 | `GET/PUT /api/settings` | language, goals text, daily XP goal |
 | `GET /api/events` | live channel (server-sent events) for sync and the admin feed |
 | `/api/admin/*` | admin only: tables (filter, sort, cell values), logs, analytics (404 for everyone else) |
@@ -101,13 +103,14 @@ css/        fonts, tokens (themes), base, components, layout, views
 fonts/      Lexend Deca (variable, SIL OFL)
 js/         app.js, core/ (api, auth, state, i18n, dom, ui, ranks, theme, pwa, data, glass, live, segmented), features/ (one module per view, admin/ for the admin pages)
 backend/    index.js, routes/, controllers/, models/, services/, middleware/, utils/
-database/   migrate.js, migrations/, migrate-data.js (one-time SQLite import)
+database/   migrate.js, migrations/ (001-014), migrate-data.js (one-time SQLite import)
 scripts/    check.js
 test/       unit, frontend static checks, integration
 Badges/     rank badge images
+icons/      logo.svg (source) and rendered PWA icons
 ```
 
-`AGENTS.md` has the detailed architecture, invariants and conventions. `WhatIveDone.md` is a log of the large redesign and hardening session.
+`AGENTS.md` has the architecture, invariants and conventions. `features.md` lists and explains every feature in detail.
 
 ## Known limitations
 
