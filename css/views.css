@@ -48,8 +48,8 @@
     .goal-title { font-size: 0.7rem; }
     .goal-ring { width: 100%; height: 46px; border-radius: 16px; background: color-mix(in srgb, var(--border-strong) 35%, transparent); }
     .goal-ring > svg:not(.goal-outline) { display: none; }
-    .goal-outline { display: block; position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; transform: none; pointer-events: none; }
-    .goal-outline rect { fill: none; stroke-width: 4; }
+    .goal-ring .goal-outline { display: block; position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; transform: none; pointer-events: none; }
+    .goal-outline rect { fill: none; stroke-width: 7; }
     .goal-outline .outline-track { stroke: var(--border-strong); }
     .goal-outline .outline-fill {
         stroke: var(--accent); stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: calc(1px * (1 - var(--p, 0)));
