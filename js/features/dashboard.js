@@ -74,7 +74,6 @@ function metaChip(iconName, text, extra = '') {
 function taskCard(task, index) {
     const done = task.completed;
     const syncing = state.pendingSync.has(task.id);
-    const savedTemplate = findTemplate(task);
     const checkButton = h('button', {
         type: 'button',
         class: `check-btn${done ? ' is-checked' : ''}`,
@@ -86,7 +85,7 @@ function taskCard(task, index) {
 
     const card = h('li', {
         class: `task-card${done ? ' is-done' : ''}${syncing ? ' is-syncing' : ''}`,
-        dataset: { category: task.category }
+        dataset: { category: task.category, id: task.id }
     },
         checkButton,
         h('div', { class: 'task-body' },
@@ -106,14 +105,29 @@ function taskCard(task, index) {
         ),
         h('div', { class: 'task-actions' },
             iconButton('edit', t('editTaskLabel', { name: task.name }), () => openTaskDialog({ mode: 'edit', task })),
-            savedTemplate
-                ? iconButton('bookmark', t('removeTemplate', { name: task.name }), () => removeTemplate(savedTemplate), 'is-saved')
-                : iconButton('bookmark', t('saveAsTemplate', { name: task.name }), () => saveAsTemplate(task)),
+            templateButton(task),
             iconButton('trash', t('deleteTaskLabel', { name: task.name }), () => deleteTask(task), 'is-danger')
         )
     );
     card.style.animationDelay = `${Math.min(index, 8) * 30}ms`;
     return card;
+}
+
+// Bookmark: filled when an identical template exists. Clicking toggles the template.
+function templateButton(task) {
+    const saved = findTemplate(task);
+    return saved
+        ? iconButton('bookmark', t('removeTemplate', { name: task.name }), () => removeTemplate(saved), 'is-saved template-toggle')
+        : iconButton('bookmark', t('saveAsTemplate', { name: task.name }), () => saveAsTemplate(task), 'template-toggle');
+}
+
+// Templates changed: swap only the bookmark buttons so the cards stay put (no re-render, no replayed animation).
+function refreshTemplateMarks() {
+    for (const card of document.querySelectorAll('#task-list .task-card[data-id]')) {
+        const task = state.tasks.find((item) => item.id === card.dataset.id);
+        const button = card.querySelector('.template-toggle');
+        if (task && button) button.replaceWith(templateButton(task));
+    }
 }
 
 function iconButton(name, label, onClick, extra = '') {
@@ -134,7 +148,7 @@ function renderTasks() {
     $('#task-subtitle').textContent = taskSubtitle();
 
     const list = $('#task-list');
-    const signature = JSON.stringify([filter, state.tasksLoaded, state.tasksError, state.tasks, [...state.pendingSync], state.templates.map((template) => template.id), t('tabPending')]);
+    const signature = JSON.stringify([filter, state.tasksLoaded, state.tasksError, state.tasks, [...state.pendingSync], t('tabPending')]);
     if (signature === drawn) return;
     drawn = signature;
     if (!state.tasksLoaded) {
@@ -251,7 +265,7 @@ function initDashboard() {
 
     on('user', renderHero);
     on('tasks', renderTasks);
-    on('templates', renderTasks);
+    on('templates', refreshTemplateMarks);
     on('stats', renderStats);
     onLanguageChange(() => { renderHero(); renderStats(); renderTasks(); });
     renderStats();

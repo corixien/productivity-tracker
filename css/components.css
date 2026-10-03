@@ -76,7 +76,7 @@
 }
 @media (hover: hover) {
     .btn:hover::after, .icon-btn:hover::after, .segment:hover::after, .nav-link:hover::after, .fab:hover::after, .check-btn:hover::after, button.chip:hover::after { opacity: 1; }
-    .btn:hover, .icon-btn:hover, .nav-link:hover, button.chip:hover { transform: translateY(-1px) scale(1.03); }
+    .btn:hover, .icon-btn:hover, .nav-link:hover, button.chip:hover { transform: translateY(-1px) scale(var(--hover-scale)); }
 }
 .btn:active, .icon-btn:active, .nav-link:active, .fab:active, .check-btn:active, button.chip:active {
     transform: scale(0.92); transition-duration: 0.12s;

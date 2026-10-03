@@ -401,7 +401,7 @@
         position: relative; z-index: 2; transform: scale(var(--hover-scale));
         box-shadow: var(--glass-shadow), 0 26px 46px -22px rgba(0, 12, 48, 0.6);
     }
-    .day-dot:hover .day-circle { transform: scale(1.14); }
+    .day-dot:hover .day-circle { transform: scale(var(--hover-scale)); }
 }
 
 /* ---- Search field (templates, activity history) ---- */
