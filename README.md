@@ -21,6 +21,7 @@ Backend: Express, PostgreSQL (Neon), bcrypt, JWT, Winston, Helmet. Frontend: van
 | `DATABASE_SSL_REJECT_UNAUTHORIZED` | `false` for Neon in production / on Render |
 | `JWT_EXPIRES_IN` | token lifetime, default `7d` |
 | `GROQ_API_KEY`, `GROQ_MODEL`, `GROQ_BASE_URL` | optional AI task rating (without a key the app falls back to manual entry); leave `GROQ_MODEL` unset to use `llama-3.3-70b-versatile`; if Groq answers 404 the server picks a model your key can use; do not wrap values in `<>` | |
+| `TROPHY_TIMEZONE` | timezone whose Sunday-to-Monday switch settles the weekly trophy (default `Europe/Berlin`) |
 | `ADMIN_USERNAMES` | comma-separated usernames of existing accounts that get admin access at startup (these names cannot be registered by anyone else) |
 | `LOG_LEVEL`, `LOG_DIR`, `LOG_RETENTION_DAYS` | logging; DB logs older than 30 days (default) are purged |
 | `CLIENT_ORIGIN`, `DATABASE_POOL_MAX`, `PORT`, `NODE_ENV` | optional |
@@ -103,7 +104,7 @@ css/        fonts, tokens (themes), base, components, layout, views
 fonts/      Lexend Deca (variable, SIL OFL)
 js/         app.js, core/ (api, auth, state, i18n, dom, ui, ranks, theme, pwa, data, glass, live, segmented), features/ (one module per view, admin/ for the admin pages)
 backend/    index.js, routes/, controllers/, models/, services/, middleware/, utils/
-database/   migrate.js, migrations/ (001-015), migrate-data.js (one-time SQLite import)
+database/   migrate.js, migrations/ (001-016), migrate-data.js (one-time SQLite import)
 scripts/    check.js
 test/       unit, frontend static checks, integration
 Badges/     rank badge images

@@ -172,3 +172,16 @@ test('settings validation', async () => {
     assert.equal(ok.req.body.goals, 'be great');
     assert.equal(ok.req.body.dailyGoalXp, 80);
 });
+
+test('daily goal bonus scales with the goal and stays within its bounds', () => {
+    assert.equal(rank.calculateGoalBonus(50), 5);
+    assert.equal(rank.calculateGoalBonus(100), 10);
+    assert.equal(rank.calculateGoalBonus(200), 20);
+    assert.equal(rank.calculateGoalBonus(10), 1);
+    assert.equal(rank.calculateGoalBonus(5000), rank.GOAL_BONUS.max);
+    assert.equal(rank.calculateGoalBonus(0), 0);
+    for (let goal = 10; goal <= 5000; goal += 10) {
+        assert.ok(rank.calculateGoalBonus(goal) <= goal * 0.1 + 0.5 || rank.calculateGoalBonus(goal) === rank.GOAL_BONUS.max, 'never more than a tenth of the goal');
+    }
+    assert.equal(rank.getMeta().weeklyTrophy.xp, rank.WEEKLY_TROPHY.xp);
+});

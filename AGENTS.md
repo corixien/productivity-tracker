@@ -38,7 +38,7 @@ backend/
                             activityTracker (user_activity/last_seen), uptimeService (minute samples)
   middleware/               auth, validation, rateLimiter (factory + presets), security (Helmet CSP), timezone, errorHandler
   utils/                    database, jwt, password, logger, validation, errors (AppError, asyncHandler, warnOnError), events (SSE hub)
-database/                   migrate.js, migrations/NNN_*.sql (next = 016), migrate-data.js (one-time SQLite import)
+database/                   migrate.js, migrations/NNN_*.sql (next = 017), migrate-data.js (one-time SQLite import)
 scripts/check.js            syntax-checks every first-party JS file
 test/                       node:test suites (unit, frontend static checks, integration)
 Badges/ icons/ LOGO.png     static assets (Badges: one PNG per rank, Platinum reuses silver with a tint; icons/logo.svg is the logo source, PNG icons and LOGO.png are rendered from it)
@@ -76,6 +76,8 @@ Links enforced in the database (`users_sync_progress`, `users_audit_xp` triggers
 - Completing: awards `round(xp_awarded * multiplier)` as an `xp_history` row (`task`). Uncomplete (`task_uncomplete`) and deleting a completed task (`task_delete`) subtract what was actually awarded (`SUM(xp_history)` for that task). Editing a completed task books the difference as `task_edit`, keeping the multiplier used at completion.
 - `users.xp = SUM(xp_history.xp_amount)`; `level = floor(xp/100)`; rank from thresholds 0/360/1080/2160/4320/8640/18000 (migration 015; Master = about one year at the 50 XP daily goal, change them together in `rankService`, `js/core/ranks.js` fallback and the SQL functions `rank_for_xp`/`rank_min_xp`/`rank_max_xp` via a new migration).
 - Multiplier (catch-up mechanic) = `clamp(((avg friend XP + 150) / (own XP + 150)) ^ 0.4, 0.85, 1.3)`, no friends = 1.0, no rank penalty (`rankService.computePositionMultiplier`, constants `MULTIPLIER`). Recomputed inside every XP transaction; `User.monitorMultipliersThrottled` audits stale users opportunistically (leaderboard requests, at most every 5 min) because the server sleeps. Existing completed tasks keep their stored `xp_awarded`; only new and edited tasks use the formula.
+- Daily goal bonus: reaching `daily_goal_xp` task XP in a local day pays `round(goal x 0.1)` (min 1, max 100) as an `xp_history` row `daily_goal` (`rankService.calculateGoalBonus`, `GOAL_BONUS`). `bonusService.reconcileDailyGoal` runs in every transaction that changes task XP (complete, uncomplete, delete, edit of a completed task) and when the goal is edited; it books a delta row, so a day that falls below the goal gets a negative row that takes the bonus back. Only task sources count towards the goal, never bonuses or trophies.
+- Weekly trophy: the player with the most task XP in the finished week (Monday-Sunday in `TROPHY_TIMEZONE`, default Europe/Berlin) among all users gets 75 XP (`xp_history` source `weekly_trophy`), nobody else. Needs 50+ week XP and a second player with XP. Settled lazily by `bonusService.awardWeeklyTrophies` (called from `/api/xp/stats` and the leaderboard; the server sleeps, so no timer), once per week via `weekly_trophies` (migration 016), looking back at most 4 weeks, never before 2026-09-28 (`TROPHY_FIRST_WEEK` overrides, tests use it). Trophy and bonus XP do not count as weekly XP or goal progress.
 - Streak: consecutive local days (client timezone) with at least one completed task; today never counts as missed. Ice streaks (`Task.computeStreaks`): +1 on every 7th streak day (max 3), one is spent per missed day, no ice left resets the streak. Derived from completion history on every `/api/xp/stats` call (no stored state); the response also carries `days` (last 35 days) for the charts.
 
 ## Invariants and gotchas
@@ -107,5 +109,5 @@ Links enforced in the database (`users_sync_progress`, `users_audit_xp` triggers
 - CommonJS in backend, ES modules in `js/`. 4-space indent, single quotes, semicolons.
 - Parameterized SQL only. Build DOM with `h()` (text nodes only); never `innerHTML` with data.
 - Log through `utils/logger`/`loggingService`; swallowed errors use `warnOnError(context)` so they stay visible.
-- New DB change = new migration (next number 016); never edit applied migrations (003 was made idempotent for fresh DBs, 010 and 011 reshaped the schema).
+- New DB change = new migration (next number 017); never edit applied migrations (003 was made idempotent for fresh DBs, 010 and 011 reshaped the schema).
 - Config via env only: `DATABASE_URL`, `JWT_SECRET` required; optional `DATABASE_SSL_REJECT_UNAUTHORIZED`, `JWT_EXPIRES_IN`, `GROQ_API_KEY`, `GROQ_MODEL` (leave unset: default `llama-3.3-70b-versatile`), `GROQ_BASE_URL`, `LOG_LEVEL`, `LOG_DIR`, `LOG_RETENTION_DAYS` (default 30), `ADMIN_USERNAMES`, `PORT`, `NODE_ENV`, `CLIENT_ORIGIN`, `DATABASE_POOL_MAX`.

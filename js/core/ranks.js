@@ -62,6 +62,17 @@ function calculateXp(duration, productivity, difficulty, bonus = 0) {
     return duration < f.shortMinutes ? Math.floor(total) : Math.max(1, Math.round(total));
 }
 
+const FALLBACK_GOAL_BONUS = { rate: 0.1, min: 1, max: 100 };
+const FALLBACK_TROPHY = { xp: 75 };
+const trophyXp = () => ((state.meta && state.meta.weeklyTrophy) || FALLBACK_TROPHY).xp;
+
+// Same as the server (rankService.calculateGoalBonus): the XP a reached daily goal pays.
+function goalBonus(goal) {
+    const f = (state.meta && state.meta.goalBonus) || FALLBACK_GOAL_BONUS;
+    if (!goal || goal <= 0) return 0;
+    return Math.min(f.max, Math.max(f.min, Math.round(goal * f.rate)));
+}
+
 const rankNames = () => ranks().map((rank) => rank.name);
 
-export { rankNames, getRankInfo, getNextRank, getProgress, getLevel, badgeUrl, rankKey, calculateXp };
+export { rankNames, getRankInfo, getNextRank, getProgress, getLevel, badgeUrl, rankKey, calculateXp, goalBonus, trophyXp };

@@ -37,8 +37,14 @@ function getAdminUsernames() {
     return new Set((process.env.ADMIN_USERNAMES || '').split(',').map((name) => name.trim().toLowerCase()).filter(Boolean));
 }
 
+// Timezone whose Sunday-to-Monday switch settles the weekly trophy (also the default for admin-triggered XP changes).
+function getTrophyTimezone() {
+    return process.env.TROPHY_TIMEZONE || 'Europe/Berlin';
+}
+
 module.exports = {
     getAdminUsernames,
+    getTrophyTimezone,
     DEFAULT_GROQ_MODEL,
     getDatabaseConfig,
     getGroqConfig,

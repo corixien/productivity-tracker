@@ -1,5 +1,6 @@
 const Task = require('../models/Task');
-const { asyncHandler } = require('../utils/errors');
+const { awardWeeklyTrophies, getRecentTrophy } = require('../services/bonusService');
+const { asyncHandler, warnOnError } = require('../utils/errors');
 
 const getXp = asyncHandler(async (req, res) => {
     const { rows, hasMore } = await Task.getXpHistory(req.user.id, {
@@ -15,7 +16,9 @@ const getXp = asyncHandler(async (req, res) => {
 });
 
 const getStats = asyncHandler(async (req, res) => {
-    res.json(await Task.getStats(req.user.id, req.tz));
+    await awardWeeklyTrophies().catch(warnOnError('xp.trophies'));
+    const [stats, trophy] = await Promise.all([Task.getStats(req.user.id, req.tz), getRecentTrophy(req.user.id)]);
+    res.json({ ...stats, trophy });
 });
 
 module.exports = { getXp, getStats };

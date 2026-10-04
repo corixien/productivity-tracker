@@ -1,6 +1,7 @@
 import { api, replaceAuthToken } from '../core/api.js';
 import { state, on } from '../core/state.js';
 import { $, fillAvatar, setBusy } from '../core/dom.js';
+import { goalBonus } from '../core/ranks.js';
 import { t, setLanguage, getCurrentLang, onLanguageChange } from '../core/i18n.js';
 import { setTheme, getTheme } from '../core/theme.js';
 import { refreshUser, signOut } from '../core/auth.js';
@@ -26,6 +27,11 @@ async function resizeImage(file) {
     return canvas.toDataURL('image/jpeg', 0.86);
 }
 
+function updateGoalHint() {
+    const goal = parseInt($('#settings-daily-goal').value, 10) || 50;
+    $('#daily-goal-hint').textContent = t('goalBonusHint', { n: goalBonus(goal) });
+}
+
 function render() {
     const user = state.user;
     if (!user) return;
@@ -36,6 +42,7 @@ function render() {
     // Do not overwrite what the user is typing.
     if (document.activeElement !== $('#settings-goals')) $('#settings-goals').value = user.goals || '';
     if (document.activeElement !== $('#settings-daily-goal')) $('#settings-daily-goal').value = user.daily_goal_xp || 50;
+    updateGoalHint();
     $('#language-select').value = getCurrentLang();
     $('#theme-select').value = getTheme();
 }
@@ -141,6 +148,7 @@ function initSettings() {
     $('#upload-avatar-btn').addEventListener('click', () => $('#avatar-input').click());
     $('#avatar-input').addEventListener('change', uploadAvatar);
     $('#goals-form').addEventListener('submit', saveGoals);
+    $('#settings-daily-goal').addEventListener('input', updateGoalHint);
     $('#account-btn').addEventListener('click', openAccountDialog);
     $('#account-form').addEventListener('submit', submitAccount);
     $('#sign-out-btn').addEventListener('click', signOut);

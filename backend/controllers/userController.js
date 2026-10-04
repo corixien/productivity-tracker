@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const { logActivity } = require('../services/loggingService');
-const { asyncHandler, notFound, badRequest, conflict } = require('../utils/errors');
+const { awardWeeklyTrophies } = require('../services/bonusService');
+const { asyncHandler, notFound, badRequest, conflict, warnOnError } = require('../utils/errors');
 
 const getFriends = asyncHandler(async (req, res) => {
     const friends = await User.getFriends(req.user.id);
@@ -35,6 +36,7 @@ const removeFriend = asyncHandler(async (req, res) => {
 const getLeaderboard = asyncHandler(async (req, res) => {
     const period = req.query.period === 'week' ? 'week' : 'all';
     User.monitorMultipliersThrottled();
+    await awardWeeklyTrophies().catch(warnOnError('leaderboard.trophies'));
     res.json(await User.getLeaderboard(req.user.id, period, req.tz));
 });
 

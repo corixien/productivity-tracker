@@ -16,7 +16,7 @@ Productivity Tracker: web app where friends compete on productivity. Users log t
 ## 3. How to navigate
 - `backend/` routes -> middleware -> controllers -> models -> `utils/database`; `services/` (rankService, groqService, loggingService, adminService...).
 - `js/` : `app.js`, `core/` (api, state, i18n, dom, ui, glass, segmented), `features/` (one module per view, `admin/`).
-- `css/` : fonts, tokens, base, components, layout, views. `sw.js` service worker. `database/migrations/` (next = 016).
+- `css/` : fonts, tokens, base, components, layout, views. `sw.js` service worker. `database/migrations/` (next = 017).
 - Lookup: XP/ranks `backend/services/rankService.js`; XP writes `models/Task.js` (`syncUserTotals`); AI `backend/services/groqService.js`; streak/activity UI `js/features/streak.js`; admin charts `js/features/admin/analytics.js` + `js/features/charts.js`; account dialog `js/features/settings.js` + `index.html`; toasts/dialogs `js/core/ui.js` + `css/components.css`; strings `js/core/i18n.js` (EN and DE both).
 
 ## 4. Commands
@@ -24,7 +24,7 @@ Run from `/home/mateo/productivity-tracker`. `npm run check`, `npm test` (integr
 
 ## 5. Invariants and gotchas
 - Never write `users.xp` directly; use `Task.syncUserTotals` in a transaction.
-- Strict CSP: no inline script/style/handlers; styles via CSSOM. New css/js files go into `SHELL` in `sw.js`; bump `VERSION` (now `v11`).
+- Strict CSP: no inline script/style/handlers; styles via CSSOM. New css/js files go into `SHELL` in `sw.js`; bump `VERSION` (now `v12`).
 - New UI text needs `en` and `de`. DB change = new migration, never edit applied ones.
 - Never print `.env`, remote URL (embeds PAT), `~/.config/opencode/opencode.json`. Reads of the production Neon DB are blocked by the auto-mode classifier; do not work around.
 - Env values must not contain `<>` placeholders. Leave `GROQ_MODEL` unset (default `llama-3.3-70b-versatile`); a 404 triggers auto-pick from Groq `/models`.
@@ -36,6 +36,7 @@ Run from `/home/mateo/productivity-tracker`. `npm run check`, `npm test` (integr
 - Goal of the current task: none open. Last session delivered the batch below.
 
 ### Done
+- [x] 2026-10-04 daily goal bonus (10% of goal, min 1, max 100, taken back when the day falls below the goal) and weekly trophy (75 XP to first place only, settled lazily, migration 016, `bonusService.js`). Values chosen by simulation, see FEATURES.md
 - [x] 2026-10-04 test pass (local Postgres via podman, 35/35 tests): server ignores client `xp` on task create, bonus capped at 100, `/api/groq/status` no longer returns `keyLength`, dead `.recur-select` CSS removed
 - [x] Analytics charts fill their cards (ResizeObserver, `fillChart`)
 - [x] Account dialog: single form, single Save button

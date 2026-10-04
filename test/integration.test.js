@@ -11,6 +11,7 @@ if (!skip) {
     process.env.DATABASE_URL = url;
     process.env.NODE_ENV = 'test';
     process.env.JWT_SECRET = 'integration-secret';
+    process.env.TROPHY_FIRST_WEEK = '2000-01-03';
     process.env.LOG_LEVEL = 'error';
     process.env.LOG_DIR = require('os').tmpdir();
 }
@@ -369,5 +370,91 @@ test('API integration', { skip }, async (t) => {
         assert.equal(del.json.newXP, before - 28);
         assert.equal((await call('DELETE', `/api/tasks/${taskId}`, { token: tokenA })).status, 404);
         assert.equal((await call('DELETE', '/api/tasks/not-a-uuid', { token: tokenA })).status, 400);
+    });
+    await t.test('daily goal bonus is paid once and taken back when the day falls below the goal', async () => {
+        const { query } = require('../backend/utils/database');
+        const name = `goal_${suffix}`;
+        const token = (await call('POST', '/api/auth/register', { body: { username: name, password: 'secret123' } })).json.token;
+        const addDone = async (duration, productivity, difficulty) => {
+            const task = await call('POST', '/api/tasks', { token, body: { name: 'goal task', duration, productivity, difficulty, category: 'other' } });
+            return { id: task.json.id, done: await call('POST', `/api/tasks/${task.json.id}/complete`, { token }) };
+        };
+        const xp = async () => (await call('GET', '/api/auth/me', { token })).json.xp;
+        const bonusRows = async () => (await query(
+            "SELECT COALESCE(SUM(xp_amount), 0)::int AS paid, COUNT(*)::int AS rows FROM xp_history WHERE source = 'daily_goal' AND user_id = (SELECT id FROM users WHERE username = $1)", [name])).rows[0];
+
+        const first = await addDone(60, 5, 5); // 37 XP, goal is 50
+        assert.equal(first.done.json.goalBonus, 0);
+        assert.equal(await xp(), 37);
+        const second = await addDone(60, 4, 3); // +24 = 61 >= 50
+        assert.equal(second.done.json.goalBonus, 5);
+        assert.equal(second.done.json.newXP, 66);
+        const third = await addDone(60, 4, 3);
+        assert.equal(third.done.json.goalBonus, 0);
+        assert.deepEqual(await bonusRows(), { paid: 5, rows: 1 });
+        const stats = (await call('GET', '/api/xp/stats', { token })).json;
+        assert.equal(stats.today.xp, 85, 'goal progress counts task XP only');
+
+        await call('PUT', `/api/tasks/${third.id}`, { token, body: { completed: false } });
+        assert.equal((await bonusRows()).paid, 5, 'still 61 XP, goal still reached');
+        const undone = await call('PUT', `/api/tasks/${second.id}`, { token, body: { completed: false } });
+        assert.equal(undone.json.goalBonus, -5);
+        assert.equal(await xp(), 37);
+        assert.equal((await bonusRows()).paid, 0);
+
+        assert.equal((await call('POST', `/api/tasks/${second.id}/complete`, { token })).json.goalBonus, 5);
+        const raised = await call('PUT', '/api/settings', { token, body: { dailyGoalXp: 200 } });
+        assert.equal(raised.status, 200);
+        assert.equal((await bonusRows()).paid, 0, 'raising the goal takes the bonus back');
+        await call('PUT', '/api/settings', { token, body: { dailyGoalXp: 50 } });
+        assert.equal((await bonusRows()).paid, 5, 'lowering it pays the bonus again');
+        assert.equal(await xp(), 66);
+
+        const removed = await call('DELETE', `/api/tasks/${second.id}`, { token });
+        assert.equal(removed.json.goalBonus, -5);
+        assert.equal(await xp(), 37);
+        assert.equal((await query('SELECT COUNT(*)::int AS n FROM v_user_integrity WHERE username = $1', [name])).rows[0].n, 0);
+    });
+
+    await t.test('weekly trophy goes to first place only, once, and never counts towards the next week', async () => {
+        const { query } = require('../backend/utils/database');
+        const { resetSettledCache } = require('../backend/services/bonusService');
+        await query("DELETE FROM users WHERE username LIKE 'trophy\\_%'");
+        const weekStart = (await query("SELECT (date_trunc('week', NOW() AT TIME ZONE 'Europe/Berlin') - INTERVAL '7 days')::date::text AS w")).rows[0].w;
+        await query('DELETE FROM weekly_trophies WHERE week_start = $1', [weekStart]);
+        const players = {};
+        for (const [key, weekXp] of [['first', 80], ['second', 60], ['third', 20]]) {
+            const username = `trophy_${key}_${suffix}`;
+            const token = (await call('POST', '/api/auth/register', { body: { username, password: 'secret123' } })).json.token;
+            const id = (await query('SELECT id FROM users WHERE username = $1', [username])).rows[0].id;
+            await query(
+                `INSERT INTO xp_history (user_id, xp_amount, source, created_at)
+                 VALUES ($1, $2, 'task', (date_trunc('week', NOW() AT TIME ZONE 'Europe/Berlin') - INTERVAL '5 days' + INTERVAL '12 hours') AT TIME ZONE 'Europe/Berlin')`,
+                [id, weekXp]
+            );
+            await query('UPDATE users SET xp = $2 WHERE id = $1', [id, weekXp]);
+            players[key] = { token, id, weekXp };
+        }
+        resetSettledCache();
+        const winnerStats = (await call('GET', '/api/xp/stats', { token: players.first.token })).json;
+        assert.deepEqual(winnerStats.trophy && winnerStats.trophy.xp, 75);
+        assert.equal(winnerStats.trophy.weekStart, weekStart);
+        assert.equal((await call('GET', '/api/xp/stats', { token: players.second.token })).json.trophy, null);
+        assert.equal((await call('GET', '/api/auth/me', { token: players.first.token })).json.xp, 80 + 75);
+        for (const key of ['second', 'third']) {
+            assert.equal((await call('GET', '/api/auth/me', { token: players[key].token })).json.xp, players[key].weekXp);
+        }
+
+        resetSettledCache();
+        await call('GET', '/api/xp/stats', { token: players.first.token });
+        const rows = await query("SELECT COUNT(*)::int AS n FROM xp_history WHERE source = 'weekly_trophy' AND user_id = ANY($1)", [Object.values(players).map((p) => p.id)]);
+        assert.equal(rows.rows[0].n, 1, 'settled once');
+        const settled = (await query('SELECT user_id, xp_amount, week_xp FROM weekly_trophies WHERE week_start = $1', [weekStart])).rows[0];
+        assert.deepEqual([settled.user_id, settled.xp_amount, settled.week_xp], [players.first.id, 75, 80]);
+
+        await call('POST', `/api/users/friends`, { token: players.first.token, body: { username: `trophy_second_${suffix}` } });
+        const board = (await call('GET', '/api/leaderboard?period=week', { token: players.first.token })).json;
+        assert.equal(board.find((entry) => entry.isSelf).weekXp, 0, 'the trophy is not weekly XP');
+        await query("DELETE FROM users WHERE username LIKE 'trophy\\_%'");
     });
 });

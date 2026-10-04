@@ -1,7 +1,7 @@
 import { api } from '../core/api.js';
 import { h, icon, $, $$, swapIn, avatarEl, formatNumber } from '../core/dom.js';
 import { t, onLanguageChange } from '../core/i18n.js';
-import { badgeUrl, rankKey } from '../core/ranks.js';
+import { badgeUrl, rankKey, trophyXp } from '../core/ranks.js';
 import { toast, confirmDialog, openDialog, closeDialog, emptyState, skeletonList, showError } from '../core/ui.js';
 
 let period = 'all';
@@ -64,6 +64,7 @@ function render() {
         return;
     }
 
+    $('#trophy-hint').textContent = t('trophyHint', { n: trophyXp() });
     const showPodium = entries.length >= 3;
     podium.replaceChildren(...(showPodium ? entries.slice(0, 3).map(podiumSpot) : []));
     const rest = showPodium ? entries.slice(3) : entries;

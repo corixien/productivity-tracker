@@ -26,6 +26,23 @@ function toast(message, { type = 'info', title, duration } = {}) {
     while (region.children.length > 4) region.firstElementChild.remove();
 }
 
+// Daily goal bonus feedback: positive when earned, negative when taken back.
+function goalBonusToast(amount) {
+    if (!amount) return;
+    toast(t(amount > 0 ? 'goalBonusEarned' : 'goalBonusLost', { n: amount }), { type: amount > 0 ? 'xp' : 'info' });
+}
+
+// Weekly trophy: congratulate once per week and device.
+const TROPHY_SEEN_KEY = 'pt_trophy_seen';
+function trophyToast(trophy) {
+    if (!trophy) return;
+    try {
+        if (localStorage.getItem(TROPHY_SEEN_KEY) === trophy.weekStart) return;
+        localStorage.setItem(TROPHY_SEEN_KEY, trophy.weekStart);
+    } catch (error) { /* storage blocked: show the toast again next time */ }
+    toast(t('trophyWon', { n: trophy.xp }), { type: 'xp', duration: 6000 });
+}
+
 function xpToast(amount) {
     const region = document.getElementById('toast-region');
     if (!region) return;
@@ -126,4 +143,4 @@ function showError(error, fallbackKey = 'genericError') {
     else toast((error && error.message) || t(fallbackKey), { type: 'error' });
 }
 
-export { toast, xpToast, showBanner, hideBanner, openDialog, closeDialog, initDialogs, confirmDialog, emptyState, skeletonList, showError, replaceChildren };
+export { toast, xpToast, goalBonusToast, trophyToast, showBanner, hideBanner, openDialog, closeDialog, initDialogs, confirmDialog, emptyState, skeletonList, showError, replaceChildren };

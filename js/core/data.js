@@ -1,5 +1,6 @@
 import { api, getQueuedCompletions } from './api.js';
 import { state, emit, setUser } from './state.js';
+import { trophyToast } from './ui.js';
 
 const META_CACHE_KEY = 'pt_meta';
 
@@ -33,6 +34,7 @@ async function loadTasks() {
 
 async function loadStats() {
     state.stats = await api.getStats();
+    trophyToast(state.stats.trophy);
     emit('stats', state.stats);
 }
 
@@ -48,6 +50,7 @@ async function refreshCore() {
     state.tasksLoaded = true;
     state.tasksError = false;
     state.stats = stats;
+    trophyToast(stats.trophy);
     syncPendingSet();
     setUser(user);
     emit('tasks', tasks);

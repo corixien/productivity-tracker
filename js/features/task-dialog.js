@@ -5,7 +5,7 @@ import { t, onLanguageChange } from '../core/i18n.js';
 import { calculateXp } from '../core/ranks.js';
 import { refreshCore, loadTemplates } from '../core/data.js';
 import { refreshUser } from '../core/auth.js';
-import { toast, openDialog, closeDialog, showError } from '../core/ui.js';
+import { toast, goalBonusToast, openDialog, closeDialog, showError } from '../core/ui.js';
 import { CATEGORY_KEYS, categoryLabel, announceProgress, warnNonCritical, findTemplate } from './shared.js';
 
 const AI_TIMEOUT_MS = 25000;
@@ -179,14 +179,17 @@ async function submit(event) {
             const after = await refreshCore();
             toast(t('taskUpdated'), { type: 'success' });
             announceProgress(before, after, result.xpChange);
+            goalBonusToast(result.goalBonus);
             return;
         }
 
         const created = await api.createTask(values);
         let xpEarned = 0;
+        let goalBonus = 0;
         if ($('#task-done').checked) {
             const completion = await api.completeTask(created.id);
             xpEarned = completion.xpEarned || 0;
+            goalBonus = completion.goalBonus || 0;
         }
         if ($('#task-save-template').checked && !findTemplate(values)) {
             await api.createTemplate(values);
@@ -196,6 +199,7 @@ async function submit(event) {
         const after = await refreshCore();
         toast(t('taskCreated'), { type: 'success' });
         announceProgress(before, after, xpEarned);
+        goalBonusToast(goalBonus);
     } catch (error) {
         setError(error.network ? t('networkError') : error.message);
         showError(error);

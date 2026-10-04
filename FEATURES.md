@@ -1,6 +1,6 @@
 # Features
 
-Reference of every feature of the Productivity Tracker, for future agents: what it does, how it works, where the code lives and what must not break. `AGENTS.md` has the conventions and commands, `README.md` has setup and the API table. Verified against the code at commit `a3fba6c` plus the formula rework; if code and this file disagree, the code wins, then fix this file.
+Reference of every feature of the Productivity Tracker, for future agents: what it does, how it works, where the code lives and what must not break. `AGENTS.md` has the conventions and commands, `README.md` has setup and the API table. Verified against the code at the daily goal bonus and weekly trophy change; if code and this file disagree, the code wins, then fix this file.
 
 Contents: [1 Accounts](#1-accounts-and-sessions) · [2 Tasks](#2-tasks) · [3 XP](#3-xp-ranks-and-levels) · [4 Multiplier](#4-multiplier-catch-up-mechanic) · [5 Streaks](#5-streaks-and-ice-streaks) · [6 Daily goal](#6-daily-goal) · [7 Templates](#7-templates) · [8 Activity](#8-activity-page) · [9 Friends and leaderboard](#9-friends-and-leaderboard) · [10 AI rating](#10-ai-task-rating-groq) · [11 Settings](#11-settings-and-profile) · [12 Admin](#12-admin-area) · [13 Live channel](#13-live-channel-sse) · [14 Database integrity](#14-database-integrity) · [15 Logging](#15-logging-and-retention) · [16 PWA](#16-pwa-and-offline) · [17 UI system](#17-ui-system) · [18 i18n](#18-internationalization) · [19 Security](#19-security) · [20 Tests and CI](#20-tests-tooling-and-ci) · [21 Deployment](#21-deployment) · [22 Removed](#22-removed-features-do-not-resurrect)
 
@@ -36,7 +36,7 @@ Files: `services/rankService.js` (source of truth), `core/ranks.js` (frontend mi
 
 - **Task XP**: `(12 + productivity x difficulty) x effectiveMinutes / 60`, plus a bonus capped at 10% of that. Effective minutes: full weight up to 120 min, half weight for minutes 120-360, quarter weight beyond, so splitting work into tiny tasks or padding durations gains nothing (12 five-minute p5d5 tasks = one hour p5d5). Tasks under 10 min round down, longer productive tasks give at least 1 XP, `0` when productivity is `0`. 1 h at p4 d3 = 24 XP; p1 d1 = 13; p5 d5 = 37 per hour. Constants live in `rankService.XP_FORMULA` and are served via `/api/meta` (`xpFormula`); the frontend mirror is `core/ranks.js calculateXp` (preview only, the server decides).
 - **Ranks** by total XP: Newcomer 0, Bronze 360, Silver 1080, Gold 2160, Platinum 4320, Diamond 8640, Master 18000 (the old 100/300/.../5000 ladder times 3.6, migration 015: about 7, 22, 43, 86, 173 and 360 days at the 50 XP default daily goal). **Level** = `floor(xp / 100)`. Rank and level are derived from `xp` by a database trigger, never set by app code.
-- **`xp_history`** is the immutable ledger: `xp_amount`, `source` (`task`, `task_uncomplete`, `task_delete`, `task_edit`, `admin_adjust`), `source_id` (task id, deliberately no foreign key so history survives deletion). `users.xp = SUM(xp_amount)`. Write XP only through `Task.syncUserTotals` inside a transaction.
+- **`xp_history`** is the immutable ledger: `xp_amount`, `source` (`task`, `task_uncomplete`, `task_delete`, `task_edit`, `admin_adjust`, `daily_goal`, `weekly_trophy`), `source_id` (task id, deliberately no foreign key so history survives deletion). `users.xp = SUM(xp_amount)`. Write XP only through `Task.syncUserTotals` inside a transaction.
 - **Badges**: `Badges/*.png`, one per rank (256 px); Platinum reuses the silver badge with a CSS tint. `GET /api/meta` serves thresholds and multipliers so the frontend does not duplicate them (cached in `localStorage` as fallback when offline).
 
 ## 4. Multiplier (catch-up mechanic)
@@ -60,6 +60,14 @@ Files: `Task.computeStreaks` (pure, unit-tested), `Task.getStats`, `features/str
 ## 6. Daily goal
 
 `users.daily_goal_xp` (10-5000, default 50), edited in Settings. Shown on the Tasks hero as a ring on desktop and, at 640 px and below, as a rounded box whose outline starts at the bottom centre, runs left once around and is done when it is back at the start (same `--p` variable; the SVG path is laid out by `layoutOutline` in `dashboard.js` and re-laid on resize), turning "done" when reached; on the Activity chart as a goal line and in the calendar heat levels.
+
+### Daily goal bonus
+
+Reaching the daily XP goal pays `round(goal x 10%)` XP (at least 1, at most 100): goal 50 pays 5, 100 pays 10, 200 pays 20. It is paid once per local day as an `xp_history` row (`daily_goal`) and shows as a toast and an Activity entry. Only task XP counts towards the goal (not bonuses or trophies, so the bonus cannot push itself over the line). If the day later falls below the goal (undo, delete, edit, or a raised goal) a negative `daily_goal` row takes the bonus back; lowering the goal or re-completing pays it again, never twice. Code: `bonusService.reconcileDailyGoal`, run inside every XP transaction; the Settings page shows the bonus for the typed goal. The goal ring and today/week stats show task XP only.
+
+### Weekly trophy
+
+At the switch from Sunday to Monday (`TROPHY_TIMEZONE`, default Europe/Berlin) the player with the most task XP of the finished week gets 75 XP (`weekly_trophy`); second and third place get nothing. The ranking covers all users, needs at least 50 week XP and a second player with XP, ties go to whoever got there first. Because the free-tier server sleeps it is settled on the first `/api/xp/stats` or leaderboard request after the switch (`bonusService.awardWeeklyTrophies`, at most the last 4 weeks, each exactly once through `weekly_trophies`, migration 016, nothing before 2026-09-28). The winner gets a toast once (`stats.trophy`, remembered in `localStorage`) and an Activity entry; the leaderboard shows a hint. Trophy XP does not count as XP of the new week. Values were tuned with a 364-day simulation of four players (efforts 60/40/25/10 and 45/42/40/38 per day): trophy 50 / 75 / 100 / 150 widens the top-to-bottom gap to about 4.5x / 5.2x / 5.3x / 5.7x (no trophy: 4.0x) in a lopsided group and barely moves a close race (1.12x to 1.16x at 100), so 75 is a compromise: a clear reward for winning, with the catch-up multiplier still holding the leader in check; the daily bonus at 10% adds about 2% of total XP (5% about 1.4%, 15% about 3.6%).
 
 ## 7. Templates
 
@@ -123,7 +131,7 @@ Migrations are the schema source of truth (`database/migrations`, run by `migrat
 - **Constraints**: `tasks.completed` and `completed_at` must agree; `xp_history.source` is a known value; `users.language` in (en, de); `users.rank` in the seven ranks; unique `lower(username)`; unique template index.
 - **Indexes** (migration 014): covering `xp_history (user_id, created_at DESC) INCLUDE (xp_amount)`, partial `tasks (user_id, created_at DESC) WHERE completed = false`, `friends (friend_id)`; redundant ones dropped.
 - **`v_user_integrity`** lists users whose stored `xp` or `tasks_completed` disagree with `xp_history` / `tasks`. It should be empty; check it after manual data work.
-- Migration history: 001-009 original schema, 010 token_version/daily goal/indexes, 011 schema cleanup + triggers, 012 `quick_tasks` -> `templates`, 013 unique templates, 014 integrity and indexes, 015 rank thresholds x3.6 (Master = about a year). 004 does not exist; next is **016**. 011 and 012 dropped or renamed data and are irreversible: take a Neon backup branch before risky migrations.
+- Migration history: 001-009 original schema, 010 token_version/daily goal/indexes, 011 schema cleanup + triggers, 012 `quick_tasks` -> `templates`, 013 unique templates, 014 integrity and indexes, 015 rank thresholds x3.6 (Master = about a year), 016 `daily_goal`/`weekly_trophy` XP sources and the `weekly_trophies` table. 004 does not exist; next is **017**. 011 and 012 dropped or renamed data and are irreversible: take a Neon backup branch before risky migrations.
 
 ## 15. Logging and retention
 
@@ -136,7 +144,7 @@ Migrations are the schema source of truth (`database/migrations`, run by `migrat
 
 `manifest.json`, `sw.js`, `offline.html`, `core/pwa.js`, `core/api.js`.
 
-- Service worker (`VERSION` constant, currently `v11`): app shell precached from the `SHELL` list, API never cached; `offline.html` fallback. Every new css/js/badge/font file must be in `SHELL` (test enforces it); bump `VERSION` when shell files change in a way that must invalidate caches.
+- Service worker (`VERSION` constant, currently `v12`): app shell precached from the `SHELL` list, API never cached; `offline.html` fallback. Every new css/js/badge/font file must be in `SHELL` (test enforces it); bump `VERSION` when shell files change in a way that must invalidate caches.
 - **Offline queue**: completing an existing task while offline is queued in `localStorage` and replayed in order when back online; the card shows "waiting to sync". Creating or editing tasks needs a connection.
 - **Cold-start handling**: requests that hang or fail with 502/503/504 are retried (1.5 s, 3 s, 6 s; POSTs only when safe) and a "server is waking up" banner shows. An offline banner shows when the browser is offline.
 - Install button (Settings, plus the sidebar when offered) uses `beforeinstallprompt`. Icons rendered from `icons/logo.svg`: favicons, `LOGO.png`, maskable PWA icon.

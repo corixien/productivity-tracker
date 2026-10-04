@@ -1,5 +1,8 @@
 const User = require('../models/User');
 const { logActivity } = require('../services/loggingService');
+const Task = require('../models/Task');
+const { transaction } = require('../utils/database');
+const { reconcileDailyGoal } = require('../services/bonusService');
 const { asyncHandler, notFound } = require('../utils/errors');
 
 async function readSettings(userId) {
@@ -15,6 +18,12 @@ const getSettings = asyncHandler(async (req, res) => {
 const updateSettings = asyncHandler(async (req, res) => {
     const { language, goals, dailyGoalXp } = req.body;
     await User.update(req.user.id, { language, goals, daily_goal_xp: dailyGoalXp });
+    if (dailyGoalXp !== undefined) {
+        // A new goal can make today's goal bonus due or void.
+        await transaction(async (client) => {
+            if (await reconcileDailyGoal(client, req.user.id, req.tz) !== 0) await Task.syncUserTotals(client, req.user.id);
+        });
+    }
     const changed = [language !== undefined && 'language', goals !== undefined && 'goals', dailyGoalXp !== undefined && 'daily goal'].filter(Boolean);
     if (changed.length) {
         await logActivity({

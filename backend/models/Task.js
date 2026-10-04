@@ -3,6 +3,7 @@ const { logActivity } = require('../services/loggingService');
 const { calculateXpFromTask } = require('../services/rankService');
 const { recalculateMultiplier } = require('../models/User');
 const { warnOnError } = require('../utils/errors');
+const { reconcileDailyGoal, EARNED_SOURCES } = require('../services/bonusService');
 
 const defaultDb = { query };
 
@@ -107,7 +108,7 @@ const XP_FIELDS = ['duration', 'productivity', 'difficulty', 'bonus'];
 
 // Edits a task. XP is recomputed when an XP input changes; for completed tasks the
 // difference is booked as a 'task_edit' xp_history row, keeping the multiplier used at completion.
-async function update(userId, id, updates) {
+async function update(userId, id, updates, tz) {
     const outcome = await transaction(async (client) => {
         const found = await client.query('SELECT * FROM tasks WHERE id = $1 AND user_id = $2 FOR UPDATE', [id, userId]);
         const task = found.rows[0];
@@ -130,6 +131,7 @@ async function update(userId, id, updates) {
         );
 
         let xpChange = 0;
+        let goalBonus = 0;
         let totalXp = null;
         if (task.completed && newXp !== task.xp_awarded) {
             const awarded = await getAwardedXp(client, userId, id);
@@ -137,11 +139,12 @@ async function update(userId, id, updates) {
             xpChange = Math.round(newXp * ratio) - awarded;
             if (xpChange !== 0) {
                 await insertXpHistory(client, userId, xpChange, 'task_edit', id);
+                goalBonus = await reconcileDailyGoal(client, userId, tz);
                 totalXp = await syncUserTotals(client, userId);
                 await recalculateMultiplier(userId, true, client);
             }
         }
-        return { task: normalizeTask(updated.rows[0]), xpChange, totalXp };
+        return { task: normalizeTask(updated.rows[0]), xpChange, goalBonus, totalXp };
     });
     if (outcome) {
         const delta = outcome.xpChange !== 0 ? ` (${outcome.xpChange > 0 ? '+' : ''}${outcome.xpChange} XP)` : '';
@@ -153,7 +156,7 @@ async function update(userId, id, updates) {
     return outcome;
 }
 
-async function setCompleted(userId, taskId, completed) {
+async function setCompleted(userId, taskId, completed, tz) {
     const outcome = await transaction(async (client) => {
         const taskResult = await client.query(
             'SELECT * FROM tasks WHERE id = $1 AND user_id = $2 FOR UPDATE',
@@ -163,7 +166,7 @@ async function setCompleted(userId, taskId, completed) {
         const task = taskResult.rows[0];
         if (Boolean(task.completed) === Boolean(completed)) {
             const totalResult = await client.query('SELECT COALESCE(SUM(xp_amount), 0) AS total FROM xp_history WHERE user_id = $1', [userId]);
-            return { task: normalizeTask(task), totalXp: parseInt(totalResult.rows[0].total, 10), xpEarned: 0 };
+            return { task: normalizeTask(task), totalXp: parseInt(totalResult.rows[0].total, 10), xpEarned: 0, goalBonus: 0 };
         }
 
         let xpChange = 0;
@@ -189,10 +192,11 @@ async function setCompleted(userId, taskId, completed) {
             }
         }
 
+        const goalBonus = await reconcileDailyGoal(client, userId, tz);
         const totalXp = await syncUserTotals(client, userId);
         await recalculateMultiplier(userId, true, client);
         const updatedResult = await client.query('SELECT * FROM tasks WHERE id = $1', [taskId]);
-        return { task: normalizeTask(updatedResult.rows[0]), totalXp, xpEarned: xpChange, changed: true };
+        return { task: normalizeTask(updatedResult.rows[0]), totalXp, xpEarned: xpChange, goalBonus, changed: true };
     });
     if (outcome && outcome.changed) {
         const sign = outcome.xpEarned > 0 ? '+' : '';
@@ -206,11 +210,11 @@ async function setCompleted(userId, taskId, completed) {
     return outcome;
 }
 
-function complete(userId, taskId) {
-    return setCompleted(userId, taskId, true);
+function complete(userId, taskId, tz) {
+    return setCompleted(userId, taskId, true, tz);
 }
 
-async function deleteTask(userId, taskId) {
+async function deleteTask(userId, taskId, tz) {
     const outcome = await transaction(async (client) => {
         const taskResult = await client.query(
             'SELECT * FROM tasks WHERE id = $1 AND user_id = $2 FOR UPDATE',
@@ -225,9 +229,10 @@ async function deleteTask(userId, taskId) {
             await insertXpHistory(client, userId, xpChange, 'task_delete', taskId);
         }
         await client.query('DELETE FROM tasks WHERE id = $1', [taskId]);
+        const goalBonus = xpChange !== 0 ? await reconcileDailyGoal(client, userId, tz) : 0;
         const totalXp = await syncUserTotals(client, userId);
         await recalculateMultiplier(userId, true, client);
-        return { deleted: true, totalXp, xpChange, name: task.name };
+        return { deleted: true, totalXp, xpChange, goalBonus, name: task.name };
     });
     if (outcome) {
         const delta = outcome.xpChange !== 0 ? ` (${outcome.xpChange} XP)` : '';
@@ -321,14 +326,14 @@ async function getStats(userId, tz) {
         query(
             `SELECT ((NOW() AT TIME ZONE $2)::date)::text AS today,
                     (SELECT COALESCE(SUM(xp_amount), 0)::int FROM xp_history
-                     WHERE user_id = $1 AND created_at >= date_trunc('day', NOW() AT TIME ZONE $2) AT TIME ZONE $2) AS today_xp,
+                     WHERE user_id = $1 AND source = ANY($3) AND created_at >= date_trunc('day', NOW() AT TIME ZONE $2) AT TIME ZONE $2) AS today_xp,
                     (SELECT COUNT(*)::int FROM tasks
                      WHERE user_id = $1 AND completed = true AND completed_at >= date_trunc('day', NOW() AT TIME ZONE $2) AT TIME ZONE $2) AS today_tasks,
                     (SELECT COALESCE(SUM(xp_amount), 0)::int FROM xp_history
-                     WHERE user_id = $1 AND created_at >= date_trunc('week', NOW() AT TIME ZONE $2) AT TIME ZONE $2) AS week_xp,
+                     WHERE user_id = $1 AND source = ANY($3) AND created_at >= date_trunc('week', NOW() AT TIME ZONE $2) AT TIME ZONE $2) AS week_xp,
                     (SELECT COUNT(*)::int FROM tasks
                      WHERE user_id = $1 AND completed = true AND completed_at >= date_trunc('week', NOW() AT TIME ZONE $2) AT TIME ZONE $2) AS week_tasks`,
-            [userId, tz]
+            [userId, tz, EARNED_SOURCES]
         ),
         query('SELECT daily_goal_xp FROM users WHERE id = $1', [userId]),
         query(
@@ -337,13 +342,13 @@ async function getStats(userId, tz) {
              )
              SELECT d::text AS date,
                     COALESCE((SELECT SUM(h.xp_amount) FROM xp_history h
-                              WHERE h.user_id = $1 AND h.created_at > NOW() - INTERVAL '60 days'
+                              WHERE h.user_id = $1 AND h.source = ANY($4) AND h.created_at > NOW() - INTERVAL '60 days'
                                 AND (h.created_at AT TIME ZONE $2)::date = days.d), 0)::int AS xp,
                     (SELECT COUNT(*) FROM tasks t
                      WHERE t.user_id = $1 AND t.completed = true AND t.completed_at > NOW() - INTERVAL '60 days'
                        AND (t.completed_at AT TIME ZONE $2)::date = days.d)::int AS tasks
              FROM days ORDER BY d ASC`,
-            [userId, tz, CALENDAR_DAYS]
+            [userId, tz, CALENDAR_DAYS, EARNED_SOURCES]
         )
     ]);
     const window = windowResult.rows[0];
@@ -384,6 +389,7 @@ module.exports = {
     getXpHistory,
     getTotalXp,
     getStats,
+    syncUserTotals,
     computeStreaks,
     normalizeTask
 };

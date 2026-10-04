@@ -73,12 +73,29 @@ function computePositionMultiplier(ownXp, friendXpTotal, friendCount) {
     return Math.round(Math.min(MULTIPLIER.max, Math.max(MULTIPLIER.min, value)) * 100) / 100;
 }
 
+// Daily goal bonus: reaching the daily XP goal pays goalRate x goal (at least min, at most max), so a higher goal
+// pays more but never more than a tenth of the XP it took to reach it. Paid once per local day, taken back when the
+// day's XP falls below the goal again (undo, delete, edit, goal raised).
+const GOAL_BONUS = { rate: 0.1, min: 1, max: 100 };
+
+// Weekly trophy: the player with the most task XP in the finished week (Monday to Sunday, TROPHY_TIMEZONE) gets xp.
+// Needs at least minWeekXp and a second player with XP, so a quiet week or a solo player earns nothing.
+// 2nd and 3rd place get nothing. Weeks before firstWeek are never awarded.
+const WEEKLY_TROPHY = { xp: 75, minWeekXp: 50, minPlayers: 2, firstWeek: '2026-09-28' };
+
+function calculateGoalBonus(goal) {
+    if (!goal || goal <= 0) return 0;
+    return Math.min(GOAL_BONUS.max, Math.max(GOAL_BONUS.min, Math.round(goal * GOAL_BONUS.rate)));
+}
+
 function getMeta() {
     return {
         ranks: RANK_THRESHOLDS.map((rank) => ({ ...rank })),
         xpPerLevel: 100,
         xpFormula: { ...XP_FORMULA },
-        multiplier: { ...MULTIPLIER }
+        multiplier: { ...MULTIPLIER },
+        goalBonus: { ...GOAL_BONUS },
+        weeklyTrophy: { xp: WEEKLY_TROPHY.xp, minWeekXp: WEEKLY_TROPHY.minWeekXp, minPlayers: WEEKLY_TROPHY.minPlayers }
     };
 }
 
@@ -86,6 +103,9 @@ module.exports = {
     RANK_THRESHOLDS,
     XP_FORMULA,
     MULTIPLIER,
+    GOAL_BONUS,
+    WEEKLY_TROPHY,
+    calculateGoalBonus,
     getRankInfo,
     getRankName,
     getProgressPercent,

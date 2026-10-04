@@ -13,8 +13,16 @@ const SOURCES = {
     task: { icon: 'check', key: 'historyTask' },
     task_uncomplete: { icon: 'undo', key: 'historyUncomplete' },
     task_delete: { icon: 'trash', key: 'historyDelete' },
-    task_edit: { icon: 'edit', key: 'historyEdit' }
+    task_edit: { icon: 'edit', key: 'historyEdit' },
+    daily_goal: { icon: 'target', key: 'historyGoalBonus' },
+    weekly_trophy: { icon: 'trophy', key: 'historyTrophy' }
 };
+
+// A negative daily_goal row is the bonus being taken back.
+function sourceOf(row) {
+    if (row.source === 'daily_goal' && row.xp_amount < 0) return { icon: 'undo', key: 'historyGoalBonusLost' };
+    return SOURCES[row.source] || SOURCES.task;
+}
 
 let rows = [];
 let hasMore = false;
@@ -23,7 +31,7 @@ let loading = false;
 let query = '';
 
 function historyItem(row) {
-    const source = SOURCES[row.source] || SOURCES.task;
+    const source = sourceOf(row);
     const date = new Date(row.created_at);
     const name = row.task_name || t('historyDeletedTask');
     const amount = row.xp_amount;
@@ -38,7 +46,7 @@ function historyItem(row) {
 }
 
 function matchesQuery(row) {
-    const source = SOURCES[row.source] || SOURCES.task;
+    const source = sourceOf(row);
     const name = row.task_name || t('historyDeletedTask');
     const text = `${t(source.key, { name })} ${row.xp_amount} ${dayLabel(new Date(row.created_at))} ${timeLabel(new Date(row.created_at))}`;
     return text.toLowerCase().includes(query);

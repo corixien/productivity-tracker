@@ -4,7 +4,7 @@ import { h, icon, $, swapIn, formatNumber, timeLabel, setBusy } from '../core/do
 import { t, onLanguageChange } from '../core/i18n.js';
 import { getRankInfo, getNextRank, getProgress, getLevel, badgeUrl, rankKey } from '../core/ranks.js';
 import { refreshCore, loadTemplates, loadTasks } from '../core/data.js';
-import { toast, xpToast, confirmDialog, emptyState, skeletonList, showError } from '../core/ui.js';
+import { toast, xpToast, goalBonusToast, confirmDialog, emptyState, skeletonList, showError } from '../core/ui.js';
 import { statTiles } from './stats.js';
 import { openTaskDialog } from './task-dialog.js';
 import { categoryLabel, announceProgress, findTemplate } from './shared.js';
@@ -204,6 +204,7 @@ async function completeTask(task, button) {
         }
         const after = await refreshCore();
         announceProgress(before, after, result.xpEarned);
+        goalBonusToast(result.goalBonus);
         if (freezesBefore !== null && state.stats.streak.freezes > freezesBefore) toast(t('iceEarned'), { type: 'xp' });
     } catch (error) {
         showError(error);
@@ -218,6 +219,7 @@ async function undoTask(task, button) {
         await refreshCore();
         toast(t('taskUncompleted'), { type: 'success' });
         if (result.xpEarned) xpToast(result.xpEarned);
+        goalBonusToast(result.goalBonus);
     } catch (error) {
         showError(error);
         setBusy(button, false);
@@ -237,6 +239,7 @@ async function deleteTask(task) {
         await refreshCore();
         toast(t('taskDeleted'), { type: 'success' });
         if (result.xpChange) xpToast(result.xpChange);
+        goalBonusToast(result.goalBonus);
     } catch (error) {
         showError(error);
     }

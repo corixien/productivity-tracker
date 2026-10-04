@@ -3,6 +3,7 @@ const { hashPassword, verifyPassword, isLegacyPasswordHash } = require('../utils
 const { logActivity } = require('../services/loggingService');
 const { computePositionMultiplier } = require('../services/rankService');
 const { warnOnError } = require('../utils/errors');
+const { EARNED_SOURCES } = require('../services/bonusService');
 
 // Any object with .query(text, params): the pool wrapper by default, or a transaction client.
 const defaultDb = { query };
@@ -242,6 +243,7 @@ async function getLeaderboard(userId, period, tz) {
              SELECT user_id, GREATEST(0, SUM(xp_amount))::int AS xp
              FROM xp_history
              WHERE user_id IN (SELECT id FROM members)
+               AND source = ANY($3)
                AND created_at >= date_trunc('week', NOW() AT TIME ZONE $2) AT TIME ZONE $2
              GROUP BY user_id
          )
@@ -252,7 +254,7 @@ async function getLeaderboard(userId, period, tz) {
          JOIN members m ON m.id = u.id
          LEFT JOIN week w ON w.user_id = u.id
          ORDER BY ${period === 'week' ? 'COALESCE(w.xp, 0)' : 'u.xp'} DESC, u.username ASC`,
-        [userId, tz]
+        [userId, tz, EARNED_SOURCES]
     );
     return result.rows.map((row) => ({
         id: row.id,
