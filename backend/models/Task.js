@@ -30,9 +30,7 @@ async function create(userId, taskData, db = defaultDb) {
     const productivity = Number(taskData.productivity || 0);
     const difficulty = Number(taskData.difficulty || 3);
     const bonus = Number(taskData.bonus || 0);
-    const xp = taskData.xp !== undefined
-        ? Number(taskData.xp)
-        : calculateXpFromTask(Number(taskData.duration), productivity, difficulty, bonus);
+    const xp = calculateXpFromTask(Number(taskData.duration), productivity, difficulty, bonus);
     const result = await db.query(
         `INSERT INTO tasks (user_id, name, xp_awarded, duration, productivity, difficulty, category, bonus, completed, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false, NOW())

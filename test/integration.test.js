@@ -57,6 +57,9 @@ test('API integration', { skip }, async (t) => {
         assert.match(csp, /script-src 'self'/);
         assert.match(csp, /frame-ancestors 'none'/);
         assert.equal((await call('GET', '/api/tasks')).status, 401);
+        const status = await call('GET', '/api/groq/status');
+        assert.equal(status.status, 200);
+        assert.equal('keyLength' in status.json, false);
         const bad = await fetch(`${base}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{oops' });
         assert.equal(bad.status, 400);
     });
@@ -99,6 +102,16 @@ test('API integration', { skip }, async (t) => {
         const undone = await call('PUT', `/api/tasks/${taskId}`, { token: tokenA, body: { completed: false } });
         assert.equal(undone.json.newXP, 0);
         await call('POST', `/api/tasks/${taskId}/complete`, { token: tokenA });
+    });
+
+    await t.test('clients cannot set task XP or an oversized bonus', async () => {
+        const body = { name: 'cheat', duration: 60, productivity: 4, difficulty: 3, category: 'other' };
+        const honest = await call('POST', '/api/tasks', { token: tokenA, body });
+        const cheat = await call('POST', '/api/tasks', { token: tokenA, body: { ...body, xp: 99999, xp_awarded: 99999, xpAwarded: 99999 } });
+        assert.equal(cheat.status, 201);
+        assert.equal(cheat.json.xp, honest.json.xp);
+        assert.equal((await call('POST', '/api/tasks', { token: tokenA, body: { ...body, bonus: 101 } })).status, 400);
+        for (const id of [honest.json.id, cheat.json.id]) await call('DELETE', `/api/tasks/${id}`, { token: tokenA });
     });
 
     await t.test('editing a completed task re-prices its XP', async () => {

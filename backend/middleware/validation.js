@@ -1,5 +1,7 @@
 const { validateUsername, validatePassword, validateTaskName, validateDuration, validateProductivity, validateDifficulty, validateCategory, validateLanguage, sanitizeString } = require('../utils/validation');
 
+const MAX_BONUS = 100;
+
 function validateRegister(req, res, next) {
     const usernameValidation = validateUsername(req.body.username);
     if (!usernameValidation.valid) {
@@ -75,8 +77,8 @@ function validateTaskCreate(req, res, next) {
     
     if (req.body.bonus !== undefined) {
         const bonus = parseInt(req.body.bonus, 10);
-        if (isNaN(bonus) || bonus < 0) {
-            return res.status(400).json({ success: false, error: 'Bonus must be a non-negative number' });
+        if (isNaN(bonus) || bonus < 0 || bonus > MAX_BONUS) {
+            return res.status(400).json({ success: false, error: `Bonus must be between 0 and ${MAX_BONUS}` });
         }
         req.body.bonus = bonus;
     } else {
@@ -131,8 +133,8 @@ function validateTaskUpdate(req, res, next) {
     
     if (req.body.bonus !== undefined) {
         const bonus = parseInt(req.body.bonus, 10);
-        if (isNaN(bonus) || bonus < 0) {
-            return res.status(400).json({ success: false, error: 'Bonus must be a non-negative number' });
+        if (isNaN(bonus) || bonus < 0 || bonus > MAX_BONUS) {
+            return res.status(400).json({ success: false, error: `Bonus must be between 0 and ${MAX_BONUS}` });
         }
         req.body.bonus = bonus;
     }
@@ -233,7 +235,7 @@ function validateQuickTask(req, res, next) {
     }
     if (!partial || body.bonus !== undefined) {
         const bonus = body.bonus === undefined ? 0 : parseInt(body.bonus, 10);
-        if (isNaN(bonus) || bonus < 0) return fail('Bonus must be a non-negative number');
+        if (isNaN(bonus) || bonus < 0 || bonus > MAX_BONUS) return fail(`Bonus must be between 0 and ${MAX_BONUS}`);
         out.bonus = bonus;
     }
     req.body = out;

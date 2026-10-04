@@ -85,7 +85,7 @@ Files: `controllers/userController.js`, `User.getLeaderboard`, `features/leaderb
 Files: `services/groqService.js`, `controllers/groqController.js`, `routes/groq.js`. Routes: `POST /api/groq` and `/api/groq/rate`, `GET /api/groq/status`, plus legacy `/api/ai/rate` and `/api/ai/status` (kept on purpose).
 
 - The browser never sees the key. The description (max 2000 chars) plus the user's goals text goes to the Groq chat-completions API (`GROQ_MODEL`, default `llama-3.3-70b-versatile`; on a 404 the server asks Groq `/models` for a usable chat model (preferring llama-3.3-70b-versatile) and retries, remembering the one that worked, `GROQ_BASE_URL`); the model must return JSON `{name, duration, productivity, difficulty, category}`. The server clamps the values, sets `bonus: 0` and computes XP itself.
-- Rate limit 10/min per user. Without `GROQ_API_KEY` the endpoint answers `ai_not_configured` and the UI says so; manual entry always works. `/status` is public and returns `{ configured, keyLength, model }` (no key value, but it does reveal the key length).
+- Rate limit 10/min per user. Without `GROQ_API_KEY` the endpoint answers `ai_not_configured` and the UI says so; manual entry always works. `/status` is public and returns `{ configured, model }`.
 - Every call is written to `groq_logs` (payload, response, time, success) and appears in admin Analytics; failures log `ai.error`.
 
 ## 11. Settings and profile
@@ -177,7 +177,7 @@ Render free tier (`render.yaml`: build `npm install`, start `npm start` = migrat
 
 ## 22. Removed features (do not resurrect)
 
-Stored here so nobody re-adds them by mistake: recurring tasks and templates (columns, UI, API), the `goals` table and `/api/goals`, the `profiles` table and `/api/users/profile`, `tasks.task_text`/`ai_score`, stored `position_based_multiplier`/`rank_based_multiplier`, the admin "object storage" tab, the multi-step task wizard with a header add button, the hamburger sidebar, `setInterval` multiplier monitor, keep-alive pings. Leftover: `.recur-select` in `css/views.css` is dead CSS.
+Stored here so nobody re-adds them by mistake: recurring tasks and templates (columns, UI, API), the `goals` table and `/api/goals`, the `profiles` table and `/api/users/profile`, `tasks.task_text`/`ai_score`, stored `position_based_multiplier`/`rank_based_multiplier`, the admin "object storage" tab, the multi-step task wizard with a header add button, the hamburger sidebar, `setInterval` multiplier monitor, keep-alive pings.
 
 ## Known limitations
 

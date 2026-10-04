@@ -218,9 +218,9 @@ Return ONLY the JSON.` },
 async function checkGroqStatus() {
     const config = getGroqConfig();
     if (!config.apiKey) {
-        return { configured: false, keyLength: 0, model: config.model || DEFAULT_GROQ_MODEL };
+        return { configured: false, model: config.model || DEFAULT_GROQ_MODEL };
     }
-    return { configured: true, keyLength: config.apiKey.length, model: config.model || DEFAULT_GROQ_MODEL };
+    return { configured: true, model: config.model || DEFAULT_GROQ_MODEL };
 }
 
 async function logGroqInteraction(userId, username, requestPayload, responsePayload, responseTimeMs, success, errorMessage = null, model) {

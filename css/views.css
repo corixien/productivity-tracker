@@ -148,7 +148,6 @@
     .template-card .task-actions .icon-btn { width: 34px; height: 34px; }
     .template-card .task-title-row { grid-column: 2; }
 }
-.recur-select { max-width: 150px; }
 
 /* ---- Activity / history ---- */
 .history { display: grid; gap: 4px; }
