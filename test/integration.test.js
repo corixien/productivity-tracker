@@ -632,4 +632,24 @@ test('API integration', { skip }, async (t) => {
             await new Promise((resolve) => fake.close(resolve));
         }
     });
+    await t.test('a reserved admin name can be registered again while no admin exists', async () => {
+        const { query } = require('../backend/utils/database');
+        const owner = `owner_${suffix}`;
+        const previous = process.env.ADMIN_USERNAMES;
+        process.env.ADMIN_USERNAMES = owner;
+        try {
+            await query('UPDATE users SET is_admin = false');
+            const register = (username) => call('POST', '/api/auth/register', { body: { username, password: 'secret123' } });
+            const first = await register(owner);
+            assert.equal(first.status, 201, 'the owner can claim the name when no admin exists');
+            assert.equal((await call('GET', '/api/auth/me', { token: first.json.token })).json.isAdmin, true);
+            assert.equal((await call('GET', '/api/admin/tables', { token: first.json.token })).status, 200);
+            await query('DELETE FROM users WHERE username = $1', [owner]);
+            await register(`boss_${suffix}`);
+            await query('UPDATE users SET is_admin = true WHERE username = $1', [`boss_${suffix}`]);
+            assert.equal((await register(owner)).status, 409, 'with an admin present the name stays reserved');
+        } finally {
+            if (previous === undefined) delete process.env.ADMIN_USERNAMES; else process.env.ADMIN_USERNAMES = previous;
+        }
+    });
 });

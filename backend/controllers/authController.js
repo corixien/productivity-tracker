@@ -33,12 +33,16 @@ function issueToken(user) {
 
 const register = asyncHandler(async (req, res) => {
     const { username, password } = req.body;
-    if (await User.findByUsername(username) || getAdminUsernames().has(username.toLowerCase())) {
+    // Names in ADMIN_USERNAMES are reserved for the owner, but only while an admin exists: with none (fresh database,
+    // or the owner's account was deleted) the owner must be able to register the name again and becomes admin at once.
+    const reserved = getAdminUsernames().has(username.toLowerCase());
+    if (await User.findByUsername(username) || (reserved && await User.hasAdmin())) {
         logAuthAttempt(username, false, req.ip).catch(warnOnError('register.log'));
         throw conflict('Username already taken', 'username_taken');
     }
 
-    const user = await User.create(username, password);
+    let user = await User.create(username, password);
+    if (reserved) user = await User.makeAdmin(user.id);
     resetAuthRateLimiter(req.ip);
 
     res.status(201).json({

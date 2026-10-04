@@ -72,6 +72,15 @@ async function update(id, updates) {
     return normalizeUser(result.rows[0]);
 }
 
+async function hasAdmin() {
+    return (await query('SELECT 1 FROM users WHERE is_admin LIMIT 1')).rows.length > 0;
+}
+
+async function makeAdmin(id) {
+    const result = await query('UPDATE users SET is_admin = true, updated_at = NOW() WHERE id = $1 RETURNING *', [id]);
+    return normalizeUser(result.rows[0]);
+}
+
 async function updateAvatar(userId, avatarUrl) {
     const result = await query(
         'UPDATE users SET avatar_url = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
@@ -277,6 +286,8 @@ module.exports = {
     create,
     update,
     updateAvatar,
+    hasAdmin,
+    makeAdmin,
     changeUsername,
     updatePassword,
     verifyCredentials,

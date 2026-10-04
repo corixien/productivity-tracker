@@ -22,7 +22,7 @@ Backend: Express, PostgreSQL (Neon), bcrypt, JWT, Winston, Helmet. Frontend: van
 | `JWT_EXPIRES_IN` | token lifetime, default `7d` |
 | `GROQ_API_KEY`, `GROQ_MODEL`, `GROQ_BASE_URL` | optional AI task rating (without a key the app falls back to manual entry); leave `GROQ_MODEL` unset to use `llama-3.3-70b-versatile`; if Groq answers 404 the server picks a model your key can use; do not wrap values in `<>` | |
 | `TROPHY_TIMEZONE` | timezone whose Sunday-to-Monday switch settles the weekly trophy (default `Europe/Berlin`) |
-| `ADMIN_USERNAMES` | comma-separated usernames of existing accounts that get admin access at startup (these names cannot be registered by anyone else) |
+| `ADMIN_USERNAMES` | comma-separated usernames of existing accounts that get admin access at startup (these names cannot be registered by anyone else while an admin exists; if no admin exists, registering the name makes you admin) |
 | `LOG_LEVEL`, `LOG_DIR`, `LOG_RETENTION_DAYS` | logging; DB logs older than 30 days (default) are purged |
 | `CLIENT_ORIGIN`, `DATABASE_POOL_MAX`, `PORT`, `NODE_ENV` | optional |
 

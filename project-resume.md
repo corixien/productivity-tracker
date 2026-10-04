@@ -36,6 +36,8 @@ Run from `/home/mateo/productivity-tracker`. `npm run check`, `npm test` (integr
 - Goal of the current task: none open. Last session delivered the batch below.
 
 ### Done
+- [x] 2026-10-04 fixed lockout after deleting all users: reserved ADMIN_USERNAMES names can be registered again while no admin exists (and the registrant becomes admin)
+- [x] 2026-10-04 accounts on production were deleted by the owner; test accounts are gone
 - [x] 2026-10-04 AI fills the offline/with friends bonus, rank-up bonus (1% of threshold, max 100, once per rank, migration 019), weekly trophy now 50 XP and never counts as next week's XP
 - [x] 2026-10-04 AI task name follows the UI language, Enter sends in the AI box (Shift+Enter = new line), daily goal bonus reworked (v_task_xp, combined toast, ring shows bonus, Activity row), first place streaks on Activity. Real-browser test harness idea: headless Firefox + WebDriver BiDi (see session notes, not committed)
 - [ ] Delete all accounts except corixien on production: blocked for the agent, user runs `node ~/bin/pt-delete-other-accounts.js --yes` (dry run without the flag)
