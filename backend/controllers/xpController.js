@@ -1,5 +1,6 @@
 const Task = require('../models/Task');
 const { awardWeeklyTrophies, getRecentTrophy } = require('../services/bonusService');
+const firstPlace = require('../services/firstPlaceService');
 const { asyncHandler, warnOnError } = require('../utils/errors');
 
 const getXp = asyncHandler(async (req, res) => {
@@ -21,4 +22,8 @@ const getStats = asyncHandler(async (req, res) => {
     res.json({ ...stats, trophy });
 });
 
-module.exports = { getXp, getStats };
+const getFirstPlace = asyncHandler(async (req, res) => {
+    res.json(await firstPlace.getFirstPlace(req.user.id, req.tz));
+});
+
+module.exports = { getXp, getStats, getFirstPlace };

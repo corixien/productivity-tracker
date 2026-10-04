@@ -1,11 +1,11 @@
 import { api } from '../core/api.js';
 import { state } from '../core/state.js';
 import { h, $, swapIn, setBusy } from '../core/dom.js';
-import { t, onLanguageChange } from '../core/i18n.js';
+import { t, onLanguageChange, getCurrentLang } from '../core/i18n.js';
 import { calculateXp } from '../core/ranks.js';
 import { refreshCore, loadTemplates } from '../core/data.js';
 import { refreshUser } from '../core/auth.js';
-import { toast, goalBonusToast, openDialog, closeDialog, showError } from '../core/ui.js';
+import { toast, openDialog, closeDialog, showError } from '../core/ui.js';
 import { CATEGORY_KEYS, categoryLabel, announceProgress, warnNonCritical, findTemplate } from './shared.js';
 
 const AI_TIMEOUT_MS = 25000;
@@ -128,7 +128,7 @@ async function rateWithAi() {
     aiController = new AbortController();
     const timer = setTimeout(() => aiController.abort(), AI_TIMEOUT_MS);
     try {
-        const rating = await api.rateTask(description, (state.user && state.user.goals) || '', aiController.signal);
+        const rating = await api.rateTask(description, (state.user && state.user.goals) || '', getCurrentLang(), aiController.signal);
         fillForm({
             name: rating.name || description.slice(0, 100),
             duration: rating.duration,
@@ -178,8 +178,7 @@ async function submit(event) {
             closeDialog(el.dialog);
             const after = await refreshCore();
             toast(t('taskUpdated'), { type: 'success' });
-            announceProgress(before, after, result.xpChange);
-            goalBonusToast(result.goalBonus);
+            announceProgress(before, after, result.xpChange, result.goalBonus);
             return;
         }
 
@@ -198,8 +197,7 @@ async function submit(event) {
         closeDialog(el.dialog);
         const after = await refreshCore();
         toast(t('taskCreated'), { type: 'success' });
-        announceProgress(before, after, xpEarned);
-        goalBonusToast(goalBonus);
+        announceProgress(before, after, xpEarned, goalBonus);
     } catch (error) {
         setError(error.network ? t('networkError') : error.message);
         showError(error);
@@ -243,7 +241,10 @@ function initTaskDialog() {
     el.form.addEventListener('submit', submit);
     el.form.addEventListener('input', updatePreview);
     $('#ai-input').addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) rateWithAi();
+        // Enter sends, Shift+Enter inserts a line break (Ctrl/Cmd+Enter also sends). Not while an IME composes text.
+        if (event.key !== 'Enter' || event.shiftKey || event.isComposing) return;
+        event.preventDefault();
+        rateWithAi();
     });
     el.dialog.addEventListener('close', reset);
     onLanguageChange(() => { fillCategories(); if (el.dialog.open) updatePreview(); });

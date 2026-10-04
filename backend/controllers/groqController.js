@@ -6,10 +6,12 @@ const { asyncHandler, AppError } = require('../utils/errors');
 const rateTask = asyncHandler(async (req, res) => {
     const { description, goals } = req.body;
     const user = await User.findById(req.user.id);
+    // The task name is written in the language the user has selected (the app sends it; the saved setting is the fallback).
+    const language = ['en', 'de'].includes(req.body.language) ? req.body.language : (user && user.language) || 'en';
 
     const startedAt = Date.now();
     try {
-        const result = await groqService.rateTask(description, goals || (user?.goals || ''), req.user.id, req.user.username);
+        const result = await groqService.rateTask(description, goals || (user?.goals || ''), req.user.id, req.user.username, language);
         await logActivity({
             userId: req.user.id, action: 'ai.rate',
             message: `AI rated "${description.slice(0, 60)}" = ${result.duration} min, productivity ${result.productivity}, difficulty ${result.difficulty}`,

@@ -253,3 +253,33 @@ test('catch-up multiplier is bounded, falls with own XP, rises with friend XP an
     assert.equal(rank.computePositionMultiplier(1234, 0, 0), 1, 'no friends = no multiplier');
     assert.equal(rank.computePositionMultiplier(1000, 3000, 2), rank.computePositionMultiplier(1000, 1500, 1), 'uses the friend average');
 });
+
+test('first place streaks: all-time by day, weekly by week, current and record', () => {
+    const { computeFirstPlace, runs } = require('../backend/services/firstPlaceService');
+    assert.deepEqual(runs([true, true, false, true, true, true]), { current: 3, record: 3, isFirst: true });
+    assert.deepEqual(runs([true, true, true, false]), { current: 3, record: 3, isFirst: false }, 'an open period that is not won keeps the finished streak alive');
+    assert.deepEqual(runs([false, false]), { current: 0, record: 0, isFirst: false });
+    assert.deepEqual(runs([]), { current: 0, record: 0, isFirst: false });
+
+    const names = new Map([['me', 'me'], ['ann', 'ann']]);
+    const result = computeFirstPlace({
+        selfId: 'me', names, today: '2026-10-06', thisWeek: '2026-10-05',
+        daily: [
+            { id: 'me', period: '2026-10-01', xp: 50 }, { id: 'ann', period: '2026-10-01', xp: 40 },
+            { id: 'me', period: '2026-10-02', xp: 10 }, { id: 'ann', period: '2026-10-02', xp: 5 },
+            { id: 'ann', period: '2026-10-04', xp: 100 },
+            { id: 'me', period: '2026-10-05', xp: 100 }
+        ],
+        weekly: [
+            { id: 'me', period: '2026-09-21', xp: 80 }, { id: 'ann', period: '2026-09-21', xp: 70 },
+            { id: 'me', period: '2026-09-28', xp: 90 }, { id: 'ann', period: '2026-09-28', xp: 60 },
+            { id: 'ann', period: '2026-10-05', xp: 20 }
+        ]
+    });
+    // totals: me 50/60/60/60/160/160, ann 40/45/45/145/145/145: me led days 1-3, ann day 4, me from day 5
+    assert.deepEqual(result.allTime, { unit: 'day', current: 2, record: 3, isFirst: true });
+    // weeks: me, me, then ann leads the open week: the streak of 2 stays alive, not first right now
+    assert.deepEqual(result.weekly, { unit: 'week', current: 2, record: 2, isFirst: false });
+    // alone, or nobody active: nothing
+    assert.deepEqual(computeFirstPlace({ selfId: 'me', names: new Map([['me', 'me']]), daily: [{ id: 'me', period: '2026-10-01', xp: 5 }], weekly: [], today: '2026-10-01', thisWeek: '2026-09-28' }).allTime.current, 0);
+});

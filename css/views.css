@@ -451,3 +451,9 @@
 .search-field { position: relative; }
 .search-field input[type="text"] { width: 100%; min-height: 44px; padding-left: 42px; }
 .search-field .search-icon { position: absolute; left: 14px; top: 50%; width: 18px; height: 18px; margin-top: -9px; color: var(--text-faint); pointer-events: none; }
+
+/* First place streaks (Activity) */
+.first-place { display: grid; gap: 10px; }
+.first-place .section-title { margin: 0; font-size: 1.05rem; }
+.first-place .first-place-row { grid-template-columns: repeat(2, 1fr); }
+.first-place .hint { margin: 0; }

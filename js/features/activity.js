@@ -6,6 +6,7 @@ import { loadStats } from '../core/data.js';
 import { emptyState, skeletonList, showError } from '../core/ui.js';
 import { statTiles } from './stats.js';
 import { renderStreakHero, renderCharts } from './streak.js';
+import { renderFirstPlace } from './first-place.js';
 import { warnNonCritical, initSearch } from './shared.js';
 
 const PAGE_SIZE = 30;
@@ -111,6 +112,7 @@ function showActivity() {
     renderStats();
     renderHistory();
     loadStats().catch(warnNonCritical('activity.stats'));
+    renderFirstPlace($('#first-place-panel'));
     loadHistory(true);
 }
 

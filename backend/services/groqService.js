@@ -45,7 +45,9 @@ function calculateXp(productivity, difficulty, duration, bonus = 0) {
     return calculateXpFromTask(duration, productivity, difficulty, bonus);
 }
 
-async function rateTask(description, goals, userId, username) {
+const LANGUAGE_NAMES = { en: 'English', de: 'German' };
+
+async function rateTask(description, goals, userId, username, language = 'en') {
     const config = getGroqConfig();
     const apiKey = config.apiKey;
     let model = workingModel || config.model || DEFAULT_GROQ_MODEL;
@@ -56,6 +58,7 @@ async function rateTask(description, goals, userId, username) {
         throw new Error('GROQ_API_KEY is not configured');
     }
 
+    const languageName = LANGUAGE_NAMES[language] || LANGUAGE_NAMES.en;
     const goalsText = goals ? `\n\nUser's long-term goals:\n${goals}` : '';
     const userMessage = `${description.trim()}${goalsText}`;
 
@@ -67,6 +70,7 @@ async function rateTask(description, goals, userId, username) {
 {"name":"short name","duration":minutes,"productivity":0-5,"difficulty":1-5,"category":"learning,exercise,creative,admin,social,deep-work,or other"}
 
 Rules:
+- name: write it in ${languageName}, whatever language the description is in (translate it if needed)
 - productivity 0-5: how much it helps goals (0=waste, 5=great)
 - difficulty 1-5: effort level
 - duration: minutes

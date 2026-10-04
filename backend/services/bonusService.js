@@ -5,8 +5,8 @@ const { publishToUser } = require('../utils/events');
 const { logActivity } = require('./loggingService');
 const { warnOnError } = require('../utils/errors');
 
-// Sources that count as XP earned by doing tasks. Bonuses and trophies never count towards the goal or the weekly ranking.
-const EARNED_SOURCES = ['task', 'task_uncomplete', 'task_delete', 'task_edit'];
+// Goal progress and the weekly ranking read v_task_xp (migration 018): task XP counted for the moment the task was
+// completed. Bonuses and trophies never count towards the goal or the ranking, and undoing an old task cannot lower today.
 const DAY_START = "date_trunc('day', NOW() AT TIME ZONE $2) AT TIME ZONE $2";
 
 // Brings today's daily-goal bonus in line with today's task XP: +bonus when the goal is reached, a negative row
@@ -17,18 +17,18 @@ async function reconcileDailyGoal(client, userId, tz = getTrophyTimezone()) {
     if (!user.rows.length) return 0;
     const goal = user.rows[0].daily_goal_xp;
     const sums = await client.query(
-        `SELECT COALESCE(SUM(xp_amount) FILTER (WHERE source = ANY($3)), 0)::int AS earned,
-                COALESCE(SUM(xp_amount) FILTER (WHERE source = 'daily_goal'), 0)::int AS paid
-         FROM xp_history
-         WHERE user_id = $1 AND created_at >= ${DAY_START}`,
-        [userId, tz, EARNED_SOURCES]
+        `SELECT (SELECT COALESCE(SUM(xp_amount), 0)::int FROM v_task_xp WHERE user_id = $1 AND completed_at >= ${DAY_START}) AS earned,
+                (SELECT COALESCE(SUM(xp_amount), 0)::int FROM xp_history
+                 WHERE user_id = $1 AND source = 'daily_goal' AND created_at >= ${DAY_START}) AS paid`,
+        [userId, tz]
     );
     const { earned, paid } = sums.rows[0];
     const target = goal && earned >= goal ? calculateGoalBonus(goal) : 0;
     const delta = target - paid;
     if (delta !== 0) {
         await client.query(
-            `INSERT INTO xp_history (user_id, xp_amount, source, source_id, created_at) VALUES ($1, $2, 'daily_goal', NULL, NOW())`,
+            // clock_timestamp(): booked after the task row of the same transaction, so the bonus lists right above it
+            `INSERT INTO xp_history (user_id, xp_amount, source, source_id, created_at) VALUES ($1, $2, 'daily_goal', NULL, clock_timestamp())`,
             [userId, delta]
         );
     }
@@ -67,14 +67,13 @@ async function settleWeek(weekStart, tz) {
     const { recalculateMultiplier } = require('../models/User');
     const outcome = await transaction(async (client) => {
         const board = await client.query(
-            `SELECT user_id, SUM(xp_amount)::int AS xp, MAX(created_at) AS last_at
-             FROM xp_history
-             WHERE source = ANY($3)
-               AND created_at >= ($1::date::timestamp AT TIME ZONE $2)
-               AND created_at < (($1::date + 7)::timestamp AT TIME ZONE $2)
+            `SELECT user_id, SUM(xp_amount)::int AS xp, MAX(completed_at) AS last_at
+             FROM v_task_xp
+             WHERE completed_at >= ($1::date::timestamp AT TIME ZONE $2)
+               AND completed_at < (($1::date + 7)::timestamp AT TIME ZONE $2)
              GROUP BY user_id HAVING SUM(xp_amount) > 0
              ORDER BY xp DESC, last_at ASC`,
-            [weekStart, tz, EARNED_SOURCES]
+            [weekStart, tz]
         );
         const winner = board.rows.length >= WEEKLY_TROPHY.minPlayers && board.rows[0].xp >= WEEKLY_TROPHY.minWeekXp ? board.rows[0] : null;
         const settled = await client.query(
@@ -115,4 +114,4 @@ async function getRecentTrophy(userId) {
 // Tests backdate XP rows and need the next check to look again.
 const resetSettledCache = () => { settledThrough = null; };
 
-module.exports = { EARNED_SOURCES, reconcileDailyGoal, awardWeeklyTrophies, getRecentTrophy, resetSettledCache };
+module.exports = { reconcileDailyGoal, awardWeeklyTrophies, getRecentTrophy, resetSettledCache };

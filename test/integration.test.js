@@ -43,6 +43,20 @@ test('API integration', { skip }, async (t) => {
         return { status: res.status, json, headers: res.headers };
     }
 
+
+    // A completed task of `xp` XP finished at the given SQL timestamp expression, with its ledger row.
+    async function backdatedTask(query, userId, xp, whenSql) {
+        const task = await query(
+            `INSERT INTO tasks (user_id, name, xp_awarded, duration, productivity, difficulty, category, bonus, completed, completed_at, created_at)
+             VALUES ($1, 'old task', $2, 60, 3, 3, 'other', 0, true, ${whenSql}, ${whenSql}) RETURNING id`,
+            [userId, xp]
+        );
+        await query(
+            `INSERT INTO xp_history (user_id, xp_amount, source, source_id, created_at) VALUES ($1, $2, 'task', $3, ${whenSql})`,
+            [userId, xp, task.rows[0].id]
+        );
+    }
+
     const suffix = Date.now().toString(36).slice(-6);
     const nameA = `alice_${suffix}`;
     const nameB = `bob_${suffix}`;
@@ -427,11 +441,7 @@ test('API integration', { skip }, async (t) => {
             const username = `trophy_${key}_${suffix}`;
             const token = (await call('POST', '/api/auth/register', { body: { username, password: 'secret123' } })).json.token;
             const id = (await query('SELECT id FROM users WHERE username = $1', [username])).rows[0].id;
-            await query(
-                `INSERT INTO xp_history (user_id, xp_amount, source, created_at)
-                 VALUES ($1, $2, 'task', (date_trunc('week', NOW() AT TIME ZONE 'Europe/Berlin') - INTERVAL '5 days' + INTERVAL '12 hours') AT TIME ZONE 'Europe/Berlin')`,
-                [id, weekXp]
-            );
+            await backdatedTask(query, id, weekXp, "(date_trunc('week', NOW() AT TIME ZONE 'Europe/Berlin') - INTERVAL '5 days' + INTERVAL '12 hours') AT TIME ZONE 'Europe/Berlin'");
             await query('UPDATE users SET xp = $2 WHERE id = $1', [id, weekXp]);
             players[key] = { token, id, weekXp };
         }
@@ -452,7 +462,7 @@ test('API integration', { skip }, async (t) => {
         const settled = (await query('SELECT user_id, xp_amount, week_xp FROM weekly_trophies WHERE week_start = $1', [weekStart])).rows[0];
         assert.deepEqual([settled.user_id, settled.xp_amount, settled.week_xp], [players.first.id, 75, 80]);
 
-        await call('POST', `/api/users/friends`, { token: players.first.token, body: { username: `trophy_second_${suffix}` } });
+        await call('POST', `/api/users/friends`, { token: players.first.token, body: { friendUsername: `trophy_second_${suffix}` } });
         const board = (await call('GET', '/api/leaderboard?period=week', { token: players.first.token })).json;
         assert.equal(board.find((entry) => entry.isSelf).weekXp, 0, 'the trophy is not weekly XP');
         await query("DELETE FROM users WHERE username LIKE 'trophy\\_%'");
@@ -498,20 +508,64 @@ test('API integration', { skip }, async (t) => {
             const username = `tie_${key}_${suffix}`;
             const tk = (await call('POST', '/api/auth/register', { body: { username, password: 'secret123' } })).json.token;
             const id = (await query('SELECT id FROM users WHERE username = $1', [username])).rows[0].id;
-            await query(
-                `INSERT INTO xp_history (user_id, xp_amount, source, created_at)
-                 VALUES ($1, 90, 'task', (date_trunc('week', NOW() AT TIME ZONE 'Europe/Berlin') - INTERVAL '4 days' + INTERVAL '${key === 'a' ? 9 : 15} hours') AT TIME ZONE 'Europe/Berlin')`,
-                [id]
-            );
+            await backdatedTask(query, id, 90, `(date_trunc('week', NOW() AT TIME ZONE 'Europe/Berlin') - INTERVAL '4 days' + INTERVAL '${key === 'a' ? 9 : 15} hours') AT TIME ZONE 'Europe/Berlin'`);
             await query('UPDATE users SET xp = 90 WHERE id = $1', [id]);
             rivals.push({ id, token: tk });
         }
-        await query("DELETE FROM xp_history WHERE source = 'task' AND user_id NOT IN (SELECT id FROM users WHERE username LIKE 'tie\\_%') AND created_at < date_trunc('week', NOW() AT TIME ZONE 'Europe/Berlin') AT TIME ZONE 'Europe/Berlin' AND created_at >= (date_trunc('week', NOW() AT TIME ZONE 'Europe/Berlin') - INTERVAL '7 days') AT TIME ZONE 'Europe/Berlin'");
         resetSettledCache();
         await Promise.all(Array.from({ length: 10 }, (_, i) => call('GET', '/api/xp/stats', { token: rivals[i % 2].token })));
         const awards = await query("SELECT user_id FROM xp_history WHERE source = 'weekly_trophy' AND user_id = ANY($1)", [rivals.map((r) => r.id)]);
         assert.equal(awards.rows.length, 1, 'exactly one trophy');
         assert.equal(awards.rows[0].user_id, rivals[0].id, 'tie goes to whoever got there first');
         await query("DELETE FROM users WHERE username LIKE 'tie\\_%'");
+    });
+    await t.test('undoing or editing an old task never changes today\'s goal progress or bonus', async () => {
+        const { query } = require('../backend/utils/database');
+        const name = `old_${suffix}`;
+        const token = (await call('POST', '/api/auth/register', { body: { username: name, password: 'secret123' } })).json.token;
+        const userId = (await query('SELECT id FROM users WHERE username = $1', [name])).rows[0].id;
+        await backdatedTask(query, userId, 30, "NOW() - INTERVAL '2 days'");
+        await query('UPDATE users SET xp = 30 WHERE id = $1', [userId]);
+        const oldId = (await call('GET', '/api/tasks?completed=true', { token })).json[0].id;
+        for (const [duration, productivity, difficulty] of [[60, 5, 5], [60, 4, 3]]) {
+            const task = await call('POST', '/api/tasks', { token, body: { name: 'today', duration, productivity, difficulty, category: 'other' } });
+            await call('POST', `/api/tasks/${task.json.id}/complete`, { token });
+        }
+        const before = (await call('GET', '/api/xp/stats', { token })).json;
+        assert.equal(before.today.xp, 61, 'only tasks completed today count');
+        assert.equal((await call('GET', '/api/auth/me', { token })).json.xp, 30 + 61 + 5);
+        await call('PUT', `/api/tasks/${oldId}`, { token, body: { duration: 120 } });
+        const undone = await call('PUT', `/api/tasks/${oldId}`, { token, body: { completed: false } });
+        assert.equal(undone.json.goalBonus, 0);
+        const after = (await call('GET', '/api/xp/stats', { token })).json;
+        assert.equal(after.today.xp, 61, 'old task changes leave today alone');
+        assert.equal((await call('GET', '/api/auth/me', { token })).json.xp, 61 + 5, 'bonus kept, old task XP taken back');
+        const history = (await call('GET', '/api/xp?limit=10', { token })).json.history;
+        const bonusAt = history.findIndex((row) => row.source === 'daily_goal');
+        assert.ok(bonusAt >= 0 && history[bonusAt].xp_amount === 5, 'the bonus is listed in the XP activity');
+        assert.equal(history[bonusAt + 1].source, 'task', 'right above the task that reached the goal');
+    });
+
+    await t.test('first place streaks follow the leaderboard', async () => {
+        const { query } = require('../backend/utils/database');
+        const a = `fp_a_${suffix}`;
+        const b = `fp_b_${suffix}`;
+        const tokenFpA = (await call('POST', '/api/auth/register', { body: { username: a, password: 'secret123' } })).json.token;
+        const tokenFpB = (await call('POST', '/api/auth/register', { body: { username: b, password: 'secret123' } })).json.token;
+        assert.deepEqual((await call('GET', '/api/xp/first-place', { token: tokenFpA })).json.allTime.current, 0, 'alone: no streak');
+        await call('POST', '/api/users/friends', { token: tokenFpA, body: { friendUsername: b } });
+        const task = await call('POST', '/api/tasks', { token: tokenFpA, body: { name: 'lead', duration: 60, productivity: 4, difficulty: 3, category: 'other' } });
+        await call('POST', `/api/tasks/${task.json.id}/complete`, { token: tokenFpA });
+        const result = (await call('GET', '/api/xp/first-place', { token: tokenFpA })).json;
+        assert.equal(result.allTime.isFirst, true);
+        assert.equal(result.allTime.current, 1);
+        assert.equal(result.allTime.record, 1);
+        assert.equal(result.weekly.isFirst, true);
+        assert.equal(result.weekly.unit, 'week');
+        const other = (await call('GET', '/api/xp/first-place', { token: tokenFpB })).json;
+        assert.equal(other.allTime.isFirst, false);
+        assert.equal(other.weekly.current, 0, 'friends are directional: B has no friends, so no race');
+        assert.equal((await call('GET', '/api/xp/first-place')).status, 401);
+        await query("DELETE FROM users WHERE username LIKE 'fp\\_%'");
     });
 });

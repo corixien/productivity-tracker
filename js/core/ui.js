@@ -26,12 +26,6 @@ function toast(message, { type = 'info', title, duration } = {}) {
     while (region.children.length > 4) region.firstElementChild.remove();
 }
 
-// Daily goal bonus feedback: positive when earned, negative when taken back.
-function goalBonusToast(amount) {
-    if (!amount) return;
-    toast(t(amount > 0 ? 'goalBonusEarned' : 'goalBonusLost', { n: amount }), { type: amount > 0 ? 'xp' : 'info' });
-}
-
 // Weekly trophy: congratulate once per week and device.
 const TROPHY_SEEN_KEY = 'pt_trophy_seen';
 function trophyToast(trophy) {
@@ -43,17 +37,21 @@ function trophyToast(trophy) {
     toast(t('trophyWon', { n: trophy.xp }), { type: 'xp', duration: 6000 });
 }
 
-function xpToast(amount) {
+// One toast for everything one action paid: the task XP and, on a second line, the daily goal bonus that came with it
+// (or its take-back). Negative amounts are red.
+function xpToast(amount, bonus = 0) {
     const region = document.getElementById('toast-region');
-    if (!region) return;
-    const positive = amount >= 0;
+    if (!region || (!amount && !bonus)) return;
+    const positive = (amount || bonus) >= 0 && amount >= 0;
+    const lines = [];
+    if (amount) lines.push(h('span', { class: positive ? 'xp-gain' : '' }, positive ? t('xpGained', { n: amount }) : t('xpLost', { n: amount })));
+    if (bonus) lines.push(h('span', { class: 'toast-sub' }, t(bonus > 0 ? 'goalBonusEarned' : 'goalBonusLost', { n: bonus })));
     const el = h('div', { class: `toast ${positive ? 'is-xp' : 'is-error'}` },
         icon(positive ? 'sparkles' : 'undo'),
-        h('div', { class: 'toast-text' },
-            h('span', { class: positive ? 'xp-gain' : '' }, positive ? t('xpGained', { n: amount }) : t('xpLost', { n: amount })))
+        h('div', { class: 'toast-text' }, ...lines)
     );
     region.append(el);
-    setTimeout(() => { el.classList.add('is-leaving'); setTimeout(() => el.remove(), 300); }, onPhone() ? TOAST_MS_PHONE : 2600);
+    setTimeout(() => { el.classList.add('is-leaving'); setTimeout(() => el.remove(), 300); }, bonus ? 4200 : onPhone() ? TOAST_MS_PHONE : 2600);
 }
 
 /* ---- banners (offline / waking) ---- */
@@ -143,4 +141,4 @@ function showError(error, fallbackKey = 'genericError') {
     else toast((error && error.message) || t(fallbackKey), { type: 'error' });
 }
 
-export { toast, xpToast, goalBonusToast, trophyToast, showBanner, hideBanner, openDialog, closeDialog, initDialogs, confirmDialog, emptyState, skeletonList, showError, replaceChildren };
+export { toast, xpToast, trophyToast, showBanner, hideBanner, openDialog, closeDialog, initDialogs, confirmDialog, emptyState, skeletonList, showError, replaceChildren };

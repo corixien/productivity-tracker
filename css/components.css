@@ -291,3 +291,4 @@ input[aria-invalid="true"] { border-color: var(--danger); }
 .strip-items { display: flex; gap: 8px; flex-wrap: wrap; }
 .strip-items .chip { cursor: pointer; min-height: 34px; transition: border-color 0.2s, color 0.2s; }
 .strip-items .chip:hover { border-color: var(--accent); color: var(--text); }
+.toast .toast-sub { display: block; font-size: 0.85rem; opacity: 0.85; }

@@ -199,6 +199,7 @@ const api = {
     uncompleteTask: (id) => apiRequest(`/tasks/${id}`, { method: 'PUT', body: { completed: false } }),
 
     getStats: () => apiRequest('/xp/stats'),
+    getFirstPlace: () => apiRequest('/xp/first-place'),
     getXp: (limit, offset) => apiRequest(`/xp?limit=${limit}&offset=${offset}`),
     getLeaderboard: (period) => apiRequest(`/leaderboard?period=${period}`),
     addFriend: (friendUsername) => apiRequest('/users/friends', { method: 'POST', body: { friendUsername } }),
@@ -222,8 +223,8 @@ const api = {
     adminLogs: (params) => apiRequest(`/admin/logs?${new URLSearchParams(params)}`),
     adminAnalytics: () => apiRequest('/admin/analytics'),
 
-    rateTask(description, goals, signal) {
-        return apiRequest('/groq', { method: 'POST', body: { description, goals }, signal });
+    rateTask(description, goals, language, signal) {
+        return apiRequest('/groq', { method: 'POST', body: { description, goals, language }, signal });
     }
 };
 

@@ -3,7 +3,7 @@ const { logActivity } = require('../services/loggingService');
 const { calculateXpFromTask } = require('../services/rankService');
 const { recalculateMultiplier } = require('../models/User');
 const { warnOnError } = require('../utils/errors');
-const { reconcileDailyGoal, EARNED_SOURCES } = require('../services/bonusService');
+const { reconcileDailyGoal } = require('../services/bonusService');
 
 const defaultDb = { query };
 
@@ -335,15 +335,15 @@ async function getStats(userId, tz) {
         ),
         query(
             `SELECT ((NOW() AT TIME ZONE $2)::date)::text AS today,
-                    (SELECT COALESCE(SUM(xp_amount), 0)::int FROM xp_history
-                     WHERE user_id = $1 AND source = ANY($3) AND created_at >= date_trunc('day', NOW() AT TIME ZONE $2) AT TIME ZONE $2) AS today_xp,
+                    (SELECT COALESCE(SUM(xp_amount), 0)::int FROM v_task_xp
+                     WHERE user_id = $1 AND completed_at >= date_trunc('day', NOW() AT TIME ZONE $2) AT TIME ZONE $2) AS today_xp,
                     (SELECT COUNT(*)::int FROM tasks
                      WHERE user_id = $1 AND completed = true AND completed_at >= date_trunc('day', NOW() AT TIME ZONE $2) AT TIME ZONE $2) AS today_tasks,
-                    (SELECT COALESCE(SUM(xp_amount), 0)::int FROM xp_history
-                     WHERE user_id = $1 AND source = ANY($3) AND created_at >= date_trunc('week', NOW() AT TIME ZONE $2) AT TIME ZONE $2) AS week_xp,
+                    (SELECT COALESCE(SUM(xp_amount), 0)::int FROM v_task_xp
+                     WHERE user_id = $1 AND completed_at >= date_trunc('week', NOW() AT TIME ZONE $2) AT TIME ZONE $2) AS week_xp,
                     (SELECT COUNT(*)::int FROM tasks
                      WHERE user_id = $1 AND completed = true AND completed_at >= date_trunc('week', NOW() AT TIME ZONE $2) AT TIME ZONE $2) AS week_tasks`,
-            [userId, tz, EARNED_SOURCES]
+            [userId, tz]
         ),
         query('SELECT daily_goal_xp FROM users WHERE id = $1', [userId]),
         query(
@@ -351,14 +351,14 @@ async function getStats(userId, tz) {
                  SELECT (date_trunc('day', NOW() AT TIME ZONE $2)::date - g) AS d FROM generate_series(0, $3::int - 1) g
              )
              SELECT d::text AS date,
-                    COALESCE((SELECT SUM(h.xp_amount) FROM xp_history h
-                              WHERE h.user_id = $1 AND h.source = ANY($4) AND h.created_at > NOW() - INTERVAL '60 days'
-                                AND (h.created_at AT TIME ZONE $2)::date = days.d), 0)::int AS xp,
+                    COALESCE((SELECT SUM(h.xp_amount) FROM v_task_xp h
+                              WHERE h.user_id = $1 AND h.completed_at > NOW() - INTERVAL '60 days'
+                                AND (h.completed_at AT TIME ZONE $2)::date = days.d), 0)::int AS xp,
                     (SELECT COUNT(*) FROM tasks t
                      WHERE t.user_id = $1 AND t.completed = true AND t.completed_at > NOW() - INTERVAL '60 days'
                        AND (t.completed_at AT TIME ZONE $2)::date = days.d)::int AS tasks
              FROM days ORDER BY d ASC`,
-            [userId, tz, CALENDAR_DAYS, EARNED_SOURCES]
+            [userId, tz, CALENDAR_DAYS]
         )
     ]);
     const window = windowResult.rows[0];

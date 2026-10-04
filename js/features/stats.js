@@ -29,4 +29,4 @@ function statTiles(stats) {
     ];
 }
 
-export { statTiles, tasksText };
+export { statTiles, tasksText, tile };

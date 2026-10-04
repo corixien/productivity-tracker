@@ -2,9 +2,9 @@ import { api } from '../core/api.js';
 import { state, on } from '../core/state.js';
 import { h, icon, $, swapIn, formatNumber, timeLabel, setBusy } from '../core/dom.js';
 import { t, onLanguageChange } from '../core/i18n.js';
-import { getRankInfo, getNextRank, getProgress, getLevel, badgeUrl, rankKey } from '../core/ranks.js';
+import { getRankInfo, getNextRank, getProgress, getLevel, badgeUrl, rankKey, goalBonus } from '../core/ranks.js';
 import { refreshCore, loadTemplates, loadTasks } from '../core/data.js';
-import { toast, xpToast, goalBonusToast, confirmDialog, emptyState, skeletonList, showError } from '../core/ui.js';
+import { toast, xpToast, confirmDialog, emptyState, skeletonList, showError } from '../core/ui.js';
 import { statTiles } from './stats.js';
 import { openTaskDialog } from './task-dialog.js';
 import { categoryLabel, announceProgress, findTemplate } from './shared.js';
@@ -75,7 +75,7 @@ function renderGoal() {
     ring.querySelector('.ring-fill').style.setProperty('--p', fraction);
     ring.style.setProperty('--p', fraction);   // the mobile outline reads it from the ring itself
     $('#goal-xp').textContent = formatNumber(earned);
-    $('#goal-label').textContent = done ? t('goalDone') : t('goalLabel', { n: formatNumber(goal) });
+    $('#goal-label').textContent = done ? t('goalDone', { n: goalBonus(goal) }) : t('goalLabel', { n: formatNumber(goal) });
     ring.setAttribute('role', 'img');
     ring.setAttribute('aria-label', `${t('dailyGoal')}: ${formatNumber(earned)} / ${formatNumber(goal)} ${t('xpUnit')}`);
 }
@@ -203,8 +203,7 @@ async function completeTask(task, button) {
             return;
         }
         const after = await refreshCore();
-        announceProgress(before, after, result.xpEarned);
-        goalBonusToast(result.goalBonus);
+        announceProgress(before, after, result.xpEarned, result.goalBonus);
         if (freezesBefore !== null && state.stats.streak.freezes > freezesBefore) toast(t('iceEarned'), { type: 'xp' });
     } catch (error) {
         showError(error);
@@ -218,8 +217,7 @@ async function undoTask(task, button) {
         const result = await api.uncompleteTask(task.id);
         await refreshCore();
         toast(t('taskUncompleted'), { type: 'success' });
-        if (result.xpEarned) xpToast(result.xpEarned);
-        goalBonusToast(result.goalBonus);
+        xpToast(result.xpEarned, result.goalBonus);
     } catch (error) {
         showError(error);
         setBusy(button, false);
@@ -238,8 +236,7 @@ async function deleteTask(task) {
         const result = await api.deleteTask(task.id);
         await refreshCore();
         toast(t('taskDeleted'), { type: 'success' });
-        if (result.xpChange) xpToast(result.xpChange);
-        goalBonusToast(result.goalBonus);
+        xpToast(result.xpChange, result.goalBonus);
     } catch (error) {
         showError(error);
     }
