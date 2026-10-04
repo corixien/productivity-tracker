@@ -16,7 +16,8 @@ const SOURCES = {
     task_delete: { icon: 'trash', key: 'historyDelete' },
     task_edit: { icon: 'edit', key: 'historyEdit' },
     daily_goal: { icon: 'target', key: 'historyGoalBonus' },
-    weekly_trophy: { icon: 'trophy', key: 'historyTrophy' }
+    weekly_trophy: { icon: 'trophy', key: 'historyTrophy' },
+    rank_up: { icon: 'star', key: 'historyRankUp' }
 };
 
 // A negative daily_goal row is the bonus being taken back.

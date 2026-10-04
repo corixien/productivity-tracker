@@ -16,12 +16,13 @@ const CATEGORY_KEYS = {
 const categoryLabel = (category) => t(CATEGORY_KEYS[category] || 'catOther');
 
 // After an XP change: show the delta and celebrate rank-ups / level-ups.
-function announceProgress(before, after, delta, bonus = 0) {
+function announceProgress(before, after, delta, bonus = 0, rankBonus = 0) {
     xpToast(delta, bonus);
     if (!before || !after) return;
     const order = rankNames();
     if (order.indexOf(after.rank) > order.indexOf(before.rank)) {
-        toast(t('rankUp', { rank: t(rankKey(after.rank)) }), { type: 'xp' });
+        const rank = t(rankKey(after.rank));
+        toast(rankBonus ? t('rankUpBonus', { rank, n: rankBonus }) : t('rankUp', { rank }), { type: 'xp' });
     } else if ((after.level || 0) > (before.level || 0)) {
         toast(t('levelUp', { n: after.level }), { type: 'xp' });
     }

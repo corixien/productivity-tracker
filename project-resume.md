@@ -16,7 +16,7 @@ Productivity Tracker: web app where friends compete on productivity. Users log t
 ## 3. How to navigate
 - `backend/` routes -> middleware -> controllers -> models -> `utils/database`; `services/` (rankService, groqService, loggingService, adminService...).
 - `js/` : `app.js`, `core/` (api, state, i18n, dom, ui, glass, segmented), `features/` (one module per view, `admin/`).
-- `css/` : fonts, tokens, base, components, layout, views. `sw.js` service worker. `database/migrations/` (next = 019).
+- `css/` : fonts, tokens, base, components, layout, views. `sw.js` service worker. `database/migrations/` (next = 020).
 - Lookup: XP/ranks `backend/services/rankService.js`; XP writes `models/Task.js` (`syncUserTotals`); AI `backend/services/groqService.js`; streak/activity UI `js/features/streak.js`; admin charts `js/features/admin/analytics.js` + `js/features/charts.js`; account dialog `js/features/settings.js` + `index.html`; toasts/dialogs `js/core/ui.js` + `css/components.css`; strings `js/core/i18n.js` (EN and DE both).
 
 ## 4. Commands
@@ -36,6 +36,7 @@ Run from `/home/mateo/productivity-tracker`. `npm run check`, `npm test` (integr
 - Goal of the current task: none open. Last session delivered the batch below.
 
 ### Done
+- [x] 2026-10-04 AI fills the offline/with friends bonus, rank-up bonus (1% of threshold, max 100, once per rank, migration 019), weekly trophy now 50 XP and never counts as next week's XP
 - [x] 2026-10-04 AI task name follows the UI language, Enter sends in the AI box (Shift+Enter = new line), daily goal bonus reworked (v_task_xp, combined toast, ring shows bonus, Activity row), first place streaks on Activity. Real-browser test harness idea: headless Firefox + WebDriver BiDi (see session notes, not committed)
 - [ ] Delete all accounts except corixien on production: blocked for the agent, user runs `node ~/bin/pt-delete-other-accounts.js --yes` (dry run without the flag)
 - [x] 2026-10-04 final audit: fixed concurrent completions deleting tasks (per-user lock + migration 017), short tasks round down below 30 min (shortMinutes 30), property tests for XP formula and multiplier, race test

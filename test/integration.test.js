@@ -447,10 +447,10 @@ test('API integration', { skip }, async (t) => {
         }
         resetSettledCache();
         const winnerStats = (await call('GET', '/api/xp/stats', { token: players.first.token })).json;
-        assert.deepEqual(winnerStats.trophy && winnerStats.trophy.xp, 75);
+        assert.deepEqual(winnerStats.trophy && winnerStats.trophy.xp, 50);
         assert.equal(winnerStats.trophy.weekStart, weekStart);
         assert.equal((await call('GET', '/api/xp/stats', { token: players.second.token })).json.trophy, null);
-        assert.equal((await call('GET', '/api/auth/me', { token: players.first.token })).json.xp, 80 + 75);
+        assert.equal((await call('GET', '/api/auth/me', { token: players.first.token })).json.xp, 80 + 50);
         for (const key of ['second', 'third']) {
             assert.equal((await call('GET', '/api/auth/me', { token: players[key].token })).json.xp, players[key].weekXp);
         }
@@ -460,7 +460,7 @@ test('API integration', { skip }, async (t) => {
         const rows = await query("SELECT COUNT(*)::int AS n FROM xp_history WHERE source = 'weekly_trophy' AND user_id = ANY($1)", [Object.values(players).map((p) => p.id)]);
         assert.equal(rows.rows[0].n, 1, 'settled once');
         const settled = (await query('SELECT user_id, xp_amount, week_xp FROM weekly_trophies WHERE week_start = $1', [weekStart])).rows[0];
-        assert.deepEqual([settled.user_id, settled.xp_amount, settled.week_xp], [players.first.id, 75, 80]);
+        assert.deepEqual([settled.user_id, settled.xp_amount, settled.week_xp], [players.first.id, 50, 80]);
 
         await call('POST', `/api/users/friends`, { token: players.first.token, body: { friendUsername: `trophy_second_${suffix}` } });
         const board = (await call('GET', '/api/leaderboard?period=week', { token: players.first.token })).json;
@@ -567,5 +567,69 @@ test('API integration', { skip }, async (t) => {
         assert.equal(other.weekly.current, 0, 'friends are directional: B has no friends, so no race');
         assert.equal((await call('GET', '/api/xp/first-place')).status, 401);
         await query("DELETE FROM users WHERE username LIKE 'fp\\_%'");
+    });
+    await t.test('rank-up bonus is 1% of the rank threshold, paid once per rank', async () => {
+        const { query } = require('../backend/utils/database');
+        const name = `rankup_${suffix}`;
+        const token = (await call('POST', '/api/auth/register', { body: { username: name, password: 'secret123' } })).json.token;
+        const userId = (await query('SELECT id FROM users WHERE username = $1', [name])).rows[0].id;
+        await backdatedTask(query, userId, 350, "NOW() - INTERVAL '3 days'");
+        await query('UPDATE users SET xp = 350 WHERE id = $1', [userId]);
+        const paid = async () => (await query("SELECT COALESCE(SUM(xp_amount), 0)::int AS sum, COUNT(*)::int AS rows FROM xp_history WHERE user_id = $1 AND source = 'rank_up'", [userId])).rows[0];
+        const task = await call('POST', '/api/tasks', { token, body: { name: 'cross', duration: 60, productivity: 5, difficulty: 5, category: 'other' } }); // 37 XP: 350 -> 387
+        const done = await call('POST', `/api/tasks/${task.json.id}/complete`, { token });
+        assert.equal(done.json.rankBonus, 4, '1% of 360 = 3.6, rounded');
+        const me = (await call('GET', '/api/auth/me', { token })).json;
+        assert.equal(me.rank, 'Bronze');
+        assert.equal(me.xp, 350 + 37 + 4, 'task XP + rank bonus (37 XP today is below the daily goal)');
+        assert.deepEqual(await paid(), { sum: 4, rows: 1 });
+        // drop below Bronze and climb again: no second payment
+        await call('PUT', `/api/tasks/${task.json.id}`, { token, body: { completed: false } });
+        const again = await call('POST', `/api/tasks/${task.json.id}/complete`, { token });
+        assert.equal(again.json.rankBonus, 0);
+        assert.deepEqual(await paid(), { sum: 4, rows: 1 });
+        const history = (await call('GET', '/api/xp?limit=10', { token })).json.history;
+        assert.ok(history.some((row) => row.source === 'rank_up' && row.xp_amount === 4), 'listed in the XP activity');
+        assert.equal((await query('SELECT COUNT(*)::int AS n FROM v_user_integrity WHERE username = $1', [name])).rows[0].n, 0);
+        const rank = require('../backend/services/rankService');
+        assert.equal(rank.calculateRankBonus('Master'), 100);
+    });
+
+    await t.test('AI rating fills the offline / with friends bonus and names the task in the chosen language', async () => {
+        const http = require('node:http');
+        const seen = [];
+        let reply = { name: 'Jogging', duration: 30, productivity: 4, difficulty: 3, category: 'exercise', bonus: true };
+        const fake = http.createServer((req, res) => {
+            let body = '';
+            req.on('data', (chunk) => { body += chunk; });
+            req.on('end', () => {
+                seen.push(JSON.parse(body));
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ choices: [{ message: { content: JSON.stringify(reply) } }] }));
+            });
+        });
+        await new Promise((resolve) => fake.listen(0, '127.0.0.1', resolve));
+        const previous = { key: process.env.GROQ_API_KEY, url: process.env.GROQ_BASE_URL };
+        process.env.GROQ_API_KEY = 'test-key';
+        process.env.GROQ_BASE_URL = `http://127.0.0.1:${fake.address().port}`;
+        try {
+            const token = (await call('POST', '/api/auth/register', { body: { username: `ai_${suffix}`, password: 'secret123' } })).json.token;
+            const withFriends = await call('POST', '/api/groq', { token, body: { description: 'jogging with a friend', language: 'de' } });
+            assert.equal(withFriends.status, 200);
+            assert.equal(withFriends.json.bonus, 3);
+            assert.equal(withFriends.json.xp, 13, 'bonus is part of the XP: 12 base + 1.2 (3 capped at 10%) = 13');
+            assert.match(seen[0].messages[0].content, /German/);
+            assert.match(seen[0].messages[0].content, /"bonus":true or false/);
+            reply = { name: 'Coding', duration: 60, productivity: 5, difficulty: 4, category: 'deep-work', bonus: false };
+            const alone = await call('POST', '/api/groq', { token, body: { description: 'coding', language: 'en' } });
+            assert.equal(alone.json.bonus, 0);
+            assert.match(seen[1].messages[0].content, /English/);
+            reply = { name: 'x', duration: 10, productivity: 3, difficulty: 3, category: 'other', bonus: 'yes please' };
+            assert.equal((await call('POST', '/api/groq', { token, body: { description: 'odd answer' } })).json.bonus, 0, 'only a real true counts');
+        } finally {
+            if (previous.key === undefined) delete process.env.GROQ_API_KEY; else process.env.GROQ_API_KEY = previous.key;
+            if (previous.url === undefined) delete process.env.GROQ_BASE_URL; else process.env.GROQ_BASE_URL = previous.url;
+            await new Promise((resolve) => fake.close(resolve));
+        }
     });
 });

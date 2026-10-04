@@ -203,7 +203,7 @@ async function completeTask(task, button) {
             return;
         }
         const after = await refreshCore();
-        announceProgress(before, after, result.xpEarned, result.goalBonus);
+        announceProgress(before, after, result.xpEarned, result.goalBonus, result.rankBonus);
         if (freezesBefore !== null && state.stats.streak.freezes > freezesBefore) toast(t('iceEarned'), { type: 'xp' });
     } catch (error) {
         showError(error);

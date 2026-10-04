@@ -64,7 +64,7 @@ function calculateXp(duration, productivity, difficulty, bonus = 0) {
 }
 
 const FALLBACK_GOAL_BONUS = { rate: 0.1, min: 1, max: 100 };
-const FALLBACK_TROPHY = { xp: 75 };
+const FALLBACK_TROPHY = { xp: 50 };
 const trophyXp = () => ((state.meta && state.meta.weeklyTrophy) || FALLBACK_TROPHY).xp;
 
 // Same as the server (rankService.calculateGoalBonus): the XP a reached daily goal pays.

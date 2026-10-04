@@ -2,7 +2,7 @@ const { getGroqConfig } = require('../config');
 const { query } = require('../utils/database');
 const { logGroqRequest, logGroqResponse, logError } = require('../services/loggingService');
 const { logger } = require('../utils/logger');
-const { calculateXpFromTask } = require('./rankService');
+const { calculateXpFromTask, TASK_BONUS } = require('./rankService');
 const { warnOnError } = require('../utils/errors');
 
 const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
@@ -67,7 +67,7 @@ async function rateTask(description, goals, userId, username, language = 'en') {
         messages: [
             { role: 'system', content: `Return ONLY this JSON (no other text, no markdown):
 
-{"name":"short name","duration":minutes,"productivity":0-5,"difficulty":1-5,"category":"learning,exercise,creative,admin,social,deep-work,or other"}
+{"name":"short name","duration":minutes,"productivity":0-5,"difficulty":1-5,"category":"learning,exercise,creative,admin,social,deep-work,or other","bonus":true or false}
 
 Rules:
 - name: write it in ${languageName}, whatever language the description is in (translate it if needed)
@@ -75,15 +75,16 @@ Rules:
 - difficulty 1-5: effort level
 - duration: minutes
 - category: pick the best one
+- bonus: true when the activity was done offline (away from phone, computer and other screens) or together with friends or other people; false for anything done on a screen or alone at a screen
 
 Examples:
-"I played the piano" -> {"name":"Played piano","duration":30,"productivity":4,"difficulty":3,"category":"creative"}
-"watched YouTube 1 hour" -> {"name":"Watched YouTube","duration":60,"productivity":0,"difficulty":1,"category":"other"}
-"coding 1 hour" -> {"name":"Coding","duration":60,"productivity":5,"difficulty":4,"category":"deep-work"}
-"basketball with friends" -> {"name":"Basketball","duration":60,"productivity":4,"difficulty":3,"category":"exercise"}
-"homework 1 hour" -> {"name":"Homework","duration":60,"productivity":4,"difficulty":2,"category":"learning"}
-"jogging 30 min" -> {"name":"Jogging","duration":30,"productivity":4,"difficulty":3,"category":"exercise"}
-"cleaned my room" -> {"name":"Cleaned room","duration":20,"productivity":2,"difficulty":2,"category":"admin"}
+"I played the piano" -> {"name":"Played piano","duration":30,"productivity":4,"difficulty":3,"category":"creative","bonus":true}
+"watched YouTube 1 hour" -> {"name":"Watched YouTube","duration":60,"productivity":0,"difficulty":1,"category":"other","bonus":false}
+"coding 1 hour" -> {"name":"Coding","duration":60,"productivity":5,"difficulty":4,"category":"deep-work","bonus":false}
+"basketball with friends" -> {"name":"Basketball","duration":60,"productivity":4,"difficulty":3,"category":"exercise","bonus":true}
+"homework 1 hour" -> {"name":"Homework","duration":60,"productivity":4,"difficulty":2,"category":"learning","bonus":false}
+"jogging 30 min" -> {"name":"Jogging","duration":30,"productivity":4,"difficulty":3,"category":"exercise","bonus":true}
+"cleaned my room" -> {"name":"Cleaned room","duration":20,"productivity":2,"difficulty":2,"category":"admin","bonus":true}
 
 Return ONLY the JSON.` },
             { role: 'user', content: userMessage }
@@ -197,7 +198,8 @@ Return ONLY the JSON.` },
     const productivity = taskData.productivity !== undefined ? Math.max(0, Math.min(5, parseInt(taskData.productivity))) : 3;
     const difficulty = taskData.difficulty !== undefined ? Math.max(1, Math.min(5, parseInt(taskData.difficulty))) : 3;
     const duration = Math.max(1, Math.min(1440, parseInt(taskData.duration) || 30));
-    const bonus = 0;
+    // The offline / with friends bonus: the model answers true or false, the server decides the amount.
+    const bonus = taskData.bonus === true || String(taskData.bonus).toLowerCase() === 'true' ? TASK_BONUS : 0;
 
     const xp = calculateXp(productivity, difficulty, duration, bonus);
 

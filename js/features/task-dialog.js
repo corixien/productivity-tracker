@@ -9,7 +9,7 @@ import { toast, openDialog, closeDialog, showError } from '../core/ui.js';
 import { CATEGORY_KEYS, categoryLabel, announceProgress, warnNonCritical, findTemplate } from './shared.js';
 
 const AI_TIMEOUT_MS = 25000;
-const BONUS_VALUE = 3;
+const BONUS_VALUE = 3; // same as rankService.TASK_BONUS
 
 let mode = 'create';
 let editing = null;
@@ -135,7 +135,7 @@ async function rateWithAi() {
             category: rating.category,
             productivity: rating.productivity,
             difficulty: rating.difficulty,
-            bonus: 0
+            bonus: rating.bonus || 0
         });
         enterForm();
     } catch (error) {
@@ -178,17 +178,19 @@ async function submit(event) {
             closeDialog(el.dialog);
             const after = await refreshCore();
             toast(t('taskUpdated'), { type: 'success' });
-            announceProgress(before, after, result.xpChange, result.goalBonus);
+            announceProgress(before, after, result.xpChange, result.goalBonus, result.rankBonus);
             return;
         }
 
         const created = await api.createTask(values);
         let xpEarned = 0;
         let goalBonus = 0;
+        let rankBonus = 0;
         if ($('#task-done').checked) {
             const completion = await api.completeTask(created.id);
             xpEarned = completion.xpEarned || 0;
             goalBonus = completion.goalBonus || 0;
+            rankBonus = completion.rankBonus || 0;
         }
         if ($('#task-save-template').checked && !findTemplate(values)) {
             await api.createTemplate(values);
@@ -197,7 +199,7 @@ async function submit(event) {
         closeDialog(el.dialog);
         const after = await refreshCore();
         toast(t('taskCreated'), { type: 'success' });
-        announceProgress(before, after, xpEarned, goalBonus);
+        announceProgress(before, after, xpEarned, goalBonus, rankBonus);
     } catch (error) {
         setError(error.network ? t('networkError') : error.message);
         showError(error);

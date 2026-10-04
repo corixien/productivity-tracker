@@ -283,3 +283,10 @@ test('first place streaks: all-time by day, weekly by week, current and record',
     // alone, or nobody active: nothing
     assert.deepEqual(computeFirstPlace({ selfId: 'me', names: new Map([['me', 'me']]), daily: [{ id: 'me', period: '2026-10-01', xp: 5 }], weekly: [], today: '2026-10-01', thisWeek: '2026-09-28' }).allTime.current, 0);
 });
+
+test('rank-up bonus is 1% of the rank threshold, at most 100', () => {
+    const bonuses = Object.fromEntries(rank.RANK_THRESHOLDS.map((entry) => [entry.name, rank.calculateRankBonus(entry.name)]));
+    assert.deepEqual(bonuses, { Newcomer: 0, Bronze: 4, Silver: 11, Gold: 22, Platinum: 43, Diamond: 86, Master: 100 });
+    assert.equal(rank.calculateRankBonus('Nonsense'), 0);
+    assert.equal(rank.WEEKLY_TROPHY.xp, 50);
+});

@@ -24,6 +24,7 @@ const updateTask = asyncHandler(async (req, res) => {
     let task = null;
     let xpChange = 0;
     let goalBonus = 0;
+    let rankBonus = 0;
     let newXP = null;
 
     if (hasEdits) {
@@ -32,6 +33,7 @@ const updateTask = asyncHandler(async (req, res) => {
         task = edited.task;
         xpChange = edited.xpChange;
         goalBonus += edited.goalBonus;
+        rankBonus += edited.rankBonus;
         newXP = edited.totalXp;
     }
 
@@ -41,6 +43,7 @@ const updateTask = asyncHandler(async (req, res) => {
         task = result.task;
         xpChange += result.xpEarned;
         goalBonus += result.goalBonus;
+        rankBonus += result.rankBonus;
         newXP = result.totalXp;
     }
 
@@ -50,19 +53,19 @@ const updateTask = asyncHandler(async (req, res) => {
     }
     if (newXP === null) newXP = await Task.getTotalXp(userId);
 
-    res.json({ ...task, success: true, xpEarned: xpChange, xpChange, goalBonus, newXP });
+    res.json({ ...task, success: true, xpEarned: xpChange, xpChange, goalBonus, rankBonus, newXP });
 });
 
 const completeTask = asyncHandler(async (req, res) => {
     const result = await Task.complete(req.user.id, req.params.id, req.tz);
     if (!result) throw notFound('Task not found');
-    res.json({ success: true, task: result.task, xpEarned: result.xpEarned, goalBonus: result.goalBonus, newXP: result.totalXp });
+    res.json({ success: true, task: result.task, xpEarned: result.xpEarned, goalBonus: result.goalBonus, rankBonus: result.rankBonus, newXP: result.totalXp });
 });
 
 const deleteTask = asyncHandler(async (req, res) => {
     const result = await Task.delete(req.user.id, req.params.id, req.tz);
     if (!result) throw notFound('Task not found');
-    res.json({ success: true, newXP: result.totalXp, xpChange: result.xpChange, goalBonus: result.goalBonus });
+    res.json({ success: true, newXP: result.totalXp, xpChange: result.xpChange, goalBonus: result.goalBonus, rankBonus: result.rankBonus });
 });
 
 module.exports = { getTasks, createTask, updateTask, completeTask, deleteTask };

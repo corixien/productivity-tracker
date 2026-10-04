@@ -1,6 +1,6 @@
 const { query, transaction } = require('../utils/database');
 const { getTrophyTimezone } = require('../config');
-const { calculateGoalBonus, WEEKLY_TROPHY } = require('./rankService');
+const { calculateGoalBonus, calculateRankBonus, RANK_THRESHOLDS, WEEKLY_TROPHY } = require('./rankService');
 const { publishToUser } = require('../utils/events');
 const { logActivity } = require('./loggingService');
 const { warnOnError } = require('../utils/errors');
@@ -33,6 +33,28 @@ async function reconcileDailyGoal(client, userId, tz = getTrophyTimezone()) {
         );
     }
     return delta;
+}
+
+// Pays the rank-up bonus for every rank the total XP has reached and that was not paid yet (once per user and rank,
+// the rank_ups primary key makes it safe against two requests at once). Returns the XP paid. Must run inside the
+// caller's transaction; the caller re-sums the ledger afterwards because the bonus itself can reach the next rank.
+async function awardRankUps(client, userId, totalXp) {
+    let paid = 0;
+    for (const rank of RANK_THRESHOLDS) {
+        if (rank.min <= 0 || rank.min > totalXp) continue;
+        const amount = calculateRankBonus(rank.name);
+        const inserted = await client.query(
+            'INSERT INTO rank_ups (user_id, rank, xp_amount) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING RETURNING rank',
+            [userId, rank.name, amount]
+        );
+        if (!inserted.rows.length || amount <= 0) continue;
+        await client.query(
+            `INSERT INTO xp_history (user_id, xp_amount, source, source_id, created_at) VALUES ($1, $2, 'rank_up', NULL, clock_timestamp())`,
+            [userId, amount]
+        );
+        paid += amount;
+    }
+    return paid;
 }
 
 // Settles every finished week (Monday-Sunday in the trophy timezone) that has no weekly_trophies row yet:
@@ -82,6 +104,7 @@ async function settleWeek(weekStart, tz) {
             [weekStart, winner ? winner.user_id : null, winner ? WEEKLY_TROPHY.xp : 0, winner ? winner.xp : 0]
         );
         if (!settled.rows.length || !winner) return null;
+        await client.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [winner.user_id]);
         await client.query(
             `INSERT INTO xp_history (user_id, xp_amount, source, source_id, created_at) VALUES ($1, $2, 'weekly_trophy', NULL, NOW())`,
             [winner.user_id, WEEKLY_TROPHY.xp]
@@ -114,4 +137,4 @@ async function getRecentTrophy(userId) {
 // Tests backdate XP rows and need the next check to look again.
 const resetSettledCache = () => { settledThrough = null; };
 
-module.exports = { reconcileDailyGoal, awardWeeklyTrophies, getRecentTrophy, resetSettledCache };
+module.exports = { reconcileDailyGoal, awardRankUps, awardWeeklyTrophies, getRecentTrophy, resetSettledCache };

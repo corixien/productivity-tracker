@@ -3,7 +3,7 @@ const { logActivity } = require('../services/loggingService');
 const { calculateXpFromTask } = require('../services/rankService');
 const { recalculateMultiplier } = require('../models/User');
 const { warnOnError } = require('../utils/errors');
-const { reconcileDailyGoal } = require('../services/bonusService');
+const { reconcileDailyGoal, awardRankUps } = require('../services/bonusService');
 
 const defaultDb = { query };
 
@@ -84,12 +84,20 @@ async function getAwardedXp(client, userId, taskId) {
 }
 
 // Re-sums xp_history and writes users.xp (rank and level are derived by a trigger). Must run inside the caller's transaction.
-async function syncUserTotals(client, userId) {
-    const totalResult = await client.query(
+// Pays the rank-up bonus for newly reached ranks first (the bonus can reach the next rank, hence the loop); the XP
+// paid that way is added to out.rankBonus.
+async function syncUserTotals(client, userId, out = {}) {
+    const sum = async () => parseInt((await client.query(
         'SELECT COALESCE(SUM(xp_amount), 0) AS total FROM xp_history WHERE user_id = $1',
         [userId]
-    );
-    const totalXp = parseInt(totalResult.rows[0].total, 10);
+    )).rows[0].total, 10);
+    let totalXp = await sum();
+    for (let round = 0; round < 8; round += 1) {
+        const paid = await awardRankUps(client, userId, totalXp);
+        if (!paid) break;
+        out.rankBonus = (out.rankBonus || 0) + paid;
+        totalXp = await sum();
+    }
     // rank and level follow xp inside the database (users_sync_progress trigger)
     await client.query('UPDATE users SET xp = $1, updated_at = NOW() WHERE id = $2', [totalXp, userId]);
     return totalXp;
@@ -140,6 +148,7 @@ async function update(userId, id, updates, tz) {
 
         let xpChange = 0;
         let goalBonus = 0;
+        const bonuses = {};
         let totalXp = null;
         if (task.completed && newXp !== task.xp_awarded) {
             const awarded = await getAwardedXp(client, userId, id);
@@ -148,11 +157,11 @@ async function update(userId, id, updates, tz) {
             if (xpChange !== 0) {
                 await insertXpHistory(client, userId, xpChange, 'task_edit', id);
                 goalBonus = await reconcileDailyGoal(client, userId, tz);
-                totalXp = await syncUserTotals(client, userId);
+                totalXp = await syncUserTotals(client, userId, bonuses);
                 await recalculateMultiplier(userId, true, client);
             }
         }
-        return { task: normalizeTask(updated.rows[0]), xpChange, goalBonus, totalXp };
+        return { task: normalizeTask(updated.rows[0]), xpChange, goalBonus, rankBonus: bonuses.rankBonus || 0, totalXp };
     });
     if (outcome) {
         const delta = outcome.xpChange !== 0 ? ` (${outcome.xpChange > 0 ? '+' : ''}${outcome.xpChange} XP)` : '';
@@ -175,7 +184,7 @@ async function setCompleted(userId, taskId, completed, tz) {
         const task = taskResult.rows[0];
         if (Boolean(task.completed) === Boolean(completed)) {
             const totalResult = await client.query('SELECT COALESCE(SUM(xp_amount), 0) AS total FROM xp_history WHERE user_id = $1', [userId]);
-            return { task: normalizeTask(task), totalXp: parseInt(totalResult.rows[0].total, 10), xpEarned: 0, goalBonus: 0 };
+            return { task: normalizeTask(task), totalXp: parseInt(totalResult.rows[0].total, 10), xpEarned: 0, goalBonus: 0, rankBonus: 0 };
         }
 
         let xpChange = 0;
@@ -202,10 +211,11 @@ async function setCompleted(userId, taskId, completed, tz) {
         }
 
         const goalBonus = await reconcileDailyGoal(client, userId, tz);
-        const totalXp = await syncUserTotals(client, userId);
+        const bonuses = {};
+        const totalXp = await syncUserTotals(client, userId, bonuses);
         await recalculateMultiplier(userId, true, client);
         const updatedResult = await client.query('SELECT * FROM tasks WHERE id = $1', [taskId]);
-        return { task: normalizeTask(updatedResult.rows[0]), totalXp, xpEarned: xpChange, goalBonus, changed: true };
+        return { task: normalizeTask(updatedResult.rows[0]), totalXp, xpEarned: xpChange, goalBonus, rankBonus: bonuses.rankBonus || 0, changed: true };
     });
     if (outcome && outcome.changed) {
         const sign = outcome.xpEarned > 0 ? '+' : '';
@@ -240,9 +250,10 @@ async function deleteTask(userId, taskId, tz) {
         }
         await client.query('DELETE FROM tasks WHERE id = $1', [taskId]);
         const goalBonus = xpChange !== 0 ? await reconcileDailyGoal(client, userId, tz) : 0;
-        const totalXp = await syncUserTotals(client, userId);
+        const bonuses = {};
+        const totalXp = await syncUserTotals(client, userId, bonuses);
         await recalculateMultiplier(userId, true, client);
-        return { deleted: true, totalXp, xpChange, goalBonus, name: task.name };
+        return { deleted: true, totalXp, xpChange, goalBonus, rankBonus: bonuses.rankBonus || 0, name: task.name };
     });
     if (outcome) {
         const delta = outcome.xpChange !== 0 ? ` (${outcome.xpChange} XP)` : '';
