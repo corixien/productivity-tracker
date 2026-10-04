@@ -118,6 +118,15 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
 }
 input[aria-invalid="true"] { border-color: var(--danger); }
+/* Saved logins: browsers paint autofilled fields yellow (Firefox adds a sepia filter). Keep the app's own surface and text. */
+input:autofill, input:-webkit-autofill, input:-moz-autofill {
+    filter: none !important;
+    -webkit-text-fill-color: var(--text);
+    caret-color: var(--text);
+    background-color: var(--surface-solid) !important;
+    box-shadow: inset 0 0 0 100px var(--surface-solid), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+    transition: background-color 9999s ease-out;
+}
 .select-sm { min-height: 38px; padding: 6px 34px 6px 12px; width: auto; font-size: 0.9rem; }
 
 .input-group { position: relative; }
