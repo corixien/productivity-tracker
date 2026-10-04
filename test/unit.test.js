@@ -185,3 +185,71 @@ test('daily goal bonus scales with the goal and stays within its bounds', () => 
     }
     assert.equal(rank.getMeta().weeklyTrophy.xp, rank.WEEKLY_TROPHY.xp);
 });
+
+test('task XP never decreases with duration, productivity or difficulty', () => {
+    for (let p = 0; p <= 5; p += 1) {
+        for (let d = 1; d <= 5; d += 1) {
+            let previous = -1;
+            for (let minutes = 1; minutes <= 1440; minutes += 1) {
+                const xp = rank.calculateXpFromTask(minutes, p, d, 0);
+                assert.ok(xp >= previous, `duration p${p} d${d} ${minutes}min`);
+                previous = xp;
+            }
+        }
+    }
+    for (const minutes of [5, 10, 29, 30, 60, 240]) {
+        for (let d = 1; d <= 5; d += 1) {
+            for (let p = 1; p <= 5; p += 1) {
+                assert.ok(rank.calculateXpFromTask(minutes, p, d) >= rank.calculateXpFromTask(minutes, p - 1, d));
+                if (d > 1) assert.ok(rank.calculateXpFromTask(minutes, p, d) >= rank.calculateXpFromTask(minutes, p, d - 1));
+            }
+        }
+    }
+});
+
+test('splitting work into several tasks gains at most the rounding error', () => {
+    let worst = 0;
+    for (let p = 1; p <= 5; p += 1) {
+        for (let d = 1; d <= 5; d += 1) {
+            for (const total of [30, 60, 90, 120]) {
+                for (const part of [10, 15, 20, 30, 40, 45, 60]) {
+                    if (part >= total || total % part) continue;
+                    const split = (total / part) * rank.calculateXpFromTask(part, p, d);
+                    worst = Math.max(worst, split / rank.calculateXpFromTask(total, p, d));
+                }
+            }
+        }
+    }
+    assert.ok(worst <= 1.08, `split gain ${worst}`);
+    // tasks under 30 minutes round down, so a 10-minute p3d3 task (3.5 XP) pays 3
+    assert.equal(rank.calculateXpFromTask(10, 3, 3), 3);
+    assert.equal(rank.calculateXpFromTask(10, 1, 1), 2);
+    assert.equal(rank.calculateXpFromTask(30, 3, 3), 11);
+    // very long entries pay less per hour than focused blocks
+    assert.ok(rank.calculateXpFromTask(480, 3, 3) < 4 * rank.calculateXpFromTask(120, 3, 3));
+});
+
+test('catch-up multiplier is bounded, falls with own XP, rises with friend XP and moves gently', () => {
+    const { min, max } = rank.MULTIPLIER;
+    for (const friends of [0, 50, 500, 3000, 18000]) {
+        let previous = Infinity;
+        for (let own = 0; own <= 20000; own += 1) {
+            const value = rank.computePositionMultiplier(own, friends, 1);
+            assert.ok(value >= min && value <= max);
+            assert.ok(value <= previous + 1e-9, `own ${own}, friends ${friends}`);
+            assert.ok(previous === Infinity || previous - value <= 0.011, 'one XP moves it by at most one rounding step');
+            previous = value;
+        }
+    }
+    for (let own = 0; own <= 5000; own += 50) {
+        let previous = 0;
+        for (let friends = 0; friends <= 20000; friends += 25) {
+            const value = rank.computePositionMultiplier(own, friends, 1);
+            assert.ok(value >= previous - 1e-9);
+            previous = value;
+        }
+    }
+    assert.equal(rank.computePositionMultiplier(1234, 1234, 1), 1);
+    assert.equal(rank.computePositionMultiplier(1234, 0, 0), 1, 'no friends = no multiplier');
+    assert.equal(rank.computePositionMultiplier(1000, 3000, 2), rank.computePositionMultiplier(1000, 1500, 1), 'uses the friend average');
+});

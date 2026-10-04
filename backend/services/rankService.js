@@ -45,7 +45,7 @@ function getXpForNextRank(xp) {
 // work into tiny tasks gains nothing and very long entries have diminishing returns. The bonus is capped
 // at 10% of the base so it cannot be farmed with tiny tasks. 0 productivity = 0 XP. Tasks under 10 minutes round
 // down (no rounding gain from spamming 1-minute tasks); longer productive tasks give at least 1 XP.
-const XP_FORMULA = { baseRate: 12, fullMinutes: 120, halfUntilMinutes: 360, bonusCap: 0.1, shortMinutes: 10 };
+const XP_FORMULA = { baseRate: 12, fullMinutes: 120, halfUntilMinutes: 360, bonusCap: 0.1, shortMinutes: 30, minPayMinutes: 10 };
 
 function effectiveMinutes(duration) {
     const { fullMinutes, halfUntilMinutes } = XP_FORMULA;
@@ -54,11 +54,18 @@ function effectiveMinutes(duration) {
         + 0.25 * Math.max(duration - halfUntilMinutes, 0);
 }
 
+// Short tasks round down so that rounding cannot be farmed: a 10-minute p3d3 task is 3.5 XP, and twelve of them
+// would pay 48 instead of the 42 of one two-hour task. From shortMinutes on the rounding error is at most about 8%, and under 4% for typical tasks.
+function roundXp(total, duration) {
+    if (duration >= XP_FORMULA.shortMinutes) return Math.max(1, Math.round(total));
+    return duration >= XP_FORMULA.minPayMinutes ? Math.max(1, Math.floor(total)) : Math.floor(total);
+}
+
 function calculateXpFromTask(duration, productivity, difficulty, bonus = 0) {
     if (!productivity) return 0;
     const base = (XP_FORMULA.baseRate + productivity * difficulty) * effectiveMinutes(duration) / 60;
     const total = base + Math.min(bonus, base * XP_FORMULA.bonusCap);
-    return duration < XP_FORMULA.shortMinutes ? Math.floor(total) : Math.max(1, Math.round(total));
+    return roundXp(total, duration);
 }
 
 // Catch-up multiplier (position among you and your friends), a smooth function of the XP gap:

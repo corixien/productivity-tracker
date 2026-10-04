@@ -104,7 +104,7 @@ css/        fonts, tokens (themes), base, components, layout, views
 fonts/      Lexend Deca (variable, SIL OFL)
 js/         app.js, core/ (api, auth, state, i18n, dom, ui, ranks, theme, pwa, data, glass, live, segmented), features/ (one module per view, admin/ for the admin pages)
 backend/    index.js, routes/, controllers/, models/, services/, middleware/, utils/
-database/   migrate.js, migrations/ (001-016), migrate-data.js (one-time SQLite import)
+database/   migrate.js, migrations/ (001-017), migrate-data.js (one-time SQLite import)
 scripts/    check.js
 test/       unit, frontend static checks, integration
 Badges/     rank badge images

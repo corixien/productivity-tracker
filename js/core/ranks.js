@@ -24,7 +24,7 @@ const BADGES = {
 
 const ranks = () => (state.meta && state.meta.ranks) || FALLBACK_RANKS;
 const xpPerLevel = () => (state.meta && state.meta.xpPerLevel) || 100;
-const FALLBACK_FORMULA = { baseRate: 12, fullMinutes: 120, halfUntilMinutes: 360, bonusCap: 0.1, shortMinutes: 10 };
+const FALLBACK_FORMULA = { baseRate: 12, fullMinutes: 120, halfUntilMinutes: 360, bonusCap: 0.1, shortMinutes: 30, minPayMinutes: 10 };
 const formula = () => (state.meta && state.meta.xpFormula && state.meta.xpFormula.baseRate ? state.meta.xpFormula : FALLBACK_FORMULA);
 
 function getRankInfo(xp) {
@@ -59,7 +59,8 @@ function calculateXp(duration, productivity, difficulty, bonus = 0) {
         + 0.25 * Math.max(duration - f.halfUntilMinutes, 0);
     const base = (f.baseRate + productivity * difficulty) * effective / 60;
     const total = base + Math.min(bonus, base * f.bonusCap);
-    return duration < f.shortMinutes ? Math.floor(total) : Math.max(1, Math.round(total));
+    if (duration >= f.shortMinutes) return Math.max(1, Math.round(total));
+    return duration >= (f.minPayMinutes ?? 10) ? Math.max(1, Math.floor(total)) : Math.floor(total);
 }
 
 const FALLBACK_GOAL_BONUS = { rate: 0.1, min: 1, max: 100 };

@@ -103,6 +103,13 @@ async function insertXpHistory(client, userId, amount, source, taskId) {
     );
 }
 
+// Serializes every XP-changing transaction of one user (the user row is the lock). Without it, concurrent completions
+// read each other's uncommitted state: the task counter, the goal bonus and the multiplier then use stale data.
+// Always take this lock before any task row lock, so the lock order is the same everywhere.
+async function lockUser(client, userId) {
+    await client.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [userId]);
+}
+
 const EDITABLE_FIELDS = ['name', 'duration', 'productivity', 'difficulty', 'category', 'bonus'];
 const XP_FIELDS = ['duration', 'productivity', 'difficulty', 'bonus'];
 
@@ -110,6 +117,7 @@ const XP_FIELDS = ['duration', 'productivity', 'difficulty', 'bonus'];
 // difference is booked as a 'task_edit' xp_history row, keeping the multiplier used at completion.
 async function update(userId, id, updates, tz) {
     const outcome = await transaction(async (client) => {
+        await lockUser(client, userId);
         const found = await client.query('SELECT * FROM tasks WHERE id = $1 AND user_id = $2 FOR UPDATE', [id, userId]);
         const task = found.rows[0];
         if (!task) return null;
@@ -158,6 +166,7 @@ async function update(userId, id, updates, tz) {
 
 async function setCompleted(userId, taskId, completed, tz) {
     const outcome = await transaction(async (client) => {
+        await lockUser(client, userId);
         const taskResult = await client.query(
             'SELECT * FROM tasks WHERE id = $1 AND user_id = $2 FOR UPDATE',
             [taskId, userId]
@@ -216,6 +225,7 @@ function complete(userId, taskId, tz) {
 
 async function deleteTask(userId, taskId, tz) {
     const outcome = await transaction(async (client) => {
+        await lockUser(client, userId);
         const taskResult = await client.query(
             'SELECT * FROM tasks WHERE id = $1 AND user_id = $2 FOR UPDATE',
             [taskId, userId]

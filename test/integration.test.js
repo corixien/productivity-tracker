@@ -457,4 +457,61 @@ test('API integration', { skip }, async (t) => {
         assert.equal(board.find((entry) => entry.isSelf).weekXp, 0, 'the trophy is not weekly XP');
         await query("DELETE FROM users WHERE username LIKE 'trophy\\_%'");
     });
+    await t.test('concurrent requests never double-pay XP, the goal bonus or the weekly trophy', async () => {
+        const { query } = require('../backend/utils/database');
+        const { resetSettledCache } = require('../backend/services/bonusService');
+        const name = `race_${suffix}`;
+        const token = (await call('POST', '/api/auth/register', { body: { username: name, password: 'secret123' } })).json.token;
+        const userId = (await query('SELECT id FROM users WHERE username = $1', [name])).rows[0].id;
+        const ids = [];
+        for (let i = 0; i < 6; i += 1) {
+            ids.push((await call('POST', '/api/tasks', { token, body: { name: `race ${i}`, duration: 60, productivity: 4, difficulty: 3, category: 'other' } })).json.id);
+        }
+        // the same task completed 8 times at once pays once
+        await Promise.all(Array.from({ length: 8 }, () => call('POST', `/api/tasks/${ids[0]}/complete`, { token })));
+        assert.equal((await call('GET', '/api/auth/me', { token })).json.xp, 24);
+        // five tasks at once reach the goal (6 x 24 = 144 >= 50): one bonus row only
+        await Promise.all(ids.slice(1).map((id) => call('POST', `/api/tasks/${id}/complete`, { token })));
+        const paid = (await query("SELECT COUNT(*)::int AS rows, COALESCE(SUM(xp_amount), 0)::int AS sum FROM xp_history WHERE user_id = $1 AND source = 'daily_goal'", [userId])).rows[0];
+        assert.deepEqual(paid, { rows: 1, sum: 5 });
+        // undo and complete racing on the same tasks must leave the ledger and users.xp in agreement
+        await Promise.all(ids.flatMap((id) => [
+            call('PUT', `/api/tasks/${id}`, { token, body: { completed: false } }),
+            call('POST', `/api/tasks/${id}/complete`, { token }),
+            call('PUT', `/api/tasks/${id}`, { token, body: { duration: 90 } })
+        ]));
+        const drift = await query('SELECT COUNT(*)::int AS n FROM v_user_integrity WHERE username = $1', [name]);
+        assert.equal(drift.rows[0].n, 0);
+        const completed = (await query('SELECT COUNT(*)::int AS n FROM tasks WHERE user_id = $1 AND completed', [userId])).rows[0].n;
+        const sums = (await query(
+            `SELECT COALESCE(SUM(xp_amount) FILTER (WHERE source = 'daily_goal'), 0)::int AS bonus,
+                    COALESCE(SUM(xp_amount) FILTER (WHERE source <> 'daily_goal'), 0)::int AS tasks FROM xp_history WHERE user_id = $1`, [userId])).rows[0];
+        assert.equal(sums.bonus, sums.tasks >= 50 ? 5 : 0, 'bonus matches the final day total');
+        assert.ok(completed === 0 || sums.tasks > 0);
+
+        // many stats requests right after the week switch settle the week once
+        const weekStart = (await query("SELECT (date_trunc('week', NOW() AT TIME ZONE 'Europe/Berlin') - INTERVAL '7 days')::date::text AS w")).rows[0].w;
+        await query('DELETE FROM weekly_trophies WHERE week_start = $1', [weekStart]);
+        await query("DELETE FROM users WHERE username LIKE 'tie\\_%'");
+        const rivals = [];
+        for (const key of ['a', 'b']) {
+            const username = `tie_${key}_${suffix}`;
+            const tk = (await call('POST', '/api/auth/register', { body: { username, password: 'secret123' } })).json.token;
+            const id = (await query('SELECT id FROM users WHERE username = $1', [username])).rows[0].id;
+            await query(
+                `INSERT INTO xp_history (user_id, xp_amount, source, created_at)
+                 VALUES ($1, 90, 'task', (date_trunc('week', NOW() AT TIME ZONE 'Europe/Berlin') - INTERVAL '4 days' + INTERVAL '${key === 'a' ? 9 : 15} hours') AT TIME ZONE 'Europe/Berlin')`,
+                [id]
+            );
+            await query('UPDATE users SET xp = 90 WHERE id = $1', [id]);
+            rivals.push({ id, token: tk });
+        }
+        await query("DELETE FROM xp_history WHERE source = 'task' AND user_id NOT IN (SELECT id FROM users WHERE username LIKE 'tie\\_%') AND created_at < date_trunc('week', NOW() AT TIME ZONE 'Europe/Berlin') AT TIME ZONE 'Europe/Berlin' AND created_at >= (date_trunc('week', NOW() AT TIME ZONE 'Europe/Berlin') - INTERVAL '7 days') AT TIME ZONE 'Europe/Berlin'");
+        resetSettledCache();
+        await Promise.all(Array.from({ length: 10 }, (_, i) => call('GET', '/api/xp/stats', { token: rivals[i % 2].token })));
+        const awards = await query("SELECT user_id FROM xp_history WHERE source = 'weekly_trophy' AND user_id = ANY($1)", [rivals.map((r) => r.id)]);
+        assert.equal(awards.rows.length, 1, 'exactly one trophy');
+        assert.equal(awards.rows[0].user_id, rivals[0].id, 'tie goes to whoever got there first');
+        await query("DELETE FROM users WHERE username LIKE 'tie\\_%'");
+    });
 });
