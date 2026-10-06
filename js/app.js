@@ -17,6 +17,7 @@ import { initTaskDialog } from './features/task-dialog.js';
 import { initTemplates, showTemplates } from './features/templates.js';
 import { initActivity, showActivity } from './features/activity.js';
 import { initLeaderboard, showLeaderboard } from './features/leaderboard.js';
+import { initProfile, showProfile } from './features/profile.js';
 import { initSettings, renderSettings } from './features/settings.js';
 import { initDatabase, showDatabase } from './features/admin/database.js';
 import { initLogs, showLogs } from './features/admin/logs.js';
@@ -82,6 +83,7 @@ async function init() {
     initTemplates();
     initActivity();
     initLeaderboard();
+    initProfile();
     initSettings();
     initDatabase();
     initLogs();
@@ -90,6 +92,7 @@ async function init() {
     registerView('templates', showTemplates);
     registerView('activity', showActivity);
     registerView('leaderboard', showLeaderboard);
+    registerView('profile', showProfile);
     registerView('settings', renderSettings);
     registerView('admin-database', showDatabase);
     registerView('admin-logs', showLogs);

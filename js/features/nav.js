@@ -20,6 +20,9 @@ const ADMIN_VIEWS = [
     { id: 'admin-exit', hash: 'tasks', icon: 'arrowLeft', label: 'navBackToApp', exit: true }
 ];
 
+// Friend profile: #/profile/<username>. Not a nav item; the Leaderboard item stays highlighted.
+const PROFILE_VIEW = { id: 'profile', hash: 'profile', parent: 'leaderboard', label: 'navLeaderboard' };
+
 const handlers = new Map();
 let current = null;
 let mode = 'app';
@@ -36,6 +39,11 @@ function resolveRoute() {
             return { mode: 'app', view: APP_VIEWS[0] };
         }
         return { mode: 'admin', view: ADMIN_VIEWS.find((view) => view.hash === raw) || ADMIN_VIEWS[0] };
+    }
+    if (raw.startsWith(`${PROFILE_VIEW.hash}/`) && raw.length > PROFILE_VIEW.hash.length + 1) {
+        let param = raw.slice(PROFILE_VIEW.hash.length + 1);
+        try { param = decodeURIComponent(param); } catch { /* keep raw */ }
+        return { mode: 'app', view: PROFILE_VIEW, param };
     }
     return { mode: 'app', view: APP_VIEWS.find((view) => view.hash === raw) || APP_VIEWS[0] };
 }
@@ -73,10 +81,10 @@ function rebuildNavs() {
 }
 
 function applyChrome(id) {
-    const view = [...APP_VIEWS, ...ADMIN_VIEWS].find((entry) => entry.id === id);
+    const view = [...APP_VIEWS, ...ADMIN_VIEWS, PROFILE_VIEW].find((entry) => entry.id === id);
     $$('.view').forEach((section) => { section.hidden = section.dataset.view !== id; });
     $$('.nav-link').forEach((link) => {
-        if (link.dataset.view === id) link.setAttribute('aria-current', 'page');
+        if (link.dataset.view === (view.parent || id)) link.setAttribute('aria-current', 'page');
         else link.removeAttribute('aria-current');
     });
     $('#fab-add-task').hidden = id !== 'tasks';
@@ -95,7 +103,7 @@ function show(route, { focus = false } = {}) {
     if (focus) $('#main-content').focus({ preventScroll: true });
     window.scrollTo({ top: 0 });
     const handler = handlers.get(current);
-    if (handler) handler();
+    if (handler) handler(route.param);
 }
 
 function registerView(id, onShow) {
@@ -122,7 +130,7 @@ const currentView = () => current;
 // Re-runs the handler of the visible view (used when the server pushes a change).
 function refreshCurrentView() {
     const handler = handlers.get(current);
-    if (handler) handler();
+    if (handler) handler(current === PROFILE_VIEW.id ? resolveRoute().param : undefined);
 }
 
 export { initNav, registerView, startNav, currentView, refreshCurrentView };

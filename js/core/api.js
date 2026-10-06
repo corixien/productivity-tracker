@@ -201,6 +201,7 @@ const api = {
     getStats: () => apiRequest('/xp/stats'),
     getFirstPlace: () => apiRequest('/xp/first-place'),
     getXp: (limit, offset) => apiRequest(`/xp?limit=${limit}&offset=${offset}`),
+    getProfile: (username) => apiRequest(`/users/${encodeURIComponent(username)}/profile`),
     getLeaderboard: (period) => apiRequest(`/leaderboard?period=${period}`),
     addFriend: (friendUsername) => apiRequest('/users/friends', { method: 'POST', body: { friendUsername } }),
     removeFriend: (friendId) => apiRequest(`/users/friends/${friendId}`, { method: 'DELETE' }),

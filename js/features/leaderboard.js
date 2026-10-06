@@ -2,6 +2,7 @@ import { api } from '../core/api.js';
 import { h, icon, $, $$, swapIn, avatarEl, formatNumber } from '../core/dom.js';
 import { t, onLanguageChange } from '../core/i18n.js';
 import { badgeUrl, rankKey, trophyXp } from '../core/ranks.js';
+import { profileHash } from './profile.js';
 import { toast, confirmDialog, openDialog, closeDialog, emptyState, skeletonList, showError } from '../core/ui.js';
 
 let period = 'all';
@@ -10,6 +11,20 @@ let loaded = false;
 
 const scoreOf = (entry) => (period === 'week' ? entry.weekXp : entry.xp);
 const displayName = (entry) => (entry.isSelf ? `${entry.username} (${t('you')})` : entry.username);
+
+// Whole row or podium spot opens the profile page; the remove button keeps its own click.
+function makeOpenable(el, entry) {
+    const open = () => { location.hash = profileHash(entry.username); };
+    el.classList.add('is-link');
+    el.tabIndex = 0;
+    el.setAttribute('role', 'link');
+    el.setAttribute('aria-label', t('pfOpen', { name: entry.username }));
+    el.addEventListener('click', (event) => { if (!event.target.closest('button')) open(); });
+    el.addEventListener('keydown', (event) => {
+        if (event.target === el && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); open(); }
+    });
+    return el;
+}
 
 function removeButton(entry) {
     if (!entry.friendId) return null;
@@ -22,14 +37,14 @@ function removeButton(entry) {
 
 function podiumSpot(entry, index) {
     const place = index + 1;
-    return h('div', { class: `podium-spot ${['is-first', 'is-second', 'is-third'][index]}${entry.isSelf ? ' is-self' : ''}`, dataset: { rank: entry.rank } },
+    return makeOpenable(h('div', { class: `podium-spot ${['is-first', 'is-second', 'is-third'][index]}${entry.isSelf ? ' is-self' : ''}`, dataset: { rank: entry.rank } },
         h('span', { class: 'podium-place' }, `#${place}`),
         avatarEl(entry, 'xl'),
         h('span', { class: 'podium-name' }, displayName(entry)),
         h('img', { class: 'rank-img', src: badgeUrl(entry.rank), alt: t(rankKey(entry.rank)), width: 40, height: 40 }),
         h('span', { class: 'podium-score' }, `${formatNumber(scoreOf(entry))} ${t('xpUnit')}`),
         removeButton(entry)
-    );
+    ), entry);
 }
 
 // Same order as the server query: score descending, then name. Lets the period switch re-rank instantly.
@@ -38,7 +53,7 @@ function sortEntries() {
 }
 
 function boardRow(entry, index) {
-    return h('li', { class: `board-row${entry.isSelf ? ' is-self' : ''}`, dataset: { rank: entry.rank } },
+    return makeOpenable(h('li', { class: `board-row${entry.isSelf ? ' is-self' : ''}`, dataset: { rank: entry.rank } },
         h('span', { class: 'board-place' }, String(index + 1)),
         avatarEl(entry, 'md'),
         h('span', { class: 'board-name' },
@@ -48,7 +63,7 @@ function boardRow(entry, index) {
         h('span', { class: 'board-score' }, `${formatNumber(scoreOf(entry))} ${t('xpUnit')}`,
             period === 'week' ? h('small', {}, t('xpTotalSmall', { n: formatNumber(entry.xp) })) : null),
         removeButton(entry)
-    );
+    ), entry);
 }
 
 function render() {

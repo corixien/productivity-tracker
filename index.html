@@ -208,6 +208,28 @@
                 <ol id="leaderboard-list" class="board"></ol>
             </section>
 
+            <!-- Friend profile (opened from the leaderboard) -->
+            <section id="view-profile" class="view" data-view="profile" aria-labelledby="h-profile" hidden>
+                <a class="btn btn-ghost profile-back" href="#/leaderboard"><span data-icon="arrowLeft"></span><span data-i18n="pfBack">Back to leaderboard</span></a>
+                <header id="profile-head" class="profile-head"></header>
+                <div id="profile-body" class="profile-body">
+                    <h2 class="section-title" data-i18n="pfSectionProfile">Profile</h2>
+                    <div class="stat-row" id="profile-info"></div>
+                    <h2 class="section-title" data-i18n="pfSectionStats">Activity</h2>
+                    <div class="stat-row" id="profile-stats"></div>
+                    <h2 class="section-title" data-i18n="fpTitle">First place streak</h2>
+                    <div class="stat-row first-place-row" id="profile-first"></div>
+                    <p class="hint" id="profile-hint"></p>
+                    <h2 class="section-title" data-i18n="pfSectionTasks">Completed tasks</h2>
+                    <div class="search-field">
+                        <label class="sr-only" for="profile-search" data-i18n="pfSearchLabel">Search completed tasks</label>
+                        <input type="text" id="profile-search" data-i18n-placeholder="pfSearch" autocomplete="off" spellcheck="false">
+                    </div>
+                    <div id="profile-tasks" class="history"></div>
+                    <p class="hint" id="profile-truncated" hidden data-i18n="pfTruncated">Showing the latest 500 tasks.</p>
+                </div>
+            </section>
+
             <!-- Settings -->
             <section id="view-settings" class="view" data-view="settings" aria-labelledby="h-settings" hidden>
                 <header class="view-header">

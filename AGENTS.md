@@ -25,7 +25,7 @@ js/
   theme-boot.js             classic script in <head>: applies saved theme before first paint
   core/                     api (fetch, retry, offline queue), auth, state (store + event bus), data (loaders), live (SSE client),
                             i18n (EN/DE), dom (h(), icons, formatters), ui (toasts, banners, dialogs), ranks, theme, pwa, glass (pointer highlight + ripple for the liquid-glass buttons), segmented (gliding lens for tab strips)
-  features/                 nav (hash routing), auth-view, dashboard (hero + task list), task-dialog (add/edit),
+  features/                 nav (hash routing, incl. #/profile/<name>), profile (friend page), auth-view, dashboard (hero + task list), task-dialog (add/edit),
                             templates, activity, streak (streak card, charts, calendar), leaderboard, settings, stats, charts (SVG), shared, admin/ (database, logs, analytics)
 backend/
   index.js                  Express entry (exports app; listens only when run directly)
@@ -62,7 +62,7 @@ Public: `GET /api/health`, `GET /api/meta` (rank thresholds/multipliers), `GET /
 
 ## API surface
 
-`/api/auth` (register, login, me) · `/api/users` (me, friends, leaderboard alias, `monitor-multipliers`, quick-tasks incl. `:id/use`, then `:username` get/put/password/avatar/change-username) · `/api/tasks` (CRUD, `PUT` edits fields and/or toggles `completed`, `:id/complete`) · `/api/xp` (history, paginated) and `/api/xp/stats` (streak, today, week, daily goal) · `/api/leaderboard?period=all|week` · `/api/settings` · `/api/events` (SSE) · `/api/admin/*` (tables with filters/sort/cell values, logs, analytics) · `/api/groq` (`/`, `/rate`, `/status`) · legacy `/api/ai/rate`, `/api/ai/status` (kept on purpose) · `/api/meta` · `/api/health`. Templates keep the API path `/api/users/quick-tasks` although the table is `templates`. Full list: README.md.
+`/api/auth` (register, login, me) · `/api/users` (me, friends, `:username/profile` = friend profile page (self or friend only), leaderboard alias, `monitor-multipliers`, quick-tasks incl. `:id/use`, then `:username` get/put/password/avatar/change-username) · `/api/tasks` (CRUD, `PUT` edits fields and/or toggles `completed`, `:id/complete`) · `/api/xp` (history, paginated) and `/api/xp/stats` (streak, today, week, daily goal) · `/api/leaderboard?period=all|week` · `/api/settings` · `/api/events` (SSE) · `/api/admin/*` (tables with filters/sort/cell values, logs, analytics) · `/api/groq` (`/`, `/rate`, `/status`) · legacy `/api/ai/rate`, `/api/ai/status` (kept on purpose) · `/api/meta` · `/api/health`. Templates keep the API path `/api/users/quick-tasks` although the table is `templates`. Full list: README.md.
 
 ## Database
 

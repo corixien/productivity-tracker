@@ -91,6 +91,8 @@ Files: `models/QuickTask.js`, `controllers/quickTaskController.js`, `features/te
 
 ## 9. Friends and leaderboard
 
+- **Friend profile page** (`features/profile.js`, hash `#/profile/<username>`, `GET /api/users/:username/profile`): clicking (or Enter on) a podium spot or leaderboard row opens it; the Leaderboard nav item stays highlighted and "Back to leaderboard" returns. Sections: Profile (total XP, rank and level, tasks done), Activity (streak, today, this week, same tiles as the Tasks page), First place streak (all time and weekly, from that user's own leaderboard via `getFirstPlace(friendId)`), and a searchable list of every completed task (latest 500, grouped by day, XP actually paid from `xp_history` via `Task.getCompletedWithXp`). Only yourself or someone you added as friend is visible; anyone else answers 404 (same as a missing user).
+
 Files: `controllers/userController.js`, `User.getLeaderboard`, `features/leaderboard.js`.
 
 - **Friends are directional** (`friends` table, `user_id -> friend_id`): you add by exact username (rate limit 30/hour), you see them, they do not automatically see you. Duplicate add = `409 Already friends`; remove with confirm.
@@ -152,7 +154,7 @@ Migrations are the schema source of truth (`database/migrations`, run by `migrat
 
 `manifest.json`, `sw.js`, `offline.html`, `core/pwa.js`, `core/api.js`.
 
-- Service worker (`VERSION` constant, currently `v12`): app shell precached from the `SHELL` list, API never cached; `offline.html` fallback. Every new css/js/badge/font file must be in `SHELL` (test enforces it); bump `VERSION` when shell files change in a way that must invalidate caches.
+- Service worker (`VERSION` constant, currently `v13`): app shell precached from the `SHELL` list, API never cached; `offline.html` fallback. Every new css/js/badge/font file must be in `SHELL` (test enforces it); bump `VERSION` when shell files change in a way that must invalidate caches.
 - **Offline queue**: completing an existing task while offline is queued in `localStorage` and replayed in order when back online; the card shows "waiting to sync". Creating or editing tasks needs a connection.
 - **Cold-start handling**: requests that hang or fail with 502/503/504 are retried (1.5 s, 3 s, 6 s; POSTs only when safe) and a "server is waking up" banner shows. An offline banner shows when the browser is offline.
 - Install button (Settings, plus the sidebar when offered) uses `beforeinstallprompt`. Icons rendered from `icons/logo.svg`: favicons, `LOGO.png`, maskable PWA icon.

@@ -457,3 +457,15 @@
 .first-place .section-title { margin: 0; font-size: 1.05rem; }
 .first-place .first-place-row { grid-template-columns: repeat(2, 1fr); }
 .first-place .hint { margin: 0; }
+
+/* Friend profile */
+.profile-back { justify-self: start; }
+.profile-head { display: flex; align-items: center; gap: 16px; }
+.profile-head .profile-id { display: grid; min-width: 0; flex: 1; }
+.profile-head h1 { margin: 0; overflow-wrap: anywhere; }
+.profile-head .rank-img { width: 56px; height: 56px; object-fit: contain; }
+.profile-body { display: grid; gap: 14px; }
+.profile-body .section-title { margin: 8px 0 0; font-size: 1.05rem; }
+.is-link { cursor: pointer; }
+.is-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.profile-body .first-place-row { grid-template-columns: repeat(2, 1fr); }

@@ -38,4 +38,6 @@ async function renderFirstPlace(container) {
     render(container);
 }
 
-export { renderFirstPlace };
+const firstPlaceTiles = (info) => [streakTile(t('fpAllTime'), info.allTime), streakTile(t('fpWeekly'), info.weekly)];
+
+export { renderFirstPlace, firstPlaceTiles };

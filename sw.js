@@ -39,6 +39,7 @@ const SHELL = [
     '/js/features/dashboard.js',
     '/js/features/leaderboard.js',
     '/js/features/nav.js',
+    '/js/features/profile.js',
     '/js/features/settings.js',
     '/js/features/shared.js',
     '/js/features/stats.js',

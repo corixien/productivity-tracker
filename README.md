@@ -80,6 +80,7 @@ All routes except register, login, `/api/meta`, `/api/health` and `/api/ai/statu
 |---|---|
 | `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me` | auth |
 | `GET /api/users/:username` | own profile, or public fields of someone else |
+| `GET /api/users/:username/profile` | profile page data (stats, first place streaks, completed tasks) of yourself or a friend; 404 otherwise |
 | `PUT /api/users/:username` | update language and goals |
 | `POST /api/users/:username/password` | change password (needs `currentPassword`, returns a new token) |
 | `POST /api/users/:username/avatar`, `POST /api/users/:username/change-username` | avatar (max 512 KB), username |

@@ -1,4 +1,6 @@
 const User = require('../models/User');
+const Task = require('../models/Task');
+const { getFirstPlace } = require('../services/firstPlaceService');
 const { logActivity } = require('../services/loggingService');
 const { awardWeeklyTrophies } = require('../services/bonusService');
 const { asyncHandler, notFound, badRequest, conflict, warnOnError } = require('../utils/errors');
@@ -40,6 +42,32 @@ const getLeaderboard = asyncHandler(async (req, res) => {
     res.json(await User.getLeaderboard(req.user.id, period, req.tz));
 });
 
+// Profile page of yourself or a friend: public fields, streak/week stats, first place streaks, completed tasks.
+const getProfile = asyncHandler(async (req, res) => {
+    const target = await User.findByUsername(req.params.username);
+    // Strangers look the same as missing users.
+    if (!target || (target.id !== req.user.id && !await User.isFriend(req.user.id, target.id))) throw notFound('User not found');
+    const [stats, firstPlace, tasks] = await Promise.all([
+        Task.getStats(target.id, req.tz),
+        getFirstPlace(target.id, req.tz),
+        Task.getCompletedWithXp(target.id)
+    ]);
+    res.json({
+        user: {
+            username: target.username,
+            avatar: target.avatar || null,
+            xp: target.xp || 0,
+            level: target.level || 0,
+            rank: target.rank,
+            tasks: target.tasks_completed || 0,
+            isSelf: target.id === req.user.id
+        },
+        stats,
+        firstPlace,
+        tasks
+    });
+});
+
 const monitorMultipliers = asyncHandler(async (req, res) => {
     res.json({ success: true, discrepancies: await User.monitorMultipliers(5) });
 });
@@ -49,5 +77,6 @@ module.exports = {
     addFriend,
     removeFriend,
     getLeaderboard,
+    getProfile,
     monitorMultipliers
 };

@@ -29,6 +29,7 @@ router.put('/quick-tasks/:id', validateQuickTask, quickTaskController.updateQuic
 router.delete('/quick-tasks/:id', quickTaskController.deleteQuickTask);
 router.post('/quick-tasks/:id/use', quickTaskController.useQuickTask);
 
+router.get('/:username/profile', userController.getProfile);
 router.get('/:username', authController.getUser);
 router.put('/:username', validateUserUpdate, authController.updateUser);
 router.post('/:username/password', passwordRateLimiter, validateChangePassword, authController.changePassword);

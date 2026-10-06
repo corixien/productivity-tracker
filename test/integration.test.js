@@ -568,6 +568,33 @@ test('API integration', { skip }, async (t) => {
         assert.equal((await call('GET', '/api/xp/first-place')).status, 401);
         await query("DELETE FROM users WHERE username LIKE 'fp\\_%'");
     });
+    await t.test('profile page is open to friends and yourself only', async () => {
+        const { query } = require('../backend/utils/database');
+        const a = `pf_a_${suffix}`;
+        const b = `pf_b_${suffix}`;
+        const tokenA = (await call('POST', '/api/auth/register', { body: { username: a, password: 'secret123' } })).json.token;
+        const tokenB = (await call('POST', '/api/auth/register', { body: { username: b, password: 'secret123' } })).json.token;
+        const task = await call('POST', '/api/tasks', { token: tokenB, body: { name: 'profile task', duration: 60, productivity: 4, difficulty: 3, category: 'other' } });
+        await call('POST', `/api/tasks/${task.json.id}/complete`, { token: tokenB });
+        await call('POST', '/api/tasks', { token: tokenB, body: { name: 'still open', duration: 30, productivity: 3, difficulty: 3, category: 'other' } });
+        assert.equal((await call('GET', `/api/users/${b}/profile`, { token: tokenA })).status, 404, 'strangers get 404');
+        await call('POST', '/api/users/friends', { token: tokenA, body: { friendUsername: b } });
+        const view = await call('GET', `/api/users/${b}/profile`, { token: tokenA });
+        assert.equal(view.status, 200);
+        assert.equal(view.json.user.username, b);
+        assert.equal(view.json.user.isSelf, false);
+        assert.ok(view.json.user.xp > 0);
+        assert.equal(view.json.tasks.length, 1, 'only completed tasks');
+        assert.equal(view.json.tasks[0].name, 'profile task');
+        assert.equal(view.json.tasks[0].xp, view.json.user.xp, 'paid XP of the task');
+        assert.ok(view.json.stats.streak && view.json.stats.week && view.json.firstPlace.allTime);
+        assert.equal(view.json.user.password_hash, undefined);
+        assert.equal((await call('GET', `/api/users/${a}/profile`, { token: tokenA })).json.user.isSelf, true);
+        assert.equal((await call('GET', `/api/users/${a}/profile`, { token: tokenB })).status, 404, 'friends are directional');
+        assert.equal((await call('GET', `/api/users/nobody_${suffix}/profile`, { token: tokenA })).status, 404);
+        assert.equal((await call('GET', `/api/users/${b}/profile`)).status, 401);
+        await query("DELETE FROM users WHERE username LIKE 'pf\\_%'");
+    });
     await t.test('rank-up bonus is 1% of the rank threshold, paid once per rank', async () => {
         const { query } = require('../backend/utils/database');
         const name = `rankup_${suffix}`;

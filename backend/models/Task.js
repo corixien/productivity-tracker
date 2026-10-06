@@ -290,6 +290,32 @@ async function getXpHistory(userId, options = {}) {
     return { rows: result.rows.slice(0, limit), hasMore: result.rows.length > limit };
 }
 
+// Completed tasks, newest first, with the XP they actually paid (task rows of xp_history, multiplier included).
+async function getCompletedWithXp(userId, limit = 500) {
+    const result = await query(
+        `SELECT t.id, t.name, t.category, t.duration, t.productivity, t.difficulty, t.bonus, t.completed_at,
+                COALESCE((SELECT SUM(h.xp_amount) FROM xp_history h
+                          WHERE h.user_id = t.user_id AND h.source_id = t.id
+                            AND h.source IN ('task', 'task_uncomplete', 'task_edit')), 0)::int AS xp
+         FROM tasks t
+         WHERE t.user_id = $1 AND t.completed = true
+         ORDER BY t.completed_at DESC, t.id
+         LIMIT $2`,
+        [userId, limit]
+    );
+    return result.rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        category: row.category,
+        duration: row.duration,
+        productivity: row.productivity,
+        difficulty: row.difficulty,
+        bonus: row.bonus,
+        xp: Math.max(0, row.xp),
+        completedAt: row.completed_at
+    }));
+}
+
 async function getTotalXp(userId) {
     const result = await query(
         'SELECT COALESCE(SUM(xp_amount), 0) AS total FROM xp_history WHERE user_id = $1',
@@ -408,6 +434,7 @@ module.exports = {
     delete: deleteTask,
     getCompletedCount,
     getXpHistory,
+    getCompletedWithXp,
     getTotalXp,
     getStats,
     syncUserTotals,
