@@ -24,7 +24,7 @@ Run from `/home/mateo/productivity-tracker`. `npm run check`, `npm test` (integr
 
 ## 5. Invariants and gotchas
 - Never write `users.xp` directly; use `Task.syncUserTotals` in a transaction.
-- Strict CSP: no inline script/style/handlers; styles via CSSOM. New css/js files go into `SHELL` in `sw.js`; bump `VERSION` (now `v17`).
+- Strict CSP: no inline script/style/handlers; styles via CSSOM. New css/js files go into `SHELL` in `sw.js`; bump `VERSION` (now `v18`).
 - New UI text needs `en` and `de`. DB change = new migration, never edit applied ones.
 - Never print `.env`, remote URL (embeds PAT), `~/.config/opencode/opencode.json`. Reads of the production Neon DB are blocked by the auto-mode classifier; do not work around.
 - Env values must not contain `<>` placeholders. Leave `GROQ_MODEL` unset (default `llama-3.3-70b-versatile`); a 404 triggers auto-pick from Groq `/models`.

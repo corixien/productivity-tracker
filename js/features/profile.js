@@ -1,5 +1,5 @@
 import { api } from '../core/api.js';
-import { h, icon, $, swapIn, avatarEl, formatNumber, dayLabel, timeLabel } from '../core/dom.js';
+import { h, icon, $, avatarEl, formatNumber, dayLabel, timeLabel } from '../core/dom.js';
 import { t, onLanguageChange } from '../core/i18n.js';
 import { getNextRank, getProgress, badgeUrl, rankKey } from '../core/ranks.js';
 import { emptyState, skeletonList, showError } from '../core/ui.js';
@@ -138,7 +138,6 @@ async function showProfile(username) {
         name = fresh.user.username;
         document.title = `${name} · ${t('appTitle')}`;
         render();
-        swapIn($('#profile-body'));
     } catch (error) {
         if (id !== requestId) return;
         showError(error);
