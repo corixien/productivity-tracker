@@ -1,7 +1,7 @@
 import { api } from '../core/api.js';
 import { h, icon, $, swapIn, avatarEl, formatNumber, dayLabel, timeLabel } from '../core/dom.js';
 import { t, onLanguageChange } from '../core/i18n.js';
-import { badgeUrl, rankKey } from '../core/ranks.js';
+import { getNextRank, getProgress, badgeUrl, rankKey } from '../core/ranks.js';
 import { emptyState, skeletonList, showError } from '../core/ui.js';
 import { statTiles, tile } from './stats.js';
 import { firstPlaceTiles } from './first-place.js';
@@ -38,7 +38,28 @@ function renderHeader() {
             h('h1', { id: 'h-profile' }, user ? user.username : name),
             user ? h('p', { class: 'subtitle' }, `${t(rankKey(user.rank))} · ${t('pfLevelValue', { n: user.level })}`) : null
         ),
-        user ? h('img', { class: 'rank-img', src: badgeUrl(user.rank), alt: t(rankKey(user.rank)), width: 56, height: 56 }) : null
+    );
+}
+
+// Same look as the rank hero on the Tasks page: badge with level pill, rank name, XP and progress to the next rank.
+function rankCard(user) {
+    const next = getNextRank(user.xp);
+    const progress = getProgress(user.xp);
+    const fill = h('div', { class: 'progress-fill' });
+    fill.style.setProperty('--p', progress.toFixed(4));
+    return h('div', { class: 'hero card', dataset: { rank: user.rank } },
+        h('div', { class: `hero-badge${user.rank === 'Platinum' ? ' is-platinum' : ''}` },
+            h('img', { src: badgeUrl(user.rank), alt: '', width: 104, height: 104 }),
+            h('span', { class: 'level-pill' }, t('levelN', { n: user.level }))
+        ),
+        h('div', { class: 'hero-main' },
+            h('div', { class: 'hero-top' }, h('h2', {}, t(rankKey(user.rank)))),
+            h('div', { class: 'xp-line' },
+                h('strong', {}, `${formatNumber(user.xp)} ${t('xpUnit')}`),
+                h('span', {}, next ? t('xpToNext', { n: formatNumber(next.min - user.xp), rank: t(rankKey(next.name)) }) : t('maxRank'))
+            ),
+            h('div', { class: 'progress', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(Math.round(progress * 100)), 'aria-label': t('xpProgress') }, fill)
+        )
     );
 }
 
@@ -46,6 +67,7 @@ function renderSections() {
     const stat = (selector, nodes) => $(selector).replaceChildren(...nodes);
     if (!data) {
         const sk = () => h('div', { class: 'skeleton', 'aria-hidden': 'true' });
+        stat('#profile-rank', [h('div', { class: 'skeleton skeleton-tall', 'aria-hidden': 'true' })]);
         stat('#profile-info', [sk(), sk(), sk()]);
         stat('#profile-stats', [sk(), sk(), sk()]);
         stat('#profile-first', [sk(), sk()]);
@@ -53,9 +75,10 @@ function renderSections() {
         return;
     }
     const { user } = data;
+    stat('#profile-rank', [rankCard(user)]);
     stat('#profile-info', [
         tile('trophy', t('pfTotalXp'), `${formatNumber(user.xp)} ${t('xpUnit')}`),
-        tile('star', t('pfRank'), t(rankKey(user.rank)), t('pfLevelValue', { n: user.level })),
+        tile('star', t('pfLevel'), formatNumber(user.level)),
         tile('check', t('pfTasksDone'), formatNumber(user.tasks))
     ]);
     stat('#profile-stats', statTiles(data.stats));

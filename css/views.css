@@ -463,7 +463,6 @@
 .profile-head { display: flex; align-items: center; gap: 16px; }
 .profile-head .profile-id { display: grid; min-width: 0; flex: 1; }
 .profile-head h1 { margin: 0; overflow-wrap: anywhere; }
-.profile-head .rank-img { width: 56px; height: 56px; object-fit: contain; }
 .profile-body { display: grid; gap: 14px; }
 .profile-body .section-title { margin: 8px 0 0; font-size: 1.05rem; }
 .is-link { cursor: pointer; }

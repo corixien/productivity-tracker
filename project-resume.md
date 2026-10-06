@@ -24,7 +24,7 @@ Run from `/home/mateo/productivity-tracker`. `npm run check`, `npm test` (integr
 
 ## 5. Invariants and gotchas
 - Never write `users.xp` directly; use `Task.syncUserTotals` in a transaction.
-- Strict CSP: no inline script/style/handlers; styles via CSSOM. New css/js files go into `SHELL` in `sw.js`; bump `VERSION` (now `v13`).
+- Strict CSP: no inline script/style/handlers; styles via CSSOM. New css/js files go into `SHELL` in `sw.js`; bump `VERSION` (now `v14`).
 - New UI text needs `en` and `de`. DB change = new migration, never edit applied ones.
 - Never print `.env`, remote URL (embeds PAT), `~/.config/opencode/opencode.json`. Reads of the production Neon DB are blocked by the auto-mode classifier; do not work around.
 - Env values must not contain `<>` placeholders. Leave `GROQ_MODEL` unset (default `llama-3.3-70b-versatile`); a 404 triggers auto-pick from Groq `/models`.
@@ -36,7 +36,7 @@ Run from `/home/mateo/productivity-tracker`. `npm run check`, `npm test` (integr
 - Goal of the current task: none open. Last session delivered the batch below.
 
 ### Done
-- [x] 2026-10-06 friend profile page: click a leaderboard entry -> `#/profile/<name>` (`js/features/profile.js`, `GET /api/users/:username/profile`, friends/self only), sections profile, activity stats, first place streaks, searchable completed task list; `sw.js` `v13`; integration test added. Account cleanup on production done by the owner.
+- [x] 2026-10-06 friend profile page: click a leaderboard entry -> `#/profile/<name>` (`js/features/profile.js`, `GET /api/users/:username/profile`, friends/self only), sections rank card, profile, activity stats, first place streaks, searchable completed task list; `sw.js` `v13`; integration test added. Account cleanup on production done by the owner.
 - [x] 2026-10-04 fixed lockout after deleting all users: reserved ADMIN_USERNAMES names can be registered again while no admin exists (and the registrant becomes admin)
 - [x] 2026-10-04 accounts on production were deleted by the owner; test accounts are gone
 - [x] 2026-10-04 AI fills the offline/with friends bonus, rank-up bonus (1% of threshold, max 100, once per rank, migration 019), weekly trophy now 50 XP and never counts as next week's XP
