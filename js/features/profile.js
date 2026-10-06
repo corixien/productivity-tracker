@@ -30,24 +30,25 @@ function matches(task) {
     return text.toLowerCase().includes(query);
 }
 
+// One hero card like the Tasks page: avatar and name on the left, rank badge with level pill, rank name, XP to the next rank and progress bar next to them.
 function renderHeader() {
     const user = data && data.user;
-    $('#profile-head').replaceChildren(
+    const head = $('#profile-head');
+    head.dataset.rank = user ? user.rank : '';
+    const identity = h('div', { class: 'profile-id' },
         user ? avatarEl(user, 'xl') : h('span', { class: 'avatar avatar-xl' }),
-        h('div', { class: 'profile-id' },
-            h('h1', { id: 'h-profile' }, user ? user.username : name),
-            user ? h('p', { class: 'subtitle' }, `${t(rankKey(user.rank))} · ${t('pfLevelValue', { n: user.level })}`) : null
-        ),
+        h('h1', { id: 'h-profile' }, user ? user.username : name)
     );
-}
-
-// Same look as the rank hero on the Tasks page: badge with level pill, rank name, XP and progress to the next rank.
-function rankCard(user) {
+    if (!user) {
+        head.replaceChildren(identity);
+        return;
+    }
     const next = getNextRank(user.xp);
     const progress = getProgress(user.xp);
     const fill = h('div', { class: 'progress-fill' });
     fill.style.setProperty('--p', progress.toFixed(4));
-    return h('div', { class: 'hero card', dataset: { rank: user.rank } },
+    head.replaceChildren(
+        identity,
         h('div', { class: `hero-badge${user.rank === 'Platinum' ? ' is-platinum' : ''}` },
             h('img', { src: badgeUrl(user.rank), alt: '', width: 104, height: 104 }),
             h('span', { class: 'level-pill' }, t('levelN', { n: user.level }))
@@ -67,7 +68,6 @@ function renderSections() {
     const stat = (selector, nodes) => $(selector).replaceChildren(...nodes);
     if (!data) {
         const sk = () => h('div', { class: 'skeleton', 'aria-hidden': 'true' });
-        stat('#profile-rank', [h('div', { class: 'skeleton skeleton-tall', 'aria-hidden': 'true' })]);
         stat('#profile-info', [sk(), sk(), sk()]);
         stat('#profile-stats', [sk(), sk(), sk()]);
         stat('#profile-first', [sk(), sk()]);
@@ -75,7 +75,6 @@ function renderSections() {
         return;
     }
     const { user } = data;
-    stat('#profile-rank', [rankCard(user)]);
     stat('#profile-info', [
         tile('trophy', t('pfTotalXp'), `${formatNumber(user.xp)} ${t('xpUnit')}`),
         tile('star', t('pfLevel'), formatNumber(user.level)),

@@ -460,9 +460,13 @@
 
 /* Friend profile */
 .profile-back { justify-self: start; }
-.profile-head { display: flex; align-items: center; gap: 16px; }
-.profile-head .profile-id { display: grid; min-width: 0; flex: 1; }
+.profile-head { grid-template-columns: auto auto minmax(0, 1fr); }
+.profile-head .profile-id { display: flex; align-items: center; gap: 16px; min-width: 0; }
 .profile-head h1 { margin: 0; overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+    .profile-head { grid-template-columns: auto minmax(0, 1fr); }
+    .profile-head .profile-id { grid-column: 1 / -1; }
+}
 .profile-body { display: grid; gap: 14px; }
 .profile-body .section-title { margin: 8px 0 0; font-size: 1.05rem; }
 .is-link { cursor: pointer; }
