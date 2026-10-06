@@ -460,12 +460,13 @@
 
 /* Friend profile */
 .profile-back { justify-self: start; }
-.profile-head { grid-template-columns: auto auto minmax(0, 1fr); }
-.profile-head .profile-id { display: flex; align-items: center; gap: 16px; min-width: 0; }
-.profile-head h1 { margin: 0; overflow-wrap: anywhere; }
-@media (max-width: 640px) {
-    .profile-head { grid-template-columns: auto minmax(0, 1fr); }
-    .profile-head .profile-id { grid-column: 1 / -1; }
+.profile-head { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: stretch; }
+.profile-id { display: flex; align-items: center; gap: 16px; padding: 24px 28px; min-width: 0; }
+.profile-id h1 { margin: 0; overflow-wrap: anywhere; }
+.profile-head .hero { min-width: 0; }
+@media (max-width: 760px) {
+    .profile-head { grid-template-columns: minmax(0, 1fr); }
+    .profile-id { padding: 20px; }
 }
 .profile-body { display: grid; gap: 14px; }
 .profile-body .section-title { margin: 8px 0 0; font-size: 1.05rem; }

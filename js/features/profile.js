@@ -30,12 +30,11 @@ function matches(task) {
     return text.toLowerCase().includes(query);
 }
 
-// One hero card like the Tasks page: avatar and name on the left, rank badge with level pill, rank name, XP to the next rank and progress bar next to them.
+// Two cards side by side: avatar and name on the left, the rank hero (badge with level pill, rank name, XP to the next rank, progress bar) on the right.
 function renderHeader() {
     const user = data && data.user;
     const head = $('#profile-head');
-    head.dataset.rank = user ? user.rank : '';
-    const identity = h('div', { class: 'profile-id' },
+    const identity = h('div', { class: 'profile-id card' },
         user ? avatarEl(user, 'xl') : h('span', { class: 'avatar avatar-xl' }),
         h('h1', { id: 'h-profile' }, user ? user.username : name)
     );
@@ -49,17 +48,19 @@ function renderHeader() {
     fill.style.setProperty('--p', progress.toFixed(4));
     head.replaceChildren(
         identity,
-        h('div', { class: `hero-badge${user.rank === 'Platinum' ? ' is-platinum' : ''}` },
-            h('img', { src: badgeUrl(user.rank), alt: '', width: 104, height: 104 }),
-            h('span', { class: 'level-pill' }, t('levelN', { n: user.level }))
-        ),
-        h('div', { class: 'hero-main' },
-            h('div', { class: 'hero-top' }, h('h2', {}, t(rankKey(user.rank)))),
-            h('div', { class: 'xp-line' },
-                h('strong', {}, `${formatNumber(user.xp)} ${t('xpUnit')}`),
-                h('span', {}, next ? t('xpToNext', { n: formatNumber(next.min - user.xp), rank: t(rankKey(next.name)) }) : t('maxRank'))
+        h('div', { class: 'hero card', dataset: { rank: user.rank } },
+            h('div', { class: `hero-badge${user.rank === 'Platinum' ? ' is-platinum' : ''}` },
+                h('img', { src: badgeUrl(user.rank), alt: '', width: 104, height: 104 }),
+                h('span', { class: 'level-pill' }, t('levelN', { n: user.level }))
             ),
-            h('div', { class: 'progress', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(Math.round(progress * 100)), 'aria-label': t('xpProgress') }, fill)
+            h('div', { class: 'hero-main' },
+                h('div', { class: 'hero-top' }, h('h2', {}, t(rankKey(user.rank)))),
+                h('div', { class: 'xp-line' },
+                    h('strong', {}, `${formatNumber(user.xp)} ${t('xpUnit')}`),
+                    h('span', {}, next ? t('xpToNext', { n: formatNumber(next.min - user.xp), rank: t(rankKey(next.name)) }) : t('maxRank'))
+                ),
+                h('div', { class: 'progress', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(Math.round(progress * 100)), 'aria-label': t('xpProgress') }, fill)
+            )
         )
     );
 }
