@@ -6,7 +6,7 @@ const TARGETS = '.btn, .icon-btn, .segment, .nav-link, .fab, .check-btn, button.
 // computed per element from its layout size. CSS reads it as scale(var(--sx), var(--sy)). Keep in sync with the
 // hover rules in components.css and views.css.
 const ZOOM = '.btn, .icon-btn, .nav-link, button.chip, .task-card, .stat, .board-row, .podium-spot, .hero, .goal-card, '
-    + '.streak-hero, .chart-card, .settings-card, .history-items, .day-circle, .user-mini';
+    + '.streak-hero, .chart-card, .settings-card, .history-items, .day-circle, .user-mini, .profile-id';
 
 function setZoomFactors(start) {
     const grow = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hover-grow')) || 6;
