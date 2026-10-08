@@ -14,6 +14,16 @@ const PREFERRED_MODELS = ['llama-3.3-70b-versatile', 'openai/gpt-oss-120b', 'ope
 const NOT_CHAT = /whisper|guard|safeguard|tts|orpheus|embed|rerank|transcri/i;
 let workingModel = null;
 
+// Reasoning models (gpt-oss) spend completion tokens on hidden thinking; with a small max_tokens nothing is left for the answer
+// and the content comes back empty. Keep the thinking short and leave generous room.
+const MAX_TOKENS = 1500;
+const isReasoningModel = (model) => /gpt-oss/i.test(model);
+function applyModel(payload, model) {
+    payload.model = model;
+    if (isReasoningModel(model)) payload.reasoning_effort = 'low';
+    else delete payload.reasoning_effort;
+}
+
 // Asks Groq which models this key can use and picks the best chat model not yet tried.
 async function pickAvailableModel(baseUrl, apiKey, tried) {
     try {
@@ -28,17 +38,35 @@ async function pickAvailableModel(baseUrl, apiKey, tried) {
 }
 
 function extractJsonFromResponse(content) {
-    let jsonStr = content;
-    const codeBlockMatch = content.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
-    if (codeBlockMatch) {
-        jsonStr = codeBlockMatch[1];
-    } else {
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-            jsonStr = jsonMatch[0];
-        }
+    const codeBlock = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    const text = codeBlock ? codeBlock[1] : content;
+    const candidates = [text, (text.match(/\[[\s\S]*\]/) || [])[0], (text.match(/\{[\s\S]*\}/) || [])[0]];
+    for (const candidate of candidates) {
+        if (!candidate) continue;
+        try { return mergeTasks(JSON.parse(candidate)); } catch (error) { /* try the next shape */ }
     }
-    return JSON.parse(jsonStr);
+    throw new Error('No JSON found');
+}
+
+// The model sometimes lists several activities despite the prompt: merge them into one task
+// (durations add up, ratings are weighted by duration, the bonus applies when any part earned it).
+function mergeTasks(parsed) {
+    if (!Array.isArray(parsed)) return parsed;
+    const items = parsed.filter((item) => item && typeof item === 'object');
+    if (!items.length) throw new Error('Empty list');
+    if (items.length === 1) return items[0];
+    const minutes = items.map((item) => Math.max(1, parseInt(item.duration) || 1));
+    const total = minutes.reduce((sum, value) => sum + value, 0);
+    const weighted = (key, fallback) => items.reduce((sum, item, index) => sum + (Number(item[key]) || fallback) * minutes[index], 0) / total;
+    const longest = items[minutes.indexOf(Math.max(...minutes))];
+    return {
+        name: items.map((item) => item.name).filter(Boolean).join(', '),
+        duration: total,
+        productivity: Math.round(weighted('productivity', 3)),
+        difficulty: Math.round(weighted('difficulty', 3)),
+        category: longest.category,
+        bonus: items.some((item) => item.bonus === true || String(item.bonus).toLowerCase() === 'true')
+    };
 }
 
 function calculateXp(productivity, difficulty, duration, bonus = 0) {
@@ -75,6 +103,7 @@ Rules:
 - difficulty 1-5: effort level
 - duration: minutes
 - category: pick the best one
+- one task only: if the description lists several activities, combine them into a single task (name them together, add up the minutes)
 - bonus: true when the activity was done offline (away from phone, computer and other screens) or together with friends or other people; false for anything done on a screen or alone at a screen
 
 Examples:
@@ -90,8 +119,9 @@ Return ONLY the JSON.` },
             { role: 'user', content: userMessage }
         ],
         temperature: 0,
-        max_tokens: 300
+        max_tokens: MAX_TOKENS
     };
+    applyModel(requestPayload, model);
 
     let groqResponse = null;
     let lastError = null;
@@ -121,7 +151,7 @@ Return ONLY the JSON.` },
                     logger.warn(`GROQ model ${model} not found, switching to ${next}`);
                     triedModels.add(next);
                     model = next;
-                    requestPayload.model = next;
+                    applyModel(requestPayload, next);
                     continue;
                 }
             }

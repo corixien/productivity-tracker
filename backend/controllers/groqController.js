@@ -27,7 +27,8 @@ const rateTask = asyncHandler(async (req, res) => {
         if (message.includes('GROQ_API_KEY')) throw new AppError(503, 'AI service is not configured', 'ai_not_configured');
         if (/rate limit/i.test(message)) throw new AppError(429, 'AI rate limit exceeded. Please try again in a minute.', 'ai_rate_limited');
         if (/authentication|invalid API key/i.test(message)) throw new AppError(503, 'AI service authentication failed', 'ai_auth_failed');
-        throw new AppError(502, 'AI service unavailable', 'ai_unavailable');
+        // The reason (HTTP status and Groq's own message, never a secret) goes to the client so a production failure is diagnosable.
+        throw new AppError(502, `AI service unavailable: ${message.replace(/^GROQ /, '').slice(0, 200)}`, 'ai_unavailable');
     }
 });
 
