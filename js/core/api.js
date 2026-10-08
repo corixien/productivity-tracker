@@ -116,7 +116,10 @@ async function apiRequest(endpoint, { method = 'GET', body, signal, headers = {}
                 throw new ApiError('Network error', 0, 'network');
             }
 
-            if (attempt < RETRY_DELAYS.length && canRetry(method, response.status)) {
+            // A JSON body with a code means the app itself answered (e.g. ai_unavailable): retrying cannot help.
+            let appAnswered = false;
+            try { appAnswered = Boolean(text && JSON.parse(text).code); } catch (error) { appAnswered = false; }
+            if (!appAnswered && attempt < RETRY_DELAYS.length && canRetry(method, response.status)) {
                 waking = true;
                 fire('waking', { active: true });
                 await sleep(RETRY_DELAYS[attempt]);

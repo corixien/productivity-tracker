@@ -126,7 +126,7 @@ Return ONLY the JSON.` },
                 }
             }
 
-            if (groqResponse.status === 429 && attempt < MAX_RETRIES) {
+            if ((groqResponse.status === 429 || groqResponse.status >= 500) && attempt < MAX_RETRIES) {
                 const waitTime = Math.pow(2, attempt) * 2000;
                 logger.warn(`GROQ rate limited, retrying in ${waitTime}ms`, { attempt: attempt + 1 });
                 await new Promise(resolve => setTimeout(resolve, waitTime));
