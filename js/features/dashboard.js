@@ -116,6 +116,7 @@ function taskCard(task, index) {
                 metaChip('clock', t('minutes', { n: task.duration })),
                 metaChip('star', t('productivityChip', { n: task.productivity || 0 }), 'chip-detail'),
                 metaChip('activity', t('difficultyChip', { n: task.difficulty || 3 }), 'chip-detail'),
+                task.money ? metaChip('sparkles', t('moneyChip', { n: task.money }), 'chip-accent chip-detail') : null,
                 task.bonus ? metaChip('sparkles', t('bonusChip', { n: task.bonus }), 'chip-accent chip-detail') : null,
                 done && task.completedAt ? metaChip('check', timeLabel(new Date(task.completedAt))) : null,
                 syncing ? metaChip('wifiOff', t('waitingSync'), 'chip-warn') : null

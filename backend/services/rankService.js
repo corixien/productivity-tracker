@@ -41,30 +41,37 @@ function getXpForNextRank(xp) {
 }
 
 // Task XP = (baseRate + productivity x difficulty) XP per hour of effective time.
-// Effective time: full up to 120 min, half weight for minutes 120-360, a quarter after that, so splitting
-// work into tiny tasks gains nothing and very long entries have diminishing returns. The bonus is capped
-// at 10% of the base so it cannot be farmed with tiny tasks. 0 productivity = 0 XP. Tasks under 10 minutes round
-// down (no rounding gain from spamming 1-minute tasks); longer productive tasks give at least 1 XP.
-const XP_FORMULA = { baseRate: 12, fullMinutes: 120, halfUntilMinutes: 360, bonusCap: 0.1, shortMinutes: 30, minPayMinutes: 10 };
+// Effective time follows a saturating exponential curve: the first minute is worth maxMinutes / tauMinutes (about
+// 1.15 effective minutes) and every further minute is worth exponentially less (e^(-t/tau)), so minute 1 is worth far
+// more than minute 100 or 200 and very long entries hit a ceiling of maxMinutes. The bonus is capped at 10% of the base.
+// 0 productivity = 0 XP. Tasks under 30 minutes round down; from 10 minutes a productive task gives at least 1 XP.
+const XP_FORMULA = { baseRate: 12, maxMinutes: 276, tauMinutes: 240, bonusCap: 0.1, shortMinutes: 30, minPayMinutes: 10 };
 
 function effectiveMinutes(duration) {
-    const { fullMinutes, halfUntilMinutes } = XP_FORMULA;
-    return Math.min(duration, fullMinutes)
-        + 0.5 * Math.min(Math.max(duration - fullMinutes, 0), halfUntilMinutes - fullMinutes)
-        + 0.25 * Math.max(duration - halfUntilMinutes, 0);
+    return XP_FORMULA.maxMinutes * (1 - Math.exp(-duration / XP_FORMULA.tauMinutes));
 }
 
-// Short tasks round down so that rounding cannot be farmed: a 10-minute p3d3 task is 3.5 XP, and twelve of them
-// would pay 48 instead of the 42 of one two-hour task. From shortMinutes on the rounding error is at most about 8%, and under 4% for typical tasks.
+// Money made (euros, slider 0-100, 100 = "100+"): a flat XP bonus by tier, not subject to the 10% bonus cap.
+// 1-9 EUR a tiny bonus, from 10 a bonus, from 50 a bigger one, from 100 the maximum.
+const MONEY_BONUS = { maxEuro: 100, tiers: [{ min: 100, xp: 10 }, { min: 50, xp: 6 }, { min: 10, xp: 3 }, { min: 1, xp: 1 }] };
+
+function calculateMoneyBonus(money) {
+    const euro = Math.min(Number(money) || 0, MONEY_BONUS.maxEuro);
+    const tier = MONEY_BONUS.tiers.find((entry) => euro >= entry.min);
+    return tier ? tier.xp : 0;
+}
+
+// Short tasks round down so that rounding cannot be farmed: a 10-minute p3d3 task pays its XP rounded down, many of
+// them would otherwise beat one longer task. From shortMinutes on the rounding error is small.
 function roundXp(total, duration) {
     if (duration >= XP_FORMULA.shortMinutes) return Math.max(1, Math.round(total));
     return duration >= XP_FORMULA.minPayMinutes ? Math.max(1, Math.floor(total)) : Math.floor(total);
 }
 
-function calculateXpFromTask(duration, productivity, difficulty, bonus = 0) {
+function calculateXpFromTask(duration, productivity, difficulty, bonus = 0, money = 0) {
     if (!productivity) return 0;
     const base = (XP_FORMULA.baseRate + productivity * difficulty) * effectiveMinutes(duration) / 60;
-    const total = base + Math.min(bonus, base * XP_FORMULA.bonusCap);
+    const total = base + Math.min(bonus, base * XP_FORMULA.bonusCap) + calculateMoneyBonus(money);
     return roundXp(total, duration);
 }
 
@@ -117,6 +124,7 @@ function getMeta() {
         goalBonus: { ...GOAL_BONUS },
         rankBonus: { ...RANK_BONUS },
         taskBonus: TASK_BONUS,
+        moneyBonus: { maxEuro: MONEY_BONUS.maxEuro, tiers: MONEY_BONUS.tiers.map((tier) => ({ ...tier })) },
         weeklyTrophy: { xp: WEEKLY_TROPHY.xp, minWeekXp: WEEKLY_TROPHY.minWeekXp, minPlayers: WEEKLY_TROPHY.minPlayers }
     };
 }
@@ -128,6 +136,8 @@ module.exports = {
     GOAL_BONUS,
     RANK_BONUS,
     TASK_BONUS,
+    MONEY_BONUS,
+    calculateMoneyBonus,
     WEEKLY_TROPHY,
     calculateGoalBonus,
     calculateRankBonus,

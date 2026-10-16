@@ -38,24 +38,28 @@ test('rank thresholds and levels', () => {
 
 test('task XP formula: (12 + productivity x difficulty) per hour, diminishing for long tasks', () => {
     assert.equal(rank.calculateXpFromTask(60, 4, 3, 0), 24);
-    assert.equal(rank.calculateXpFromTask(30, 4, 3, 0), 12);
+    assert.equal(rank.calculateXpFromTask(30, 4, 3, 0), 13);
     assert.equal(rank.calculateXpFromTask(30, 0, 3, 0), 0);
-    assert.equal(rank.calculateXpFromTask(60, 5, 5, 0), 37);
+    assert.equal(rank.calculateXpFromTask(60, 5, 5, 0), 38);
     assert.equal(rank.calculateXpFromTask(10, 1, 1, 0), 2);
     assert.equal(rank.calculateXpFromTask(15, 1, 1, 0), 3);
     assert.equal(rank.calculateXpFromTask(1, 5, 5, 0), 0, 'under 10 minutes rounds down');
-    // 3 h: 120 full + 60 min at half weight = 150 effective minutes
-    assert.equal(rank.calculateXpFromTask(180, 5, 4, 0), 80);
+    // 3 h: 276 x (1 - e^(-180/240)) = 146 effective minutes
+    assert.equal(rank.calculateXpFromTask(180, 5, 4, 0), 78);
+    // each further minute is worth exponentially less: the first hour pays far more than the third
+    const hour = (n) => rank.calculateXpFromTask(60 * n, 5, 5, 0) - rank.calculateXpFromTask(60 * (n - 1), 5, 5, 0);
+    assert.ok(hour(1) > hour(2) && hour(2) > hour(3) && hour(3) > hour(4));
+    assert.ok(hour(1) > 1.5 * hour(3), 'the first hour is worth over 1.5x the third');
 });
 
 test('task XP cannot be farmed by splitting or padding', () => {
     const whole = rank.calculateXpFromTask(60, 5, 5, 3);
     const split = 12 * rank.calculateXpFromTask(5, 5, 5, 3);
-    assert.ok(split <= whole + 6, `12 five-minute tasks (${split}) must not beat one hour (${whole})`);
+    assert.ok(split <= whole, `12 five-minute tasks (${split}) must not beat one hour (${whole})`);
     assert.ok(rank.calculateXpFromTask(1440, 1, 1, 0) < 150, 'a 24 h low-value entry stays small');
     assert.ok(60 * rank.calculateXpFromTask(1, 5, 5, 3) <= whole, 'sixty one-minute tasks must not beat one hour');
     // the bonus is capped at 10% of the base
-    assert.equal(rank.calculateXpFromTask(60, 4, 3, 3), 26);
+    assert.equal(rank.calculateXpFromTask(60, 4, 3, 3), 27);
     assert.equal(rank.calculateXpFromTask(5, 4, 3, 3), 2);
 });
 
@@ -207,7 +211,7 @@ test('task XP never decreases with duration, productivity or difficulty', () => 
     }
 });
 
-test('splitting work into several tasks gains at most the rounding error', () => {
+test('splitting work into several tasks gains a bounded amount (concave time curve)', () => {
     let worst = 0;
     for (let p = 1; p <= 5; p += 1) {
         for (let d = 1; d <= 5; d += 1) {
@@ -220,7 +224,8 @@ test('splitting work into several tasks gains at most the rounding error', () =>
             }
         }
     }
-    assert.ok(worst <= 1.08, `split gain ${worst}`);
+    // the time curve is concave on purpose, so splitting gains a little; shortMinutes rounding keeps it bounded
+    assert.ok(worst <= 1.3, `split gain ${worst}`);
     // tasks under 30 minutes round down, so a 10-minute p3d3 task (3.5 XP) pays 3
     assert.equal(rank.calculateXpFromTask(10, 3, 3), 3);
     assert.equal(rank.calculateXpFromTask(10, 1, 1), 2);
@@ -289,4 +294,17 @@ test('rank-up bonus is 1% of the rank threshold, at most 100', () => {
     assert.deepEqual(bonuses, { Newcomer: 0, Bronze: 4, Silver: 11, Gold: 22, Platinum: 43, Diamond: 86, Master: 100 });
     assert.equal(rank.calculateRankBonus('Nonsense'), 0);
     assert.equal(rank.WEEKLY_TROPHY.xp, 50);
+});
+
+test('money made pays a tiered XP bonus, 100 EUR is the maximum', () => {
+    assert.equal(rank.calculateMoneyBonus(0), 0);
+    assert.equal(rank.calculateMoneyBonus(9), 1);
+    assert.equal(rank.calculateMoneyBonus(10), 3);
+    assert.equal(rank.calculateMoneyBonus(49), 3);
+    assert.equal(rank.calculateMoneyBonus(50), 6);
+    assert.equal(rank.calculateMoneyBonus(100), 10);
+    assert.equal(rank.calculateMoneyBonus(5000), 10);
+    const base = rank.calculateXpFromTask(60, 4, 3, 0, 0);
+    assert.equal(rank.calculateXpFromTask(60, 4, 3, 0, 100), base + 10);
+    assert.equal(rank.calculateXpFromTask(60, 0, 3, 0, 100), 0, 'no productivity = no XP, also with money');
 });

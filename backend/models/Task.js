@@ -19,6 +19,7 @@ function normalizeTask(task) {
         productivity: task.productivity,
         difficulty: task.difficulty,
         bonus: task.bonus,
+        money: task.money || 0,
         category: task.category,
         completed: task.completed,
         createdAt: task.created_at,
@@ -31,12 +32,13 @@ async function create(userId, taskData, db = defaultDb) {
     const productivity = Number(taskData.productivity || 0);
     const difficulty = Number(taskData.difficulty || 3);
     const bonus = Number(taskData.bonus || 0);
-    const xp = calculateXpFromTask(Number(taskData.duration), productivity, difficulty, bonus);
+    const money = Number(taskData.money || 0);
+    const xp = calculateXpFromTask(Number(taskData.duration), productivity, difficulty, bonus, money);
     const result = await db.query(
-        `INSERT INTO tasks (user_id, name, xp_awarded, duration, productivity, difficulty, category, bonus, completed, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false, NOW())
+        `INSERT INTO tasks (user_id, name, xp_awarded, duration, productivity, difficulty, category, bonus, money, completed, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false, NOW())
          RETURNING *`,
-        [userId, name, xp, Number(taskData.duration), productivity, difficulty, taskData.category || 'other', bonus]
+        [userId, name, xp, Number(taskData.duration), productivity, difficulty, taskData.category || 'other', bonus, money]
     );
     const task = normalizeTask(result.rows[0]);
     await logActivity({
@@ -118,8 +120,8 @@ async function lockUser(client, userId) {
     await client.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [userId]);
 }
 
-const EDITABLE_FIELDS = ['name', 'duration', 'productivity', 'difficulty', 'category', 'bonus'];
-const XP_FIELDS = ['duration', 'productivity', 'difficulty', 'bonus'];
+const EDITABLE_FIELDS = ['name', 'duration', 'productivity', 'difficulty', 'category', 'bonus', 'money'];
+const XP_FIELDS = ['duration', 'productivity', 'difficulty', 'bonus', 'money'];
 
 // Edits a task. XP is recomputed when an XP input changes; for completed tasks the
 // difference is booked as a 'task_edit' xp_history row, keeping the multiplier used at completion.
@@ -136,14 +138,14 @@ async function update(userId, id, updates, tz) {
         }
         const xpInputsChanged = XP_FIELDS.some((field) => updates[field] !== undefined && Number(updates[field]) !== Number(task[field]));
         const newXp = xpInputsChanged
-            ? calculateXpFromTask(Number(next.duration), Number(next.productivity), Number(next.difficulty), Number(next.bonus))
+            ? calculateXpFromTask(Number(next.duration), Number(next.productivity), Number(next.difficulty), Number(next.bonus), Number(next.money))
             : task.xp_awarded;
 
         const updated = await client.query(
             `UPDATE tasks SET name = $1, duration = $2, productivity = $3, difficulty = $4,
-                 category = $5, bonus = $6, xp_awarded = $7, updated_at = NOW()
-             WHERE id = $8 RETURNING *`,
-            [next.name, next.duration, next.productivity, next.difficulty, next.category, next.bonus, newXp, id]
+                 category = $5, bonus = $6, money = $7, xp_awarded = $8, updated_at = NOW()
+             WHERE id = $9 RETURNING *`,
+            [next.name, next.duration, next.productivity, next.difficulty, next.category, next.bonus, next.money, newXp, id]
         );
 
         let xpChange = 0;
@@ -293,7 +295,7 @@ async function getXpHistory(userId, options = {}) {
 // Completed tasks, newest first, with the XP they actually paid (task rows of xp_history, multiplier included).
 async function getCompletedWithXp(userId, limit = 500) {
     const result = await query(
-        `SELECT t.id, t.name, t.category, t.duration, t.productivity, t.difficulty, t.bonus, t.completed_at,
+        `SELECT t.id, t.name, t.category, t.duration, t.productivity, t.difficulty, t.bonus, t.money, t.completed_at,
                 COALESCE((SELECT SUM(h.xp_amount) FROM xp_history h
                           WHERE h.user_id = t.user_id AND h.source_id = t.id
                             AND h.source IN ('task', 'task_uncomplete', 'task_edit')), 0)::int AS xp
@@ -311,6 +313,7 @@ async function getCompletedWithXp(userId, limit = 500) {
         productivity: row.productivity,
         difficulty: row.difficulty,
         bonus: row.bonus,
+        money: row.money,
         xp: Math.max(0, row.xp),
         completedAt: row.completed_at
     }));

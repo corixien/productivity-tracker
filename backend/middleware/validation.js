@@ -1,6 +1,7 @@
 const { validateUsername, validatePassword, validateTaskName, validateDuration, validateProductivity, validateDifficulty, validateCategory, validateLanguage, sanitizeString } = require('../utils/validation');
 
 const MAX_BONUS = 100;
+const MAX_MONEY = 100;
 
 function validateRegister(req, res, next) {
     const usernameValidation = validateUsername(req.body.username);
@@ -84,6 +85,16 @@ function validateTaskCreate(req, res, next) {
     } else {
         req.body.bonus = 0;
     }
+
+    if (req.body.money !== undefined) {
+        const money = parseInt(req.body.money, 10);
+        if (isNaN(money) || money < 0 || money > MAX_MONEY) {
+            return res.status(400).json({ success: false, error: `Money must be between 0 and ${MAX_MONEY}` });
+        }
+        req.body.money = money;
+    } else {
+        req.body.money = 0;
+    }
     
     req.body.name = nameValidation.value;
     req.body.duration = durationValidation.value;
@@ -137,6 +148,14 @@ function validateTaskUpdate(req, res, next) {
             return res.status(400).json({ success: false, error: `Bonus must be between 0 and ${MAX_BONUS}` });
         }
         req.body.bonus = bonus;
+    }
+
+    if (req.body.money !== undefined) {
+        const money = parseInt(req.body.money, 10);
+        if (isNaN(money) || money < 0 || money > MAX_MONEY) {
+            return res.status(400).json({ success: false, error: `Money must be between 0 and ${MAX_MONEY}` });
+        }
+        req.body.money = money;
     }
     
     if (req.body.completed !== undefined) {

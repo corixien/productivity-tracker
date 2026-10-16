@@ -1,7 +1,7 @@
 const Task = require('../models/Task');
 const { asyncHandler, notFound } = require('../utils/errors');
 
-const EDIT_FIELDS = ['name', 'duration', 'productivity', 'difficulty', 'category', 'bonus'];
+const EDIT_FIELDS = ['name', 'duration', 'productivity', 'difficulty', 'category', 'bonus', 'money'];
 
 const getTasks = asyncHandler(async (req, res) => {
     const { completed, limit, offset } = req.query;

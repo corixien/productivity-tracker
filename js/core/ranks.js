@@ -24,7 +24,7 @@ const BADGES = {
 
 const ranks = () => (state.meta && state.meta.ranks) || FALLBACK_RANKS;
 const xpPerLevel = () => (state.meta && state.meta.xpPerLevel) || 100;
-const FALLBACK_FORMULA = { baseRate: 12, fullMinutes: 120, halfUntilMinutes: 360, bonusCap: 0.1, shortMinutes: 30, minPayMinutes: 10 };
+const FALLBACK_FORMULA = { baseRate: 12, maxMinutes: 276, tauMinutes: 240, bonusCap: 0.1, shortMinutes: 30, minPayMinutes: 10 };
 const formula = () => (state.meta && state.meta.xpFormula && state.meta.xpFormula.baseRate ? state.meta.xpFormula : FALLBACK_FORMULA);
 
 function getRankInfo(xp) {
@@ -51,16 +51,24 @@ const badgeUrl = (rank) => `Badges/${BADGES[rank] || 'newcomer'}.png`;
 const rankKey = (rank) => `rank${rank}`;
 
 // Same formula as the server (rankService.calculateXpFromTask); the server stays the source of truth.
-function calculateXp(duration, productivity, difficulty, bonus = 0) {
+function calculateXp(duration, productivity, difficulty, bonus = 0, money = 0) {
     if (!productivity) return 0;
     const f = formula();
-    const effective = Math.min(duration, f.fullMinutes)
-        + 0.5 * Math.min(Math.max(duration - f.fullMinutes, 0), f.halfUntilMinutes - f.fullMinutes)
-        + 0.25 * Math.max(duration - f.halfUntilMinutes, 0);
+    const effective = f.maxMinutes * (1 - Math.exp(-duration / f.tauMinutes));
     const base = (f.baseRate + productivity * difficulty) * effective / 60;
-    const total = base + Math.min(bonus, base * f.bonusCap);
+    const total = base + Math.min(bonus, base * f.bonusCap) + moneyBonus(money);
     if (duration >= f.shortMinutes) return Math.max(1, Math.round(total));
     return duration >= (f.minPayMinutes ?? 10) ? Math.max(1, Math.floor(total)) : Math.floor(total);
+}
+
+const FALLBACK_MONEY = { maxEuro: 100, tiers: [{ min: 100, xp: 10 }, { min: 50, xp: 6 }, { min: 10, xp: 3 }, { min: 1, xp: 1 }] };
+
+// Same as the server (rankService.calculateMoneyBonus): tiered XP bonus for money made.
+function moneyBonus(money) {
+    const config = (state.meta && state.meta.moneyBonus) || FALLBACK_MONEY;
+    const euro = Math.min(Number(money) || 0, config.maxEuro);
+    const tier = config.tiers.find((entry) => euro >= entry.min);
+    return tier ? tier.xp : 0;
 }
 
 const FALLBACK_GOAL_BONUS = { rate: 0.1, min: 1, max: 100 };
@@ -76,4 +84,4 @@ function goalBonus(goal) {
 
 const rankNames = () => ranks().map((rank) => rank.name);
 
-export { rankNames, getRankInfo, getNextRank, getProgress, getLevel, badgeUrl, rankKey, calculateXp, goalBonus, trophyXp };
+export { rankNames, getRankInfo, getNextRank, getProgress, getLevel, badgeUrl, rankKey, calculateXp, moneyBonus, goalBonus, trophyXp };

@@ -2,7 +2,7 @@
 
 > Instruction for Claude: read this whole file first. Then read every file under "Must read before any change". Do not modify anything until you have fully understood the project. Keep this file updated as you work (see "Maintenance rules").
 
-Last updated: 2026-10-06
+Last updated: 2026-10-16
 
 ## 1. What this project is
 Productivity Tracker: web app where friends compete on productivity. Users log tasks (AI-rated via Groq or manual), complete them for server-computed XP, keep streaks, climb ranks, compare on a leaderboard. EN/DE, dark/light, installable PWA, admin area. Stack: Express 4 + Neon Postgres (CommonJS backend), vanilla ES-module SPA, no build step. Deploy: Render free tier (push to `main` deploys and migrates). Owner: Mateo Rettenberger.
@@ -16,7 +16,7 @@ Productivity Tracker: web app where friends compete on productivity. Users log t
 ## 3. How to navigate
 - `backend/` routes -> middleware -> controllers -> models -> `utils/database`; `services/` (rankService, groqService, loggingService, adminService...).
 - `js/` : `app.js`, `core/` (api, state, i18n, dom, ui, glass, segmented), `features/` (one module per view, `admin/`).
-- `css/` : fonts, tokens, base, components, layout, views. `sw.js` service worker. `database/migrations/` (next = 020).
+- `css/` : fonts, tokens, base, components, layout, views. `sw.js` service worker. `database/migrations/` (next = 021).
 - Lookup: XP/ranks `backend/services/rankService.js`; XP writes `models/Task.js` (`syncUserTotals`); AI `backend/services/groqService.js`; streak/activity UI `js/features/streak.js`; admin charts `js/features/admin/analytics.js` + `js/features/charts.js`; account dialog `js/features/settings.js` + `index.html`; toasts/dialogs `js/core/ui.js` + `css/components.css`; strings `js/core/i18n.js` (EN and DE both).
 
 ## 4. Commands
@@ -24,7 +24,7 @@ Run from `/home/mateo/productivity-tracker`. `npm run check`, `npm test` (integr
 
 ## 5. Invariants and gotchas
 - Never write `users.xp` directly; use `Task.syncUserTotals` in a transaction.
-- Strict CSP: no inline script/style/handlers; styles via CSSOM. New css/js files go into `SHELL` in `sw.js`; bump `VERSION` (now `v18`).
+- Strict CSP: no inline script/style/handlers; styles via CSSOM. New css/js files go into `SHELL` in `sw.js`; bump `VERSION` (now `v20`).
 - New UI text needs `en` and `de`. DB change = new migration, never edit applied ones.
 - Never print `.env`, remote URL (embeds PAT), `~/.config/opencode/opencode.json`. Reads of the production Neon DB are blocked by the auto-mode classifier; do not work around.
 - Env values must not contain `<>` placeholders. Leave `GROQ_MODEL` unset (default `llama-3.3-70b-versatile`); a 404 triggers auto-pick from Groq `/models`.
@@ -36,6 +36,7 @@ Run from `/home/mateo/productivity-tracker`. `npm run check`, `npm test` (integr
 - Goal of the current task: none open. Last session delivered the batch below.
 
 ### Done
+- [x] 2026-10-16 XP time curve now exponential `276*(1-e^(-min/240))` (first minute worth most, splitting gains up to ~28%); Money made slider (0-100 EUR, `tasks.money`, migration 020, tier bonus +1/+3/+6/+10 XP); sw.js `v20`
 - [x] 2026-10-06 friend profile page: click a leaderboard entry -> `#/profile/<name>` (`js/features/profile.js`, `GET /api/users/:username/profile`, friends/self only), header with name card and rank hero card side by side, sections profile, activity stats, first place streaks, searchable completed task list; `sw.js` `v13`; integration test added. Account cleanup on production done by the owner.
 - [x] 2026-10-04 fixed lockout after deleting all users: reserved ADMIN_USERNAMES names can be registered again while no admin exists (and the registrant becomes admin)
 - [x] 2026-10-04 accounts on production were deleted by the owner; test accounts are gone

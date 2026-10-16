@@ -415,6 +415,11 @@
                     <label for="task-difficulty"><span data-i18n="difficulty">Difficulty</span> <output id="task-difficulty-out" for="task-difficulty">3</output>/5</label>
                     <input type="range" id="task-difficulty" min="1" max="5" value="3" class="slider">
                 </div>
+                <div class="field">
+                    <label for="task-money"><span data-i18n="money">Money made</span> <output id="task-money-out" for="task-money">0</output></label>
+                    <input type="range" id="task-money" min="0" max="100" value="0" class="slider">
+                    <p class="hint" id="task-money-hint"></p>
+                </div>
                 <label class="check">
                     <input type="checkbox" id="task-bonus">
                     <span data-i18n="bonus">Bonus: offline or with friends (+3 XP)</span>

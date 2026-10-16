@@ -2,7 +2,7 @@ import { api } from '../core/api.js';
 import { state } from '../core/state.js';
 import { h, $, swapIn, setBusy } from '../core/dom.js';
 import { t, onLanguageChange, getCurrentLang } from '../core/i18n.js';
-import { calculateXp } from '../core/ranks.js';
+import { calculateXp, moneyBonus } from '../core/ranks.js';
 import { refreshCore, loadTemplates } from '../core/data.js';
 import { refreshUser } from '../core/auth.js';
 import { toast, openDialog, closeDialog, showError } from '../core/ui.js';
@@ -51,6 +51,7 @@ function readForm() {
         category: $('#task-category').value,
         productivity: parseInt($('#task-productivity').value, 10),
         difficulty: parseInt($('#task-difficulty').value, 10),
+        money: parseInt($('#task-money').value, 10) || 0,
         // Keep unusual stored bonus values (not 0/3) unless the checkbox was changed.
         bonus: bonusChecked ? (originalBonus > 0 ? originalBonus : BONUS_VALUE) : 0
     };
@@ -58,13 +59,15 @@ function readForm() {
 
 function updatePreview() {
     const values = readForm();
-    ['#task-productivity', '#task-difficulty'].forEach((selector) => setSliderFill($(selector)));
+    ['#task-productivity', '#task-difficulty', '#task-money'].forEach((selector) => setSliderFill($(selector)));
     $('#task-productivity-out').textContent = values.productivity;
     $('#task-difficulty-out').textContent = values.difficulty;
+    $('#task-money-out').textContent = values.money >= 100 ? '100+ EUR' : `${values.money} EUR`;
+    $('#task-money-hint').textContent = values.money > 0 ? t('moneyHint', { n: moneyBonus(values.money) }) : t('moneyHintNone');
     $('#task-productivity-hint').textContent = values.productivity === 0 ? t('productivityZero') : '';
 
     const duration = Number.isFinite(values.duration) ? values.duration : 0;
-    const base = calculateXp(duration, values.productivity, values.difficulty, values.bonus);
+    const base = calculateXp(duration, values.productivity, values.difficulty, values.bonus, values.money);
     const multiplier = Number(state.user && state.user.multiplier) || 1;
     const showMultiplier = !(mode === 'edit' && editing && editing.completed) && Math.abs(multiplier - 1) > 0.004;
     const final = showMultiplier ? Math.round(base * multiplier) : base;
@@ -80,6 +83,7 @@ function fillForm(values) {
     $('#task-category').value = CATEGORY_KEYS[values.category] ? values.category : 'other';
     $('#task-productivity').value = values.productivity ?? 3;
     $('#task-difficulty').value = values.difficulty ?? 3;
+    $('#task-money').value = values.money || 0;
     originalBonus = values.bonus || 0;
     $('#task-bonus').checked = originalBonus > 0;
     updatePreview();
@@ -150,7 +154,7 @@ async function rateWithAi() {
 
 function manualEntry() {
     const description = $('#ai-input').value.trim();
-    fillForm({ name: description.slice(0, 200), duration: 30, category: 'other', productivity: 3, difficulty: 3, bonus: 0 });
+    fillForm({ name: description.slice(0, 200), duration: 30, category: 'other', productivity: 3, difficulty: 3, bonus: 0, money: 0 });
     enterForm();
 }
 
