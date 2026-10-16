@@ -1,5 +1,5 @@
 // Service worker: makes the app shell load offline. API calls are never cached.
-const VERSION = 'v20';
+const VERSION = 'v21';
 const SHELL_CACHE = `pt-shell-${VERSION}`;
 const RUNTIME_CACHE = `pt-runtime-${VERSION}`;
 
@@ -110,6 +110,11 @@ self.addEventListener('fetch', (event) => {
 
     if (request.mode === 'navigate') {
         event.respondWith(networkFirst(new Request('/'), '/offline.html'));
+        return;
+    }
+    // Code must match the HTML it belongs to: stale-while-revalidate served old scripts next to a new index.html.
+    if (/\.(js|css)$/.test(url.pathname)) {
+        event.respondWith(networkFirst(request, '/offline.html'));
         return;
     }
     event.respondWith(staleWhileRevalidate(request));
