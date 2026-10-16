@@ -1,7 +1,7 @@
 /* Liquid glass. Surfaces get depth from layered gradients, a bright top edge and a chromatic rim
    (blue on the left, pink on the right) that fakes refraction at the glass edge. All of that is
    plain painting. Real backdrop blur is reserved for the few surfaces that sit over moving content. */
-.card, .sidebar, .tabbar, .stat, .task-card, .history-items, .board-row, .podium-spot, .user-mini, .segmented, .toast, .banner, .ice-panel {
+.card, .sidebar, .tabbar, .stat, .task-card, .history-items, .board-row, .user-mini, .segmented, .toast, .banner, .ice-panel {
     background: var(--glass-bg-soft);
     border: 1px solid var(--glass-border);
     box-shadow: var(--glass-shadow);

@@ -12,7 +12,7 @@ let loaded = false;
 const scoreOf = (entry) => (period === 'week' ? entry.weekXp : entry.xp);
 const displayName = (entry) => (entry.isSelf ? `${entry.username} (${t('you')})` : entry.username);
 
-// Whole row or podium spot opens the profile page; the remove button keeps its own click.
+// Whole row opens the profile page; the remove button keeps its own click.
 function makeOpenable(el, entry) {
     const open = () => { location.hash = profileHash(entry.username); };
     el.classList.add('is-link');
@@ -33,18 +33,6 @@ function removeButton(entry) {
         'aria-label': t('removeFriendLabel', { name: entry.username }), title: t('remove'),
         onClick: () => removeFriend(entry)
     }, icon('close'));
-}
-
-function podiumSpot(entry, index) {
-    const place = index + 1;
-    return makeOpenable(h('div', { class: `podium-spot ${['is-first', 'is-second', 'is-third'][index]}${entry.isSelf ? ' is-self' : ''}`, dataset: { rank: entry.rank } },
-        h('span', { class: 'podium-place' }, `#${place}`),
-        avatarEl(entry, 'xl'),
-        h('span', { class: 'podium-name' }, displayName(entry)),
-        h('img', { class: 'rank-img', src: badgeUrl(entry.rank), alt: t(rankKey(entry.rank)), width: 40, height: 40 }),
-        h('span', { class: 'podium-score' }, `${formatNumber(scoreOf(entry))} ${t('xpUnit')}`),
-        removeButton(entry)
-    ), entry);
 }
 
 // Same order as the server query: score descending, then name. Lets the period switch re-rank instantly.
@@ -70,21 +58,15 @@ function render() {
     $$('#period-tabs [data-period]').forEach((button) => {
         button.setAttribute('aria-pressed', String(button.dataset.period === period));
     });
-    const podium = $('#podium');
     const list = $('#leaderboard-list');
 
     if (!loaded) {
-        podium.replaceChildren();
         list.replaceChildren(...skeletonList(4));
         return;
     }
 
     $('#trophy-hint').textContent = t('trophyHint', { n: trophyXp() });
-    const showPodium = entries.length >= 3;
-    podium.replaceChildren(...(showPodium ? entries.slice(0, 3).map(podiumSpot) : []));
-    const rest = showPodium ? entries.slice(3) : entries;
-    const offset = showPodium ? 3 : 0;
-    const rows = rest.map((entry, i) => boardRow(entry, i + offset));
+    const rows = entries.map(boardRow);
     if (entries.length < 2) {
         rows.unshift(emptyState('userPlus', t('noFriendsTitle'), t('noFriendsText'),
             h('button', { type: 'button', class: 'btn btn-primary', onClick: openFriendDialog }, icon('userPlus'), t('addFriend'))));
@@ -99,7 +81,7 @@ async function load() {
         sortEntries();
         loaded = true;
         render();
-        if (fresh) { swapIn($('#podium')); swapIn($('#leaderboard-list')); }
+        if (fresh) swapIn($('#leaderboard-list'));
     } catch (error) {
         showError(error);
     }
@@ -158,7 +140,6 @@ function initLeaderboard() {
                 // Both scores are already here: re-rank right away so the content moves with the lens, then refresh quietly.
                 sortEntries();
                 render();
-                swapIn($('#podium'));
                 swapIn($('#leaderboard-list'));
             } else {
                 render();
