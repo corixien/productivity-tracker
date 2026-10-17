@@ -2,7 +2,7 @@
 
 > Instruction for Claude: read this whole file first. Then read every file under "Must read before any change". Do not modify anything until you have fully understood the project. Keep this file updated as you work (see "Maintenance rules").
 
-Last updated: 2026-10-16
+Last updated: 2026-10-17
 
 ## 1. What this project is
 Productivity Tracker: web app where friends compete on productivity. Users log tasks (AI-rated via Groq or manual), complete them for server-computed XP, keep streaks, climb ranks, compare on a leaderboard. EN/DE, dark/light, installable PWA, admin area. Stack: Express 4 + Neon Postgres (CommonJS backend), vanilla ES-module SPA, no build step. Deploy: Render free tier (push to `main` deploys and migrates). Owner: Mateo Rettenberger.
@@ -24,19 +24,21 @@ Run from `/home/mateo/productivity-tracker`. `npm run check`, `npm test` (integr
 
 ## 5. Invariants and gotchas
 - Never write `users.xp` directly; use `Task.syncUserTotals` in a transaction.
-- Strict CSP: no inline script/style/handlers; styles via CSSOM. New css/js files go into `SHELL` in `sw.js`; bump `VERSION` (now `v20`).
+- Strict CSP: no inline script/style/handlers; styles via CSSOM. New css/js files go into `SHELL` in `sw.js`; bump `VERSION` (now `v22`).
 - New UI text needs `en` and `de`. DB change = new migration, never edit applied ones.
 - Never print `.env`, remote URL (embeds PAT), `~/.config/opencode/opencode.json`. Reads of the production Neon DB are blocked by the auto-mode classifier; do not work around.
 - Env values must not contain `<>` placeholders. Leave `GROQ_MODEL` unset (default `llama-3.3-70b-versatile`); a 404 triggers auto-pick from Groq `/models`.
 - Mobile breakpoints: 960px (dock, toasts 2.5 s at top), 640px (dialogs open from top), 560px (bar values hidden).
 
 ## 6. Current state
-- Branch / last commit: `main`, see `git log` (pushed after the 2026-10-04 test pass).
+- Branch / last commit: `main`, see `git log` (all work pushed; last: leaderboard list, `5b5dd00`).
 - Working tree: clean after push.
 - Goal of the current task: none open. Last session delivered the batch below.
 
 ### Done
 - [x] 2026-10-16 XP time curve now exponential `276*(1-e^(-min/240))` (first minute worth most, splitting gains up to ~28%); Money made slider (0-100 EUR, `tasks.money`, migration 020, tier bonus +1/+3/+6/+10 XP); sw.js `v20`
+- [x] 2026-10-16 fix: money slider showed 0 because the service worker served stale JS next to fresh HTML; `sw.js` now loads js/css network-first (`v21`)
+- [x] 2026-10-16 leaderboard is one plain list, podium removed (`v22`)
 - [x] 2026-10-06 friend profile page: click a leaderboard entry -> `#/profile/<name>` (`js/features/profile.js`, `GET /api/users/:username/profile`, friends/self only), header with name card and rank hero card side by side, sections profile, activity stats, first place streaks, searchable completed task list; `sw.js` `v13`; integration test added. Account cleanup on production done by the owner.
 - [x] 2026-10-04 fixed lockout after deleting all users: reserved ADMIN_USERNAMES names can be registered again while no admin exists (and the registrant becomes admin)
 - [x] 2026-10-04 accounts on production were deleted by the owner; test accounts are gone
@@ -65,6 +67,7 @@ Run from `/home/mateo/productivity-tracker`. `npm run check`, `npm test` (integr
 - None.
 
 ## 7. Decisions log
+- 2026-10-16 - XP time value is a saturating exponential (user wish: minute 1 worth far more than minute 100/200); side effect: splitting into several tasks gains up to ~28% (accepted, test bound 1.3). Money bonus tiers +1/+3/+6/+10 XP chosen by Claude, not capped at 10%; templates and AI rating do not carry money.
 - 2026-10-03 - removed `response_format: json_object` from Groq call - not all models support it; prompt + parser suffice.
 - 2026-10-03 - toasts kept on phones (top, 2.5 s) after user asked to restore them.
 
